@@ -1,0 +1,222 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String
+  industry  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users              User[]
+  products           Product[]
+  inventory          InventoryLedger[]
+  batches            Batch[]
+  purchaseOrders     PurchaseOrder[]
+  pickLists          PickList[]
+  
+  // Transfer orders involve two companies
+  transferOrdersOut  TransferOrder[] @relation("SourceCompany")
+  transferOrdersIn   TransferOrder[] @relation("DestCompany")
+  
+  salesOrders        SalesOrder[]
+  notifications      Notification[]
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   // SUPER_ADMIN, WAREHOUSE_MANAGER, INVENTORY_CLERK, CLIENT
+  status    String   @default("ACTIVE")
+  companyId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company? @relation(fields: [companyId], references: [id])
+  auditLogs AuditLog[]
+  notifications Notification[]
+}
+
+model Client {
+  id          String   @id @default(uuid())
+  name        String
+  creditLimit Float    @default(0.0)
+  tier        String   @default("STANDARD")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  salesOrders SalesOrder[]
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  event     String
+  userId    String?
+  ipAddress String?
+  timestamp DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model SystemSettings {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id             String   @id @default(uuid())
+  sku            String   
+  name           String
+  category       String
+  unitCost       Float    @default(0.0)
+  wholesalePrice Float    @default(0.0)
+  availableStock Int      @default(0)
+  committedStock Int      @default(0)
+  companyId      String
+  status         String   @default("ACTIVE")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company        Company  @relation(fields: [companyId], references: [id])
+  inventory      InventoryLedger[]
+  batches        Batch[]
+  transferOrders TransferOrder[]
+  pickListItems  PickListItem[]
+  salesOrderItems SalesOrderItem[]
+}
+
+model InventoryLedger {
+  id            String   @id @default(uuid())
+  productId     String
+  companyId     String
+  location      String
+  quantityDelta Int      // Positive for IN, Negative for OUT
+  movementType  String   // e.g., PO_RECEIPT, TRANSFER, ADJUSTMENT, PICK
+  timestamp     DateTime @default(now())
+
+  product       Product  @relation(fields: [productId], references: [id])
+  company       Company  @relation(fields: [companyId], references: [id])
+}
+
+model Batch {
+  id                String   @id @default(uuid())
+  lotId             String
+  productId         String
+  companyId         String
+  mfgDate           DateTime?
+  expiryDate        DateTime?
+  quarantine        Boolean  @default(false)
+  coaLocked         Boolean  @default(true)
+  testCertificateId String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  product           Product  @relation(fields: [productId], references: [id])
+  company           Company  @relation(fields: [companyId], references: [id])
+  pickListItems     PickListItem[]
+}
+
+model PurchaseOrder {
+  id               String   @id @default(uuid())
+  supplier         String
+  expectedDelivery DateTime?
+  totalCost        Float    @default(0.0)
+  status           String   @default("PENDING") // PENDING, APPROVED, RECEIVED
+  companyId        String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company          Company  @relation(fields: [companyId], references: [id])
+}
+
+model TransferOrder {
+  id                   String   @id @default(uuid())
+  sourceCompanyId      String
+  destinationCompanyId String
+  productId            String
+  quantity             Int
+  status               String   @default("PENDING") // PENDING, DISPATCHED, RECEIVED
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  sourceCompany        Company  @relation("SourceCompany", fields: [sourceCompanyId], references: [id])
+  destinationCompany   Company  @relation("DestCompany", fields: [destinationCompanyId], references: [id])
+  product              Product  @relation(fields: [productId], references: [id])
+}
+
+model PickList {
+  id        String   @id @default(uuid())
+  orderId   String   // Can be related to a SalesOrder in Phase 3
+  status    String   @default("PENDING") // PENDING, PICKING, COMPLETED
+  companyId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company  @relation(fields: [companyId], references: [id])
+  items     PickListItem[]
+}
+
+model PickListItem {
+  id             String   @id @default(uuid())
+  pickListId     String
+  productId      String
+  batchId        String?
+  binLocation    String
+  targetQuantity Int
+  pickedQuantity Int      @default(0)
+  picked         Boolean  @default(false)
+
+  pickList       PickList @relation(fields: [pickListId], references: [id])
+  product        Product  @relation(fields: [productId], references: [id])
+  batch          Batch?   @relation(fields: [batchId], references: [id])
+}
+
+// Phase 3 Models
+
+model SalesOrder {
+  id              String   @id @default(uuid())
+  clientId        String
+  companyId       String
+  status          String   @default("PENDING_REVIEW") // PENDING_REVIEW, PICKING, REJECTED, COMPLETED
+  rejectionReason String?
+  totalCost       Float    @default(0.0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  client          Client   @relation(fields: [clientId], references: [id])
+  company         Company  @relation(fields: [companyId], references: [id])
+  items           SalesOrderItem[]
+}
+
+model SalesOrderItem {
+  id           String   @id @default(uuid())
+  salesOrderId String
+  productId    String
+  quantity     Int
+
+  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id])
+  product      Product    @relation(fields: [productId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String?  // Nullable if sending to all admins of a company
+  companyId String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id])
+  company   Company  @relation(fields: [companyId], references: [id])
+}

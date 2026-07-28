@@ -1,0 +1,139 @@
+const prisma = require('../../utils/prisma');
+const NotificationService = require('../../utils/notification.service');
+
+const getSalesOrders = async (req, res) => {
+  try {
+    const orders = await prisma.salesOrder.findMany({
+      where: { companyId: req.user.companyId },
+      include: {
+        items: { include: { product: true } },
+        client: { select: { name: true, tier: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(orders);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+const approveSalesOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const order = await prisma.salesOrder.findFirst({
+      where: { id, companyId: req.user.companyId },
+      include: { items: true }
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: 'Sales order not found' });
+    }
+
+    if (order.status !== 'PENDING_REVIEW') {
+      return res.status(400).json({ message: 'Order is not in a pending state' });
+    }
+
+    // Wrap in transaction to ensure stock is reserved safely
+    await prisma.$transaction(async (tx) => {
+      // 1. Verify stock for all items first
+      for (const item of order.items) {
+        const product = await tx.product.findUnique({ where: { id: item.productId } });
+        if (product.availableStock < item.quantity) {
+          throw new Error(`Insufficient stock for product ${product.sku}`);
+        }
+      }
+
+      // 2. Deduct available, increment committed
+      for (const item of order.items) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: {
+            availableStock: { decrement: item.quantity },
+            committedStock: { increment: item.quantity }
+          }
+        });
+      }
+
+      // 3. Update order status
+      await tx.salesOrder.update({
+        where: { id },
+        data: { status: 'PICKING' }
+      });
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        event: 'SALES_ORDER_APPROVED',
+        userId: req.user.id,
+        ipAddress: req.ip
+      }
+    });
+
+    // Notify Client
+    await NotificationService.send({
+      title: 'Order Approved',
+      message: `Your order (${order.id}) has been approved and is now being picked.`,
+      companyId: req.user.companyId
+    });
+
+    res.json({ id, status: 'PICKING' });
+  } catch (error) {
+    console.error(error);
+    if (error.message.includes('Insufficient stock')) {
+      return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+const rejectSalesOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({ message: 'Rejection reason is required' });
+    }
+
+    const order = await prisma.salesOrder.findFirst({
+      where: { id, companyId: req.user.companyId }
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: 'Sales order not found' });
+    }
+
+    if (order.status !== 'PENDING_REVIEW') {
+      return res.status(400).json({ message: 'Order is not in a pending state' });
+    }
+
+    await prisma.salesOrder.update({
+      where: { id },
+      data: { status: 'REJECTED', rejectionReason: reason }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        event: 'SALES_ORDER_REJECTED',
+        userId: req.user.id,
+        ipAddress: req.ip
+      }
+    });
+
+    // Notify Client
+    await NotificationService.send({
+      title: 'Order Rejected',
+      message: `Your order (${order.id}) was rejected. Reason: ${reason}`,
+      companyId: req.user.companyId
+    });
+
+    res.json({ id, status: 'REJECTED' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+module.exports = { getSalesOrders, approveSalesOrder, rejectSalesOrder };

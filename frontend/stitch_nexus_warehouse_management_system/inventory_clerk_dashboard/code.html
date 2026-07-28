@@ -1,0 +1,534 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Nexus WMS - Inventory Clerk Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Custom micro-interactions */
+        .task-card:hover .action-btn { opacity: 1; transform: translateX(0); }
+        .action-btn { opacity: 0; transform: translateX(10px); transition: all 0.2s ease-in-out; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#e1e2ec",
+                        "secondary-container": "#d5e0f8",
+                        "outline-variant": "#c3c6d6",
+                        "error": "#ba1a1a",
+                        "primary-fixed": "#dae2ff",
+                        "on-surface-variant": "#434654",
+                        "on-secondary-container": "#586377",
+                        "on-error-container": "#93000a",
+                        "inverse-on-surface": "#f0f0fb",
+                        "inverse-primary": "#b2c5ff",
+                        "background": "#faf8ff",
+                        "outline": "#737685",
+                        "secondary-fixed": "#d8e3fb",
+                        "surface-dim": "#d9d9e4",
+                        "on-primary-container": "#c4d2ff",
+                        "surface-container-low": "#f3f3fd",
+                        "on-surface": "#191b23",
+                        "primary": "#003d9b",
+                        "primary-container": "#0052cc",
+                        "surface-container-high": "#e7e7f2",
+                        "on-background": "#191b23",
+                        "tertiary-container": "#585b5d",
+                        "tertiary-fixed": "#e0e3e5",
+                        "on-tertiary-fixed": "#191c1e",
+                        "secondary-fixed-dim": "#bcc7de",
+                        "primary-fixed-dim": "#b2c5ff",
+                        "on-secondary-fixed-variant": "#3c475a",
+                        "on-secondary-fixed": "#111c2d",
+                        "error-container": "#ffdad6",
+                        "tertiary": "#404445",
+                        "on-primary": "#ffffff",
+                        "inverse-surface": "#2e3038",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "secondary": "#545f73",
+                        "surface-container": "#ededf8",
+                        "surface": "#faf8ff",
+                        "on-primary-fixed-variant": "#0040a2",
+                        "on-tertiary-fixed-variant": "#444749",
+                        "on-primary-fixed": "#001848",
+                        "surface-tint": "#0c56d0",
+                        "surface-variant": "#e1e2ec",
+                        "surface-bright": "#faf8ff",
+                        "on-error": "#ffffff",
+                        "tertiary-fixed-dim": "#c4c7c9",
+                        "on-tertiary-container": "#d1d3d5",
+                        "on-secondary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "lg": "24px",
+                        "md": "16px",
+                        "xs": "4px",
+                        "base": "8px",
+                        "2xl": "48px",
+                        "sm": "8px",
+                        "margin-mobile": "16px",
+                        "margin-desktop": "32px",
+                        "xl": "32px",
+                        "gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "mono-label": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "mono-label": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                        "body-sm": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "headline-lg": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "display-lg": ["36px", {"lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "label-md": ["13px", {"lineHeight": "18px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface font-body-md selection:bg-primary-container selection:text-on-primary-container overflow-hidden">
+<div class="flex h-screen w-full">
+<!-- Side Navigation (Shared Component Logic) -->
+<aside class="fixed left-0 top-0 h-full w-[240px] flex flex-col py-lg bg-on-background dark:bg-inverse-surface z-50">
+<div class="px-6 mb-8 flex flex-col gap-1">
+<h1 class="text-headline-lg font-headline-lg text-primary-fixed">Nexus WMS</h1>
+<div class="flex items-center gap-2 mt-2">
+<div class="w-8 h-8 rounded bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-[20px]">warehouse</span>
+</div>
+<div>
+<p class="text-body-sm font-bold text-on-primary-container leading-none">Warehouse Alpha</p>
+<p class="text-[10px] text-primary-fixed-dim/70 tracking-wider">REGION: EAST COAST</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 px-2 space-y-1">
+<!-- Dashboard Active -->
+<a class="bg-primary-container text-on-primary-container rounded-lg mx-2 my-1 px-4 py-3 flex items-center gap-3 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body-md">Dashboard</span>
+</a>
+<a class="text-on-tertiary-container hover:bg-tertiary-container/50 rounded-lg mx-2 my-1 px-4 py-3 flex items-center gap-3 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="font-body-md">Products</span>
+</a>
+<a class="text-on-tertiary-container hover:bg-tertiary-container/50 rounded-lg mx-2 my-1 px-4 py-3 flex items-center gap-3 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="package_2">package_2</span>
+<span class="font-body-md">Inventory</span>
+</a>
+<a class="text-on-tertiary-container hover:bg-tertiary-container/50 rounded-lg mx-2 my-1 px-4 py-3 flex items-center gap-3 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="inventory">inventory</span>
+<span class="font-body-md">Lots</span>
+</a>
+<a class="text-on-tertiary-container hover:bg-tertiary-container/50 rounded-lg mx-2 my-1 px-4 py-3 flex items-center gap-3 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="barcode_scanner">barcode_scanner</span>
+<span class="font-body-md">Barcode</span>
+</a>
+<a class="text-on-tertiary-container hover:bg-tertiary-container/50 rounded-lg mx-2 my-1 px-4 py-3 flex items-center gap-3 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="event_busy">event_busy</span>
+<span class="font-body-md">Expiry</span>
+</a>
+<a class="text-on-tertiary-container hover:bg-tertiary-container/50 rounded-lg mx-2 my-1 px-4 py-3 flex items-center gap-3 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="location_on">location_on</span>
+<span class="font-body-md">Locations</span>
+</a>
+<a class="text-on-tertiary-container hover:bg-tertiary-container/50 rounded-lg mx-2 my-1 px-4 py-3 flex items-center gap-3 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="conveyor_belt">conveyor_belt</span>
+<span class="font-body-md">Cycle Count</span>
+</a>
+</nav>
+<div class="mt-auto px-4 py-4 border-t border-outline/20">
+<div class="flex items-center gap-3 p-2">
+<img class="w-10 h-10 rounded-full border border-outline-variant object-cover" data-alt="A professional warehouse inventory clerk portrait, wearing a reflective safety vest over a clean corporate polo. The lighting is bright and industrial, with soft focus warehouse racking in the background. The aesthetic is clean, professional, and trustworthy, with high-fidelity detail in the uniform textures." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBkhNZPImm-wNO5oOVQ7Do6nfBtQo4yr7xWMPB4ozJ8sGXbaL-ELs4YMiS4saBFCE-hgMN2AAMrlWsAassmNZPEP0WHzPG8haY2M2F50xIidkDR5n758MEOqeUZbzz31RCe9-OCYkaEt-khVJu1-QMzjy3-hst46sunoaJ14ImjoFOpbF1c2RT-FyQXtK24c8871rVS7qp0U0B67lRwi_zldxyORbeiVdEcqJfsCdEGp9EqTfT-ssOYBHTqqf0HHx8R4peCD6sEwy8">
+<div class="overflow-hidden">
+<p class="text-body-md font-bold text-on-primary-container truncate">Marcus Chen</p>
+<p class="text-body-sm text-on-tertiary-container/70 truncate">Clerk ID: 49202</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 ml-[240px] overflow-y-auto bg-surface-container-lowest">
+<!-- Top App Bar -->
+<header class="sticky top-0 z-40 flex justify-between items-center w-full px-margin-desktop h-16 bg-surface border-b border-outline-variant">
+<div class="flex items-center gap-md">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline" data-icon="search">search</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container rounded-lg border-none focus:ring-2 focus:ring-primary text-body-md w-80" placeholder="Scan SKU or Location..." type="text">
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</div>
+</header>
+<div class="p-margin-desktop space-y-xl max-w-7xl mx-auto">
+<!-- KPI Row -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
+<!-- KPI Card 1 -->
+<div class="bg-surface border border-outline-variant p-lg rounded-xl flex flex-col justify-between group hover:border-primary transition-all">
+<div class="flex justify-between items-start mb-4">
+<span class="text-on-surface-variant font-label-md text-label-md uppercase tracking-wider">Total SKUs Managed</span>
+<span class="material-symbols-outlined text-primary" data-icon="inventory_2">inventory_2</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-headline-lg font-headline-lg">12,842</span>
+<span class="text-body-sm text-green-600 font-bold">+2.4%</span>
+</div>
+<div class="h-1 w-full bg-surface-container mt-4 rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[75%]"></div>
+</div>
+</div>
+<!-- KPI Card 2 -->
+<div class="bg-surface border border-outline-variant p-lg rounded-xl flex flex-col justify-between group hover:border-error transition-all">
+<div class="flex justify-between items-start mb-4">
+<span class="text-on-surface-variant font-label-md text-label-md uppercase tracking-wider">Open Cycle Counts</span>
+<span class="material-symbols-outlined text-error" data-icon="sync_alt">sync_alt</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-headline-lg font-headline-lg">24</span>
+<span class="text-body-sm text-on-surface-variant">Tasks</span>
+</div>
+<div class="mt-4 flex -space-x-2">
+<div class="w-6 h-6 rounded-full border-2 border-surface bg-primary flex items-center justify-center text-[10px] text-white font-bold">MC</div>
+<div class="w-6 h-6 rounded-full border-2 border-surface bg-secondary flex items-center justify-center text-[10px] text-white font-bold">JS</div>
+<div class="w-6 h-6 rounded-full border-2 border-surface bg-tertiary-container flex items-center justify-center text-[10px] text-on-surface-variant font-bold">+3</div>
+</div>
+</div>
+<!-- KPI Card 3 -->
+<div class="bg-error-container border border-error/20 p-lg rounded-xl flex flex-col justify-between group hover:shadow-lg transition-all">
+<div class="flex justify-between items-start mb-4">
+<span class="text-on-error-container font-label-md text-label-md uppercase tracking-wider">Low Stock Alerts</span>
+<span class="material-symbols-outlined text-error" data-icon="warning">warning</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-headline-lg font-headline-lg text-on-error-container">18</span>
+<span class="text-body-sm text-on-error-container/80">Critical</span>
+</div>
+<div class="mt-4">
+<span class="px-2 py-1 bg-error text-white text-[10px] rounded-full font-bold uppercase">Immediate Action</span>
+</div>
+</div>
+<!-- KPI Card 4 -->
+<div class="bg-surface border border-outline-variant p-lg rounded-xl flex flex-col justify-between group hover:border-primary transition-all">
+<div class="flex justify-between items-start mb-4">
+<span class="text-on-surface-variant font-label-md text-label-md uppercase tracking-wider">Barcodes to Print</span>
+<span class="material-symbols-outlined text-primary" data-icon="print">print</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-headline-lg font-headline-lg">156</span>
+<span class="text-body-sm text-on-surface-variant">Pending</span>
+</div>
+<button class="mt-4 w-full py-2 bg-secondary-container text-on-secondary-container rounded-lg font-label-md text-label-md hover:bg-primary hover:text-white transition-colors">Print Queue</button>
+</div>
+</div>
+<!-- Bento Grid Layout for Main Sections -->
+<div class="grid grid-cols-12 gap-gutter">
+<!-- My Task Queue (Priority) -->
+<div class="col-span-12 lg:col-span-8 bg-surface border border-outline-variant rounded-xl overflow-hidden flex flex-col">
+<div class="px-lg py-md border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="format_list_bulleted">format_list_bulleted</span>
+<h2 class="text-headline-md font-headline-md">My Task Queue</h2>
+</div>
+<button class="text-primary hover:underline font-label-md text-label-md">View All Work Orders</button>
+</div>
+<div class="p-0">
+<div class="divide-y divide-outline-variant">
+<!-- Task Item 1 -->
+<div class="task-card p-lg flex items-center gap-lg hover:bg-surface-container transition-colors group">
+<div class="w-12 h-12 rounded-xl bg-primary-container/10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-primary" data-icon="move_up">move_up</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<h3 class="font-bold text-body-lg">Relocate Lot B12-X09</h3>
+<span class="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[11px] font-bold rounded uppercase">High Priority</span>
+</div>
+<p class="text-body-sm text-on-surface-variant">Transfer 50 units of "Thermal Gaskets" from Receipt Area A to Bin 402-B.</p>
+</div>
+<div class="flex items-center gap-2">
+<button class="action-btn px-4 py-2 bg-primary text-white rounded-lg font-label-md text-label-md">Start</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Task Item 2 -->
+<div class="task-card p-lg flex items-center gap-lg hover:bg-surface-container transition-colors group">
+<div class="w-12 h-12 rounded-xl bg-tertiary-container/10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-tertiary" data-icon="inventory">inventory</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<h3 class="font-bold text-body-lg">Cycle Count Aisle 4</h3>
+<span class="px-2 py-0.5 bg-surface-container-highest text-on-surface-variant text-[11px] font-bold rounded uppercase">Recurring</span>
+</div>
+<p class="text-body-sm text-on-surface-variant">Verify quantities for 12 SKUs in Section 4-A to 4-F. Last count: 30 days ago.</p>
+</div>
+<div class="flex items-center gap-2">
+<button class="action-btn px-4 py-2 bg-primary text-white rounded-lg font-label-md text-label-md">Start</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Task Item 3 -->
+<div class="task-card p-lg flex items-center gap-lg hover:bg-surface-container transition-colors group">
+<div class="w-12 h-12 rounded-xl bg-error-container/10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-error" data-icon="assignment_late">assignment_late</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<h3 class="font-bold text-body-lg">Damaged Goods Reporting</h3>
+<span class="px-2 py-0.5 bg-error text-white text-[11px] font-bold rounded uppercase">Flagged</span>
+</div>
+<p class="text-body-sm text-on-surface-variant">Inspect Lot L-9921 for water damage reported by Loading Bay 3.</p>
+</div>
+<div class="flex items-center gap-2">
+<button class="action-btn px-4 py-2 bg-primary text-white rounded-lg font-label-md text-label-md">Start</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Stock Level Alerts -->
+<div class="col-span-12 lg:col-span-4 bg-surface border border-outline-variant rounded-xl overflow-hidden flex flex-col">
+<div class="px-lg py-md border-b border-outline-variant flex items-center gap-2 bg-error-container/10">
+<span class="material-symbols-outlined text-error" data-icon="notifications_active">notifications_active</span>
+<h2 class="text-headline-md font-headline-md">Stock Alerts</h2>
+</div>
+<div class="flex-1 overflow-auto">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-container-low sticky top-0">
+<tr>
+<th class="px-lg py-3 text-label-md font-label-md text-on-surface-variant">Item</th>
+<th class="px-lg py-3 text-label-md font-label-md text-on-surface-variant">Level</th>
+<th class="px-lg py-3 text-label-md font-label-md text-on-surface-variant">Action</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<tr class="hover:bg-surface-container transition-colors">
+<td class="px-lg py-4">
+<p class="font-bold text-body-sm">SKU-4921</p>
+<p class="text-[10px] text-on-surface-variant">Copper Wire 12G</p>
+</td>
+<td class="px-lg py-4">
+<span class="text-error font-bold">12</span>
+<span class="text-on-surface-variant text-[10px]"> / 200 min</span>
+</td>
+<td class="px-lg py-4">
+<button class="w-8 h-8 flex items-center justify-center rounded-lg bg-secondary-container text-on-secondary-container hover:bg-primary hover:text-white">
+<span class="material-symbols-outlined text-[18px]" data-icon="shopping_cart_checkout">shopping_cart_checkout</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container transition-colors">
+<td class="px-lg py-4">
+<p class="font-bold text-body-sm">SKU-8810</p>
+<p class="text-[10px] text-on-surface-variant">Silicon Sealant</p>
+</td>
+<td class="px-lg py-4">
+<span class="text-error font-bold">5</span>
+<span class="text-on-surface-variant text-[10px]"> / 50 min</span>
+</td>
+<td class="px-lg py-4">
+<button class="w-8 h-8 flex items-center justify-center rounded-lg bg-secondary-container text-on-secondary-container hover:bg-primary hover:text-white">
+<span class="material-symbols-outlined text-[18px]" data-icon="shopping_cart_checkout">shopping_cart_checkout</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container transition-colors">
+<td class="px-lg py-4">
+<p class="font-bold text-body-sm">SKU-2029</p>
+<p class="text-[10px] text-on-surface-variant">Steel Washers M8</p>
+</td>
+<td class="px-lg py-4">
+<span class="text-error font-bold">402</span>
+<span class="text-on-surface-variant text-[10px]"> / 1000 min</span>
+</td>
+<td class="px-lg py-4">
+<button class="w-8 h-8 flex items-center justify-center rounded-lg bg-secondary-container text-on-secondary-container hover:bg-primary hover:text-white">
+<span class="material-symbols-outlined text-[18px]" data-icon="shopping_cart_checkout">shopping_cart_checkout</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-lg bg-surface-container-low border-t border-outline-variant">
+<button class="w-full py-2 border-2 border-primary text-primary font-bold rounded-lg hover:bg-primary hover:text-white transition-all">Reorder All Low Stock</button>
+</div>
+</div>
+<!-- Recently Received -->
+<div class="col-span-12 bg-surface border border-outline-variant rounded-xl overflow-hidden">
+<div class="px-lg py-md border-b border-outline-variant flex justify-between items-center">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="move_to_inbox">move_to_inbox</span>
+<h2 class="text-headline-md font-headline-md">Recently Received (Needs Put-away)</h2>
+</div>
+<div class="flex gap-2">
+<button class="px-4 py-2 bg-surface-container-high rounded-lg text-body-sm font-bold flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]" data-icon="filter_list">filter_list</span>
+                                    Filter
+                                </button>
+<button class="px-4 py-2 bg-primary text-white rounded-lg text-body-sm font-bold">Print All Labels</button>
+</div>
+</div>
+<div class="p-0">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-container-low border-b border-outline-variant">
+<tr>
+<th class="px-lg py-4 text-label-md font-label-md text-on-surface-variant">PO #</th>
+<th class="px-lg py-4 text-label-md font-label-md text-on-surface-variant">Item Detail</th>
+<th class="px-lg py-4 text-label-md font-label-md text-on-surface-variant">Qty</th>
+<th class="px-lg py-4 text-label-md font-label-md text-on-surface-variant">Lot #</th>
+<th class="px-lg py-4 text-label-md font-label-md text-on-surface-variant">Status</th>
+<th class="px-lg py-4 text-label-md font-label-md text-on-surface-variant">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<tr class="hover:bg-surface-container transition-colors group">
+<td class="px-lg py-4 font-mono-label text-mono-label">PO-99201</td>
+<td class="px-lg py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-surface-container overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Close up high-resolution professional product shot of industrial hydraulic valves on a clean white laboratory background. Minimalist lighting highlighting the metallic textures and precision engineering. Part of a modern enterprise WMS interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDZxNVaydA1XedInSKC2i-JbNXnzz56ZNMoY7QGRnW8qaw7BcwCQoM6KOFqbxzfZDDe52mUmovUbvqK9OUaGIQJHsVrXoLiaHgpRFKWLWcOBWMUMjMqEPBKKDriyhSwH69heHLzmnTWK0IxlDiyP1h-mJluLOf7QG232bGAO0q3I3knmVYPAS_StiRJUp2EXYoJm6xdDBrFk86ZKYqeOtWmAmfSRX_QD6gbYjdSwFWPS-5zbM7I5hjuyOXwgmzfs5NPyrCU0YfT5Ac">
+</div>
+<div>
+<p class="font-bold text-body-md text-primary">Hydraulic Valve X-1</p>
+<p class="text-body-sm text-on-surface-variant">Supplier: Precision Motion Ltd</p>
+</div>
+</div>
+</td>
+<td class="px-lg py-4 font-bold">120 Units</td>
+<td class="px-lg py-4 text-on-surface-variant font-mono-label">LOT-A-4029</td>
+<td class="px-lg py-4">
+<span class="inline-flex items-center gap-1 px-2 py-1 bg-secondary-fixed text-on-secondary-fixed rounded-full text-[11px] font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                                                    STAGED
+                                                </span>
+</td>
+<td class="px-lg py-4">
+<div class="flex items-center gap-2">
+<button class="px-3 py-1.5 bg-primary text-white text-[12px] font-bold rounded-lg hover:bg-primary-container transition-colors">Assign Bin</button>
+<button class="p-1.5 hover:bg-surface-container-high rounded text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]" data-icon="label">label</span>
+</button>
+</div>
+</td>
+</tr>
+<tr class="bg-surface-container-low hover:bg-surface-container transition-colors group">
+<td class="px-lg py-4 font-mono-label text-mono-label">PO-99205</td>
+<td class="px-lg py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-surface-container overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Macro photography of industrial Grade-8 bolts and fasteners organized neatly in a professional gray container. The aesthetic is sharp, industrial, and clean, perfectly suited for an enterprise inventory system. High contrast lighting on metallic surfaces." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC62DC-dMJJfyBWZwcbk4eYy9nhz4Ph7CzicMDBbzCz2iNX52nVHw4NEG5y1YjexvCLosqfcTRTntjTDRBeg46yJJYAhxJtCExhqvsq_jrtFZWPIP7kroQWTzIm15liAMFQ_iWY7cLYMqvFNG23lLKLM4xJHumtf8HxOJoGR2xH0Z5kCTM7lGQErmjr9I6PcLMeCmHDjL-Nd0jWAclZltUofpwoDTfYbWydA29PqjuqY77DTKWZue2ViNlQx6YRfoIMF8KW4bWY_7I">
+</div>
+<div>
+<p class="font-bold text-body-md text-primary">Steel Hex Bolts M12</p>
+<p class="text-body-sm text-on-surface-variant">Supplier: Global Fasteners Co.</p>
+</div>
+</div>
+</td>
+<td class="px-lg py-4 font-bold">2,500 Units</td>
+<td class="px-lg py-4 text-on-surface-variant font-mono-label">LOT-B-8831</td>
+<td class="px-lg py-4">
+<span class="inline-flex items-center gap-1 px-2 py-1 bg-tertiary-fixed text-on-tertiary-fixed rounded-full text-[11px] font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+                                                    UNLABELED
+                                                </span>
+</td>
+<td class="px-lg py-4">
+<div class="flex items-center gap-2">
+<button class="px-3 py-1.5 bg-primary text-white text-[12px] font-bold rounded-lg hover:bg-primary-container transition-colors">Print Label</button>
+<button class="p-1.5 hover:bg-surface-container-high rounded text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]" data-icon="label">label</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Meta -->
+<footer class="px-margin-desktop py-lg text-on-surface-variant flex justify-between items-center opacity-60">
+<p class="text-body-sm">© 2024 Nexus Logistics Systems • v4.2.0-stable</p>
+<div class="flex gap-lg">
+<a class="hover:text-primary transition-colors" href="#">Privacy Policy</a>
+<a class="hover:text-primary transition-colors" href="#">Terms of Service</a>
+</div>
+</footer>
+</main>
+</div>
+<!-- Floating Action Button for Scan (Mobile Optimized) -->
+<button class="fixed bottom-lg right-lg w-14 h-14 bg-primary text-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 active:scale-95 transition-all lg:hidden">
+<span class="material-symbols-outlined text-[28px]" data-icon="barcode_scanner">barcode_scanner</span>
+</button>
+<script>
+        // Simple micro-interaction for task completion
+        document.querySelectorAll('.action-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const card = this.closest('.task-card');
+                if (this.textContent === 'Start') {
+                    this.textContent = 'In Progress';
+                    this.classList.remove('bg-primary');
+                    this.classList.add('bg-tertiary');
+                    card.classList.add('border-l-4', 'border-tertiary');
+                } else {
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateX(-20px)';
+                    setTimeout(() => {
+                        card.remove();
+                    }, 300);
+                }
+            });
+        });
+    </script>
+</body></html>
