@@ -1,4 +1,5 @@
 const prisma = require('../../utils/prisma');
+const { logAudit } = require('../../utils/auditLogger');
 
 const getClients = async (req, res) => {
   try {
@@ -28,13 +29,7 @@ const provisionClient = async (req, res) => {
       },
     });
 
-    await prisma.auditLog.create({
-      data: {
-        event: 'CLIENT_PROVISIONED',
-        userId: req.user?.id || null,
-        ipAddress: req.ip,
-      },
-    });
+    await logAudit(req, 'CLIENT_PROVISIONED');
 
     res.status(201).json(client);
   } catch (error) {
@@ -48,6 +43,11 @@ const updateClient = async (req, res) => {
     const { id } = req.params;
     const { name, creditLimit, tier } = req.body;
 
+    const existingClient = await prisma.client.findUnique({ where: { id } });
+    if (!existingClient) {
+      return res.status(404).json({ message: 'Client not found' });
+    }
+
     const client = await prisma.client.update({
       where: { id },
       data: {
@@ -58,13 +58,7 @@ const updateClient = async (req, res) => {
       },
     });
 
-    await prisma.auditLog.create({
-      data: {
-        event: 'CLIENT_UPDATED',
-        userId: req.user?.id || null,
-        ipAddress: req.ip,
-      },
-    });
+    await logAudit(req, 'CLIENT_UPDATED');
 
     res.json(client);
   } catch (error) {
@@ -77,17 +71,16 @@ const deleteClient = async (req, res) => {
   try {
     const { id } = req.params;
 
+    const existingClient = await prisma.client.findUnique({ where: { id } });
+    if (!existingClient) {
+      return res.status(200).json({ message: 'Client already deleted or not found', id });
+    }
+
     await prisma.client.delete({
       where: { id },
     });
 
-    await prisma.auditLog.create({
-      data: {
-        event: 'CLIENT_DELETED',
-        userId: req.user?.id || null,
-        ipAddress: req.ip,
-      },
-    });
+    await logAudit(req, 'CLIENT_DELETED');
 
     res.json({ message: 'Client deleted successfully', id });
   } catch (error) {

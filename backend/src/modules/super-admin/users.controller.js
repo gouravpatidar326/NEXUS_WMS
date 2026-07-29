@@ -1,11 +1,6 @@
 const bcrypt = require('bcrypt');
 const prisma = require('../../utils/prisma');
-
-const getValidUserId = async (req) => {
-  if (!req.user?.id) return null;
-  const exists = await prisma.user.findUnique({ where: { id: req.user.id } });
-  return exists ? req.user.id : null;
-};
+const { logAudit } = require('../../utils/auditLogger');
 
 const getUsers = async (req, res) => {
   try {
@@ -58,14 +53,7 @@ const inviteUser = async (req, res) => {
       },
     });
 
-    const auditUserId = await getValidUserId(req);
-    await prisma.auditLog.create({
-      data: {
-        event: 'USER_INVITED',
-        userId: auditUserId,
-        ipAddress: req.ip,
-      },
-    });
+    await logAudit(req, 'USER_INVITED');
 
     res.status(201).json({ id: user.id, message: 'User invited successfully', user });
   } catch (error) {
@@ -95,14 +83,7 @@ const updateUser = async (req, res) => {
       },
     });
 
-    const auditUserId = await getValidUserId(req);
-    await prisma.auditLog.create({
-      data: {
-        event: 'USER_UPDATED',
-        userId: auditUserId,
-        ipAddress: req.ip,
-      },
-    });
+    await logAudit(req, 'USER_UPDATED');
 
     res.json(user);
   } catch (error) {
@@ -134,14 +115,7 @@ const deleteUser = async (req, res) => {
       where: { id },
     });
 
-    const auditUserId = await getValidUserId(req);
-    await prisma.auditLog.create({
-      data: {
-        event: 'USER_DELETED',
-        userId: auditUserId,
-        ipAddress: req.ip,
-      },
-    });
+    await logAudit(req, 'USER_DELETED');
 
     res.json({ message: 'User deleted successfully', id });
   } catch (error) {
