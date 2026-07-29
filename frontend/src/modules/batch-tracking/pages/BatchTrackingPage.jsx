@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { batchService } from '@/services/batchService';
 import { productService } from '@/services/productService';
+import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import LoadingState from '@/components/feedback/LoadingState';
