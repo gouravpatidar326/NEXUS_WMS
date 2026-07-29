@@ -17,6 +17,7 @@ export const SUPER_ADMIN_ITEMS = [
 
 export const WAREHOUSE_MANAGER_ITEMS = [
   { id: 'dashboard', title: 'Dashboard', path: '/dashboard', iconName: 'dashboard' },
+  { id: 'products', title: 'Products', path: '/products', iconName: 'category' },
   { id: 'inventory', title: 'Inventory', path: '/inventory', iconName: 'inventory_2' },
   { id: 'lots', title: 'Lots & Batches', path: '/batch-tracking', iconName: 'qr_code_2' },
   { id: 'expiry', title: 'Expiry Tracking', path: '/expiry-tracking', iconName: 'calendar_clock' },

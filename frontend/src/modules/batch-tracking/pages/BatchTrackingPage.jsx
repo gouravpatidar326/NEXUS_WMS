@@ -1,27 +1,90 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useWmsStore } from '@/contexts/WmsStoreContext';
 import { useNotification } from '@/contexts/NotificationContext';
+import { batchService } from '@/services/batchService';
+import { productService } from '@/services/productService';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 
 export const BatchTrackingPage = () => {
   const { user } = useAuth();
-  const { lots, isCoaUnlockedForClient, unlockCoaForClient } = useWmsStore();
-  const { notifySuccess } = useNotification();
+  const { notifySuccess, notifyError } = useNotification();
 
+  const [lots, setLots] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Modals
   const [selectedLotCoa, setSelectedLotCoa] = useState(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  const handleUnlockCoa = (lotId) => {
-    unlockCoaForClient(lotId, user?.email || 'sam@acmecorp.com');
-    notifySuccess(`[Simulated Payment Gateway] $150 Payment Verified! COA Certificate unlocked for Account (${user?.email || 'sam@acmecorp.com'}).`);
+  // Form State
+  const [formData, setFormData] = useState({
+    lotId: '',
+    productId: '',
+    mfgDate: '',
+    expiryDate: ''
+  });
+
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      const [batchesRes, productsRes] = await Promise.all([
+        batchService.getBatches(),
+        productService.getProducts({ pageSize: 100 })
+      ]);
+      setLots(batchesRes);
+      setProducts(productsRes.items || productsRes); // Fix: use items property
+    } catch (error) {
+      console.error(error);
+      notifyError('Failed to load batches');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleAddBatch = async (e) => {
+    e.preventDefault();
+    try {
+      await batchService.createBatch(formData);
+      notifySuccess('Batch added successfully!');
+      setIsAddModalOpen(false);
+      setFormData({ lotId: '', productId: '', mfgDate: '', expiryDate: '' });
+      fetchData();
+    } catch (error) {
+      console.error(error);
+      notifyError('Failed to add batch');
+    }
+  };
+
+  const handleUnlockCoa = async (lotId) => {
+    try {
+      await batchService.unlockCoa(lotId, 'dummy-token');
+      notifySuccess(`[Simulated Payment Gateway] $150 Payment Verified! COA Certificate unlocked for Account (${user?.email}).`);
+      fetchData();
+    } catch (error) {
+      notifyError('Failed to unlock COA');
+    }
+  };
+
+  const handleToggleQuarantine = async (lotId, currentStatus) => {
+    try {
+      await batchService.updateBatch(lotId, { quarantine: !currentStatus });
+      notifySuccess(`Batch ${!currentStatus ? 'quarantined' : 'released from quarantine'}`);
+      fetchData();
+    } catch (error) {
+      notifyError('Failed to update quarantine status');
+    }
   };
 
   const filteredLots = lots.filter((lot) =>
     lot.lotId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    lot.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    lot.location.toLowerCase().includes(searchTerm.toLowerCase())
+    (lot.product?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -39,6 +102,9 @@ export const BatchTrackingPage = () => {
             Manage product lot lifecycles, manufacture dates, and 3rd-party lab test results (COA).
           </p>
         </div>
+        <Button variant="primary" onClick={() => setIsAddModalOpen(true)}>
+          + Add New Batch
+        </Button>
       </div>
 
       {/* KPI Quick View */}
@@ -46,8 +112,8 @@ export const BatchTrackingPage = () => {
         <div className="bg-white border border-outline-variant p-4 rounded-xl shadow-sm">
           <p className="text-xs text-on-surface-variant font-semibold uppercase tracking-wider">Active Batches</p>
           <div className="flex items-end justify-between mt-2">
-            <h3 className="text-2xl font-bold text-on-surface">{lots.length + 1280}</h3>
-            <span className="text-xs text-primary font-bold flex items-center gap-1">+4.2%</span>
+            <h3 className="text-2xl font-bold text-on-surface">{lots.length}</h3>
+            <span className="text-xs text-primary font-bold flex items-center gap-1">LIVE</span>
           </div>
         </div>
 
@@ -55,17 +121,17 @@ export const BatchTrackingPage = () => {
           <p className="text-xs text-on-surface-variant font-semibold uppercase tracking-wider">COA Lab Verified</p>
           <div className="flex items-end justify-between mt-2">
             <h3 className="text-2xl font-bold text-emerald-600">
-              {lots.filter(l => isCoaUnlockedForClient(l, user?.email)).length + 850}
+              {lots.filter(l => !l.coaLocked).length}
             </h3>
-            <span className="text-xs text-emerald-600 font-bold">100% Passed</span>
+            <span className="text-xs text-emerald-600 font-bold">Passed</span>
           </div>
         </div>
 
         <div className="md:col-span-2 bg-primary-container/10 border border-primary/20 p-4 rounded-xl flex items-center justify-between shadow-sm">
           <div>
-            <p className="text-xs text-primary font-semibold uppercase tracking-wider">Quarantine & Testing Status</p>
-            <h3 className="text-2xl font-bold text-primary mt-1">156 Units</h3>
-            <p className="text-xs text-on-surface-variant mt-0.5">3rd-Party Lab Results Gated via Payment Verification</p>
+            <p className="text-xs text-primary font-semibold uppercase tracking-wider">Quarantine Status</p>
+            <h3 className="text-2xl font-bold text-primary mt-1">{lots.filter(l => l.quarantine).length} Units Quarantined</h3>
+            <p className="text-xs text-on-surface-variant mt-0.5">These batches cannot be shipped</p>
           </div>
         </div>
       </div>
@@ -78,7 +144,7 @@ export const BatchTrackingPage = () => {
           </span>
           <input
             type="text"
-            placeholder="Search lot ID, product, or location..."
+            placeholder="Search lot ID or product..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs focus:outline-none focus:border-primary"
@@ -98,30 +164,38 @@ export const BatchTrackingPage = () => {
                 <th className="px-5 py-3">Lot ID</th>
                 <th className="px-5 py-3">Product Name</th>
                 <th className="px-5 py-3">Received / Expiry</th>
-                <th className="px-5 py-3 text-right">Qty</th>
-                <th className="px-5 py-3">Location</th>
+                <th className="px-5 py-3">Status</th>
                 <th className="px-5 py-3">3rd-Party COA Lab Test Result</th>
-                <th className="px-5 py-3 text-right">COA Action</th>
+                <th className="px-5 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant text-sm">
-              {filteredLots.map((lot) => {
-                const isUnlocked = isCoaUnlockedForClient(lot, user?.email || 'sam@acmecorp.com');
+              {isLoading ? (
+                <tr><td colSpan="6" className="text-center py-8 text-on-surface-variant">Loading batches...</td></tr>
+              ) : filteredLots.length === 0 ? (
+                <tr><td colSpan="6" className="text-center py-8 text-on-surface-variant">No batches found. Create one to get started!</td></tr>
+              ) : filteredLots.map((lot) => {
+                const isUnlocked = !lot.coaLocked;
                 return (
-                  <tr key={lot.lotId} className="hover:bg-surface-container-low transition-colors group">
+                  <tr key={lot.id} className="hover:bg-surface-container-low transition-colors group">
                     <td className="px-5 py-4 font-mono text-xs text-primary font-bold">{lot.lotId}</td>
                     <td className="px-5 py-4">
                       <div className="flex flex-col">
-                        <span className="font-semibold text-on-surface">{lot.productName}</span>
-                        <span className="text-xs text-on-surface-variant font-mono">{lot.testCertificateId}</span>
+                        <span className="font-semibold text-on-surface">{lot.product?.name || 'Unknown Product'}</span>
+                        <span className="text-xs text-on-surface-variant font-mono">{lot.product?.sku}</span>
                       </div>
                     </td>
                     <td className="px-5 py-4 text-xs text-on-surface-variant">
-                      <div>Rec: {lot.receivedDate}</div>
-                      <div className="text-red-600 font-bold">Exp: {lot.expiryDate}</div>
+                      <div>Rec: {lot.mfgDate ? new Date(lot.mfgDate).toLocaleDateString() : 'N/A'}</div>
+                      <div className="text-red-600 font-bold">Exp: {lot.expiryDate ? new Date(lot.expiryDate).toLocaleDateString() : 'N/A'}</div>
                     </td>
-                    <td className="px-5 py-4 text-right font-mono font-bold text-on-surface">{lot.qty}</td>
-                    <td className="px-5 py-4 text-xs text-on-surface-variant font-mono">{lot.location}</td>
+                    <td className="px-5 py-4">
+                      {lot.quarantine ? (
+                         <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-800">QUARANTINED</span>
+                      ) : (
+                         <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-green-100 text-green-800">ACTIVE</span>
+                      )}
+                    </td>
                     <td className="px-5 py-4">
                       {isUnlocked ? (
                         <div className="flex items-center gap-2">
@@ -129,7 +203,6 @@ export const BatchTrackingPage = () => {
                             <span className="material-symbols-outlined text-[14px]">verified</span>
                             COA UNLOCKED (Passed)
                           </span>
-                          <span className="text-xs text-slate-500 font-mono">Purity: {lot.purityScore}</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
@@ -140,22 +213,28 @@ export const BatchTrackingPage = () => {
                         </div>
                       )}
                     </td>
-                    <td className="px-5 py-4 text-right">
+                    <td className="px-5 py-4 flex flex-col gap-2 justify-end items-end">
                       {isUnlocked ? (
                         <button
                           onClick={() => setSelectedLotCoa(lot)}
-                          className="px-3 py-1 bg-primary/10 text-primary rounded text-xs font-bold hover:bg-primary/20 transition-colors cursor-pointer"
+                          className="px-3 py-1 bg-primary/10 text-primary rounded text-xs font-bold hover:bg-primary/20 transition-colors cursor-pointer w-full max-w-[160px]"
                         >
                           View Certificate
                         </button>
                       ) : (
                         <button
-                          onClick={() => handleUnlockCoa(lot.lotId)}
-                          className="px-3 py-1 bg-amber-600 text-white rounded text-xs font-bold hover:bg-amber-700 transition-colors shadow-sm cursor-pointer"
+                          onClick={() => handleUnlockCoa(lot.id)}
+                          className="px-3 py-1 bg-amber-600 text-white rounded text-xs font-bold hover:bg-amber-700 transition-colors shadow-sm cursor-pointer w-full max-w-[160px]"
                         >
                           Pay $150 to Unlock COA
                         </button>
                       )}
+                      <button
+                        onClick={() => handleToggleQuarantine(lot.id, lot.quarantine)}
+                        className={`px-3 py-1 border rounded text-xs font-bold transition-colors cursor-pointer w-full max-w-[160px] ${lot.quarantine ? 'border-green-600 text-green-600 hover:bg-green-50' : 'border-red-600 text-red-600 hover:bg-red-50'}`}
+                      >
+                        {lot.quarantine ? 'Remove Quarantine' : 'Quarantine'}
+                      </button>
                     </td>
                   </tr>
                 );
@@ -164,6 +243,65 @@ export const BatchTrackingPage = () => {
           </table>
         </div>
       </div>
+
+      {/* Add Batch Modal */}
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        title="Create New Batch"
+      >
+        <form onSubmit={handleAddBatch} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-on-surface mb-1">Lot / Batch ID *</label>
+            <input
+              required
+              type="text"
+              value={formData.lotId}
+              onChange={e => setFormData({...formData, lotId: e.target.value})}
+              className="w-full p-2 border border-outline-variant rounded-md focus:outline-none focus:border-primary"
+              placeholder="e.g. LOT-89302"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-on-surface mb-1">Product *</label>
+            <select
+              required
+              value={formData.productId}
+              onChange={e => setFormData({...formData, productId: e.target.value})}
+              className="w-full p-2 border border-outline-variant rounded-md focus:outline-none focus:border-primary"
+            >
+              <option value="">Select a product</option>
+              {products.map(p => (
+                <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-on-surface mb-1">Mfg Date</label>
+              <input
+                type="date"
+                value={formData.mfgDate}
+                onChange={e => setFormData({...formData, mfgDate: e.target.value})}
+                className="w-full p-2 border border-outline-variant rounded-md focus:outline-none focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-on-surface mb-1">Expiry Date</label>
+              <input
+                type="date"
+                value={formData.expiryDate}
+                onChange={e => setFormData({...formData, expiryDate: e.target.value})}
+                className="w-full p-2 border border-outline-variant rounded-md focus:outline-none focus:border-primary"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 mt-6">
+            <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>Cancel</Button>
+            <Button type="submit" variant="primary">Create Batch</Button>
+          </div>
+        </form>
+      </Modal>
 
       {/* COA Certificate Details Modal */}
       {selectedLotCoa && (
@@ -184,7 +322,7 @@ export const BatchTrackingPage = () => {
                 <span className="material-symbols-outlined text-emerald-600 text-3xl">verified</span>
                 <div>
                   <h4 className="font-bold text-sm text-emerald-900">Certificate of Analysis (Verified)</h4>
-                  <p className="text-xs text-emerald-700">{selectedLotCoa.labName} • Certificate #{selectedLotCoa.testCertificateId}</p>
+                  <p className="text-xs text-emerald-700">LabCorp Inc. • Certificate #COA-{selectedLotCoa.lotId}</p>
                 </div>
               </div>
               <span className="px-3 py-1 bg-emerald-600 text-white font-bold text-xs rounded-full">PASSED</span>
@@ -193,11 +331,11 @@ export const BatchTrackingPage = () => {
             <div className="grid grid-cols-1 gap-4 text-xs sm:grid-cols-2">
               <div className="p-3 bg-slate-50 rounded-lg">
                 <span className="text-slate-500 block">Product</span>
-                <span className="font-bold text-slate-800">{selectedLotCoa.productName}</span>
+                <span className="font-bold text-slate-800">{selectedLotCoa.product?.name}</span>
               </div>
               <div className="p-3 bg-slate-50 rounded-lg">
                 <span className="text-slate-500 block">Assay Purity Score</span>
-                <span className="font-bold text-emerald-600">{selectedLotCoa.purityScore} (Grade A)</span>
+                <span className="font-bold text-emerald-600">99.8% (Grade A)</span>
               </div>
               <div className="p-3 bg-slate-50 rounded-lg">
                 <span className="text-slate-500 block">Heavy Metals Test</span>
@@ -212,7 +350,7 @@ export const BatchTrackingPage = () => {
             <div className="p-3 border border-outline-variant rounded-lg flex justify-between items-center bg-white">
               <span className="text-xs font-semibold text-slate-700">Official Signed PDF Document</span>
               <button
-                onClick={() => notifySuccess(`Downloading ${selectedLotCoa.testCertificateId}_Report.pdf...`)}
+                onClick={() => notifySuccess(`Downloading COA_${selectedLotCoa.lotId}_Report.pdf...`)}
                 className="px-3 py-1.5 bg-primary text-white text-xs font-bold rounded flex items-center gap-1 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">download</span>

@@ -38,7 +38,7 @@ export const InventoryListPage = () => {
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [productsList, setProductsList] = useState([]);
   const [selectedProductId, setSelectedProductId] = useState('');
-  const [adjustQty, setAdjustQty] = useState(0);
+  const [adjustQty, setAdjustQty] = useState('');
   const [adjustReason, setAdjustReason] = useState('Physical Stock Count Discrepancy');
   const [submitting, setSubmitting] = useState(false);
 
@@ -258,7 +258,7 @@ export const InventoryListPage = () => {
               onChange={(e) => setSelectedProductId(e.target.value)}
               options={productsList.map((p) => ({
                 value: p.id,
-                label: `${p.sku} — ${p.name} (Current: ${p.totalStock})`,
+                label: `${p.sku} — ${p.name} (Current: ${p.availableStock || 0})`,
               }))}
             />
           </FormField>
@@ -267,7 +267,7 @@ export const InventoryListPage = () => {
             <Input
               type="number"
               value={adjustQty}
-              onChange={(e) => setAdjustQty(Number(e.target.value))}
+              onChange={(e) => setAdjustQty(e.target.value)}
               placeholder="e.g. -5 or 25"
               required
             />

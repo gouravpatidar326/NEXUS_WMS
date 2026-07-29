@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-const API_BASE_URL = 'http://localhost:5000/api';
-=======
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
->>>>>>> bfea083027191f1ba39e44601454fe317a16f51a
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export const api = {
   async request(endpoint, options = {}) {

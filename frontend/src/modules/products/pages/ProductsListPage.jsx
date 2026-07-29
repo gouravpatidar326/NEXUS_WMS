@@ -1,20 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useWmsStore } from '@/contexts/WmsStoreContext';
 import { ROLES } from '@/permissions/roles';
 import { useNotification } from '@/contexts/NotificationContext';
 import Modal from '@/components/ui/Modal';
 import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
+import LoadingState from '@/components/feedback/LoadingState';
+import { productService } from '@/services/productService';
 
 export const ProductsListPage = () => {
   const { user } = useAuth();
-  const { getProductsForUser, adjustStock } = useWmsStore();
-  const { notifySuccess } = useNotification();
+  const { notifySuccess, notifyError } = useNotification();
 
-  const products = getProductsForUser(user);
-
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [selectedStatus, setSelectedStatus] = useState('Status: All');
@@ -31,21 +31,51 @@ export const ProductsListPage = () => {
   const isClerk = user?.role === ROLES.INVENTORY_CLERK;
   const showFinancials = !isClient && !isClerk;
 
-  const handleAddProduct = (e) => {
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const res = await productService.getProducts();
+      setProducts(res.items || res);
+    } catch (error) {
+      notifyError('Failed to fetch products');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const handleAddProduct = async (e) => {
     e.preventDefault();
-    adjustStock({
-      productId: `prd_${Date.now()}`,
-      productName: name,
-      sku: sku || `SKU-${Math.floor(1000 + Math.random() * 9000)}`,
-      quantity: Number(totalStock),
-      reason: 'New SKU Onboarded to Catalog',
-      location: 'Receiving Bin A-1',
-      user,
-    });
-    notifySuccess(`Product "${name}" created in master catalog & stock updated.`);
-    setIsModalOpen(false);
-    setName('');
-    setSku('');
+    try {
+      await productService.createProduct({
+        name,
+        sku: sku || `SKU-${Math.floor(1000 + Math.random() * 9000)}`,
+        category,
+        unitCost: Number(unitCost),
+        wholesalePrice: Number(wholesalePrice)
+      });
+      notifySuccess(`Product "${name}" created in master catalog.`);
+      setIsModalOpen(false);
+      setName('');
+      setSku('');
+      fetchProducts();
+    } catch (error) {
+      notifyError('Failed to add product');
+    }
+  };
+
+  const handleDeleteProduct = async (id, name) => {
+    if (!window.confirm(`Are you sure you want to delete "${name}"?`)) return;
+    try {
+      await productService.deleteProduct(id);
+      notifySuccess(`Product "${name}" deleted successfully.`);
+      fetchProducts();
+    } catch (error) {
+      notifyError('Failed to delete product');
+    }
   };
 
   const filteredProducts = products.filter((prd) => {
@@ -59,6 +89,8 @@ export const ProductsListPage = () => {
       selectedStatus === 'Status: All' || prd.status === selectedStatus;
     return matchesSearch && matchesCat && matchesStatus;
   });
+
+  if (loading) return <LoadingState />;
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden sm:gap-6">
@@ -167,6 +199,9 @@ export const ProductsListPage = () => {
                 )}
                 <th className="px-4 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider text-right">Available Stock</th>
                 <th className="px-4 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Status</th>
+                {!isClient && (
+                  <th className="px-4 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider text-right">Actions</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/40">
@@ -188,33 +223,42 @@ export const ProductsListPage = () => {
                   <td className="px-4 py-3 text-sm text-on-surface-variant">{prd.category}</td>
                   {showFinancials && (
                     <td className="px-4 py-3 text-sm text-right font-mono font-medium text-slate-600">
-                      ${prd.unitCost}
+                      ${prd.unitCost || '0.00'}
                     </td>
                   )}
                   <td className="px-4 py-3 text-sm text-right font-mono font-bold text-primary">
-                    ${prd.wholesalePrice}
+                    ${prd.wholesalePrice || '0.00'}
                   </td>
                   {showFinancials && (
                     <td className="px-4 py-3 text-sm text-right font-bold text-emerald-600">
-                      {prd.margin}
+                      --
                     </td>
                   )}
                   <td className={`px-4 py-3 text-sm text-right font-bold ${prd.availableStock < 20 ? 'text-red-600' : 'text-slate-800'}`}>
-                    {prd.availableStock} Units
+                    {prd.availableStock || 0} Units
                   </td>
                   <td className="px-4 py-3">
                     <span
                       className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-tight ${
-                        prd.status === 'In Stock'
+                        (prd.availableStock || 0) > 0
                           ? 'bg-green-100 text-green-700 border border-green-200'
-                          : prd.status === 'Low Stock'
-                          ? 'bg-red-100 text-red-700 border border-red-200'
-                          : 'bg-amber-100 text-amber-700 border border-amber-200'
+                          : 'bg-red-100 text-red-700 border border-red-200'
                       }`}
                     >
-                      {prd.status}
+                      {(prd.availableStock || 0) > 0 ? 'In Stock' : 'Out of Stock'}
                     </span>
                   </td>
+                  {!isClient && (
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => handleDeleteProduct(prd.id, prd.name)}
+                        className="text-red-600 hover:text-red-800 transition-colors cursor-pointer"
+                        title="Delete Product"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

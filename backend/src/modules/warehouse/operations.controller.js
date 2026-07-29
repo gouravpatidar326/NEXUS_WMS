@@ -209,5 +209,50 @@ const generateShippingLabel = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+const getCarriers = async (req, res) => {
+  try {
+    let settings = await prisma.systemSettings.findUnique({ where: { key: 'CARRIERS' } });
+    if (!settings) {
+      settings = await prisma.systemSettings.create({
+        data: {
+          key: 'CARRIERS',
+          value: JSON.stringify(['FedEx Freight', 'UPS Express', 'DHL Supply Chain', 'XPO Logistics', 'Blue Dart', 'Delhivery'])
+        }
+      });
+    }
+    res.json(JSON.parse(settings.value));
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
 
-module.exports = { getPickLists, completePick, updateLocation, generateShippingLabel, getShipments, getCompanies };
+const deleteShipment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const shipment = await prisma.shipment.findFirst({
+      where: { id, companyId: req.user.companyId }
+    });
+
+    if (!shipment) {
+      return res.status(404).json({ message: 'Shipment not found' });
+    }
+
+    await prisma.shipment.delete({ where: { id } });
+
+    await prisma.auditLog.create({
+      data: {
+        event: 'SHIPMENT_DELETED',
+        userId: req.user.id,
+        ipAddress: req.ip
+      }
+    });
+
+    res.json({ message: 'Shipment deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+module.exports = { getPickLists, completePick, updateLocation, generateShippingLabel, getShipments, getCompanies, getCarriers, deleteShipment };

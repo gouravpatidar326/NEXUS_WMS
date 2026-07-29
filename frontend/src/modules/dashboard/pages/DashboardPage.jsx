@@ -4,10 +4,7 @@ import { useNotification } from '@/contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
 import { ROLES } from '@/permissions/roles';
 import { dashboardService } from '@/services/dashboardService';
-<<<<<<< HEAD
-=======
 import LoadingState from '@/components/feedback/LoadingState';
->>>>>>> bfea083027191f1ba39e44601454fe317a16f51a
 
 export const DashboardPage = () => {
   const { user } = useAuth();
@@ -239,8 +236,8 @@ const SuperAdminDashboard = ({ user }) => {
 const WarehouseManagerDashboard = ({ user }) => {
   const navigate = useNavigate();
   const { notifySuccess, notifyError } = useNotification();
-<<<<<<< HEAD
   const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -249,26 +246,11 @@ const WarehouseManagerDashboard = ({ user }) => {
         setSummary(data);
       } catch (error) {
         notifyError('Failed to fetch dashboard summary');
-      }
-    };
-    fetchSummary();
-=======
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await dashboardService.getManagerDashboard();
-        setData(response.data);
-      } catch (err) {
-        notifyError('Failed to load dashboard data');
       } finally {
         setLoading(false);
       }
     };
-    fetchData();
->>>>>>> bfea083027191f1ba39e44601454fe317a16f51a
+    fetchSummary();
   }, [notifyError]);
 
   const handleClearance = (lotId) => {
@@ -291,15 +273,14 @@ const WarehouseManagerDashboard = ({ user }) => {
 
       {/* 4 KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm opacity-60">
-          <p className="text-xs text-on-surface-variant flex justify-between">Warehouse Capacity <span className="bg-slate-100 px-1 rounded text-[10px]">Coming Soon</span></p>
-          <h3 className="text-2xl font-bold text-primary">N/A</h3>
+        <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
+          <p className="text-xs text-on-surface-variant flex justify-between">Warehouse Capacity <span className="bg-green-100 text-green-700 px-1 rounded text-[10px] font-bold">LIVE</span></p>
+          <h3 className="text-2xl font-bold text-primary">{summary ? `${summary.capacityPercentage}%` : '...'}</h3>
           <div className="w-full bg-slate-100 h-1.5 rounded-full mt-2 overflow-hidden">
-            <div className="bg-primary h-full" style={{ width: '0%' }}></div>
+            <div className="bg-primary h-full transition-all duration-500" style={{ width: `${summary?.capacityPercentage || 0}%` }}></div>
           </div>
         </div>
         <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
-<<<<<<< HEAD
           <p className="text-xs text-on-surface-variant">Pending Pick Lists</p>
           <h3 className="text-2xl font-bold text-primary">{summary ? summary.pendingPickLists : '...'}</h3>
           <p className="text-[11px] text-on-surface-variant font-bold mt-2">Active picking tasks</p>
@@ -312,18 +293,6 @@ const WarehouseManagerDashboard = ({ user }) => {
         <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
           <p className="text-xs text-on-surface-variant">Near Expiry (&lt;30d)</p>
           <h3 className="text-2xl font-bold text-red-600">{summary ? summary.nearExpiryBatches?.length || 0 : '...'}</h3>
-=======
-          <p className="text-xs text-on-surface-variant">Pending Tasks</p>
-          <h3 className="text-2xl font-bold text-primary">{data?.pendingTasks || 0}</h3>
-        </div>
-        <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
-          <p className="text-xs text-on-surface-variant">Today's Shipments</p>
-          <h3 className="text-2xl font-bold text-primary">{data?.todaysShipments || 0}</h3>
-        </div>
-        <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
-          <p className="text-xs text-on-surface-variant">Near Expiry (&lt;30d)</p>
-          <h3 className="text-2xl font-bold text-red-600">{data?.nearExpiryCount || 0}</h3>
->>>>>>> bfea083027191f1ba39e44601454fe317a16f51a
           <p onClick={() => navigate('/expiry-tracking')} className="text-[11px] text-red-600 font-bold underline mt-2 cursor-pointer">
             View critical lots
           </p>
@@ -427,7 +396,6 @@ const WarehouseManagerDashboard = ({ user }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant text-xs">
-<<<<<<< HEAD
                 {summary && summary.nearExpiryBatches && summary.nearExpiryBatches.length > 0 ? (
                   summary.nearExpiryBatches.map((batch) => (
                     <tr key={batch.id} className="hover:bg-surface-container-low transition-colors">
@@ -450,29 +418,6 @@ const WarehouseManagerDashboard = ({ user }) => {
                   <tr>
                     <td colSpan="6" className="px-4 py-6 text-center text-on-surface-variant font-medium">
                       No expiring lots found.
-=======
-                {data?.expiringLots?.map((lot) => (
-                  <tr key={lot.id} className="hover:bg-surface-container-low transition-colors">
-                    <td className="px-4 py-3 font-mono font-bold text-primary">{lot.batchNumber}</td>
-                    <td className="px-4 py-3 font-semibold text-on-surface">{lot.product?.name || 'Unknown'}</td>
-                    <td className="px-4 py-3 text-red-600 font-bold">{new Date(lot.expiryDate).toLocaleDateString()}</td>
-                    <td className="px-4 py-3">{lot.quantity} Units</td>
-                    <td className="px-4 py-3 font-mono">N/A</td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => handleClearance(lot.batchNumber)}
-                        className="px-3 py-1 bg-primary/10 text-primary rounded font-bold hover:bg-primary/20 transition-colors whitespace-nowrap cursor-pointer"
-                      >
-                        Mark for Clearance
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {!data?.expiringLots?.length && (
-                  <tr>
-                    <td colSpan="6" className="px-4 py-6 text-center text-sm text-on-surface-variant">
-                      No lots expiring soon.
->>>>>>> bfea083027191f1ba39e44601454fe317a16f51a
                     </td>
                   </tr>
                 )}
@@ -481,31 +426,31 @@ const WarehouseManagerDashboard = ({ user }) => {
           </div>
         </div>
 
-        {/* Incoming Shipments (Clean Grid Layout) */}
+        {/* Recent Dispatches (Clean Grid Layout) */}
         <div className="bg-white border border-outline-variant rounded-xl p-4 sm:p-5 shadow-sm flex flex-col">
           <div className="flex justify-between items-center mb-4">
-            <h4 className="text-base font-bold text-on-surface">Incoming Shipments</h4>
-            <span className="text-xs text-on-surface-variant font-medium">Nov 22, 2023</span>
+            <h4 className="text-base font-bold text-on-surface">Recent Dispatches</h4>
+            <span className="text-xs text-on-surface-variant font-medium">Latest Labels</span>
           </div>
           <div className="space-y-3 flex-1 overflow-y-auto custom-scrollbar">
-            {data?.incomingShipments?.map((po) => (
-              <div key={po.id} className="p-3 border border-outline-variant rounded-lg hover:border-primary transition-all cursor-pointer">
+            {summary?.recentShipments?.map((shipment) => (
+              <div key={shipment.id} onClick={() => navigate('/shipping')} className="p-3 border border-outline-variant rounded-lg hover:border-primary transition-all cursor-pointer">
                 <div className="grid grid-cols-[48px_minmax(0,1fr)_auto] gap-3 items-center">
                   <div className="flex flex-col items-center justify-center bg-slate-100 p-1.5 rounded text-center shrink-0">
-                    <span className="text-[9px] text-on-surface-variant font-bold">ETA</span>
+                    <span className="material-symbols-outlined text-primary text-[20px]">local_shipping</span>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-xs font-bold text-on-surface truncate">{po.orderNumber}</div>
-                    <p className="text-[11px] text-on-surface-variant truncate">Expected {new Date(po.expectedDate).toLocaleDateString()}</p>
+                    <div className="text-xs font-bold text-on-surface truncate">{shipment.trackingNumber}</div>
+                    <p className="text-[11px] text-on-surface-variant truncate">To {shipment.recipient} via {shipment.carrier}</p>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 shrink-0">
-                    {po.status}
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 shrink-0">
+                    {shipment.status}
                   </span>
                 </div>
               </div>
             ))}
-            {!data?.incomingShipments?.length && (
-              <p className="text-sm text-center text-on-surface-variant p-4">No incoming shipments.</p>
+            {!summary?.recentShipments?.length && (
+              <p className="text-sm text-center text-on-surface-variant p-4">No recent dispatches.</p>
             )}
           </div>
         </div>

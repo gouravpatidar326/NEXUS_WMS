@@ -16,12 +16,14 @@ export const batchService = {
   },
 
   async createBatch(batchData) {
-    // Phase 2 backend automatically creates batches via PO Receipt,
-    // so manual creation isn't implemented in the mock, but we can mock it here for UI continuity
-    return {
-      id: `BAT-2026-0${Math.floor(Math.random() * 1000)}`,
-      status: 'Healthy',
-      ...batchData,
-    };
+    return await api.post('/batches', batchData);
   },
+
+  async updateBatch(id, updateData) {
+    return await api.put(`/batches/${id}`, updateData);
+  },
+
+  async unlockCoa(id, paymentToken) {
+    return await api.post(`/batches/${id}/unlock-coa`, { paymentToken });
+  }
 };

@@ -4,7 +4,7 @@ export const productService = {
   async getProducts({ search = '', category = '', status = '', page = 1, pageSize = 10 } = {}) {
     const products = await api.get('/products');
     
-    // Front-end local filtering/pagination since backend GET /api/warehouse/products returns all
+    // Front-end local filtering/pagination since backend GET /api/products returns all
     let filtered = [...products];
 
     if (search) {
@@ -38,7 +38,7 @@ export const productService = {
   },
 
   async createProduct(productData) {
-    return await api.post('/warehouse/products', productData);
+    return await api.post('/products', productData);
   },
 
   async updateProduct(id, updates) {
@@ -47,6 +47,6 @@ export const productService = {
   },
 
   async deleteProduct(id) {
-    return true;
+    return await api.delete(`/products/${id}`);
   },
 };

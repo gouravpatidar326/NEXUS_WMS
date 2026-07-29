@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Send, Plus, Truck, ExternalLink } from 'lucide-react';
+import { Send, Plus, Truck, ExternalLink, Trash2 } from 'lucide-react';
 import { shippingService } from '@/services/shippingService';
+import { salesOrderService } from '@/services/salesOrderService';
 import { useNotification } from '@/contexts/NotificationContext';
 import { PERMISSIONS } from '@/permissions/permissions';
 import PermissionGuard from '@/guards/PermissionGuard';
@@ -19,26 +20,44 @@ export const ShippingPage = () => {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [carrierOptions, setCarrierOptions] = useState([]);
+  const [salesOrders, setSalesOrders] = useState([]);
 
   const [carrier, setCarrier] = useState('FedEx Freight');
-  const [orderId, setOrderId] = useState('SO-4021');
-  const [recipient, setRecipient] = useState('Acme Corp');
-  const [destination, setDestination] = useState('Dallas, TX');
+  const [orderId, setOrderId] = useState('');
+  const [recipient, setRecipient] = useState('');
+  const [destination, setDestination] = useState('');
 
-  const fetchShipments = async () => {
+  const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const data = await shippingService.getShipments();
-      setShipments(data);
+      const [shipmentsData, carriersData, salesOrdersData] = await Promise.all([
+        shippingService.getShipments(),
+        shippingService.getCarriers(),
+        salesOrderService.fetchSalesOrders()
+      ]);
+      setShipments(shipmentsData);
+      setCarrierOptions(carriersData);
+      setSalesOrders(salesOrdersData);
+      if (carriersData.length > 0) setCarrier(carriersData[0]);
     } catch {
-      notifyError('Failed to load shipments');
+      notifyError('Failed to load shipping data');
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchShipments = async () => {
+    try {
+      const data = await shippingService.getShipments();
+      setShipments(data);
+    } catch {
+      notifyError('Failed to load shipments');
+    }
+  };
+
   useEffect(() => {
-    fetchShipments();
+    fetchInitialData();
   }, []);
 
   const handleCreateShipment = async (e) => {
@@ -52,9 +71,23 @@ export const ShippingPage = () => {
       });
       notifySuccess('Shipping label generated & dispatch queued.');
       setIsModalOpen(false);
+      setOrderId('');
+      setRecipient('');
+      setDestination('');
       fetchShipments();
     } catch {
       notifyError('Shipment creation failed');
+    }
+  };
+
+  const handleDeleteShipment = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this shipment?')) return;
+    try {
+      await shippingService.deleteShipment(id);
+      notifySuccess('Shipment deleted successfully');
+      fetchInitialData();
+    } catch {
+      notifyError('Failed to delete shipment');
     }
   };
 
@@ -81,6 +114,21 @@ export const ShippingPage = () => {
         const variant = row.status === 'In Transit' ? 'success' : 'warning';
         return <Badge variant={variant}>{row.status}</Badge>;
       },
+    },
+    {
+      header: 'Actions',
+      accessor: 'id',
+      cell: (row) => (
+        <PermissionGuard permission={PERMISSIONS.SHIPPING_DELETE}>
+          <button
+            onClick={() => handleDeleteShipment(row.id)}
+            className="p-1.5 text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/20 rounded-lg transition-colors"
+            title="Delete Shipment"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </PermissionGuard>
+      ),
     },
   ];
 
@@ -122,12 +170,31 @@ export const ShippingPage = () => {
             <Select
               value={carrier}
               onChange={(e) => setCarrier(e.target.value)}
-              options={['FedEx Freight', 'UPS Express', 'DHL Supply Chain', 'XPO Logistics']}
+              options={carrierOptions}
             />
           </FormField>
 
           <FormField label="Target Sales Order Ref" required>
-            <Input value={orderId} onChange={(e) => setOrderId(e.target.value)} />
+            <Select
+              value={orderId}
+              onChange={(e) => {
+                const selectedOrderId = e.target.value;
+                setOrderId(selectedOrderId);
+                const order = salesOrders.find(o => o.id === selectedOrderId);
+                if (order) {
+                  setRecipient(order.client?.name || 'Unknown');
+                  setDestination(order.client?.name ? `${order.client.name} Facility` : 'Unknown');
+                } else {
+                  setRecipient('');
+                  setDestination('');
+                }
+              }}
+              placeholder="Select a Sales Order"
+              options={salesOrders.map(o => ({
+                value: o.id,
+                label: `${o.orderNumber} - ${o.client?.name} (${o.status})`
+              }))}
+            />
           </FormField>
 
           <FormField label="Recipient Name" required>

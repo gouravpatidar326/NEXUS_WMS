@@ -4,20 +4,33 @@ export const inventoryService = {
   async getMovements({ search = '', type = '', page = 1, pageSize = 10 } = {}) {
     const movementsStore = await api.get('/inventory');
 
-    let filtered = [...movementsStore];
+    const mappedMovements = movementsStore.map(m => ({
+      ...m,
+      productName: m.product?.name || 'Unknown',
+      sku: m.product?.sku || 'Unknown',
+      type: m.movementType === 'INBOUND' ? 'Inbound Receipt' : 'Stock Adjustment',
+      quantity: m.quantityDelta,
+      sourceLocation: m.quantityDelta < 0 ? m.location : '-',
+      destLocation: m.quantityDelta > 0 ? m.location : '-',
+      reason: m.movementType,
+      performedBy: 'System',
+      timestamp: new Date(m.timestamp).toLocaleString()
+    }));
+
+    let filtered = [...mappedMovements];
 
     if (search) {
       const q = search.toLowerCase();
       filtered = filtered.filter(
         (m) =>
-          m.product?.name?.toLowerCase().includes(q) ||
-          m.product?.sku?.toLowerCase().includes(q) ||
-          m.movementType?.toLowerCase().includes(q)
+          m.productName.toLowerCase().includes(q) ||
+          m.sku.toLowerCase().includes(q) ||
+          m.reason.toLowerCase().includes(q)
       );
     }
 
     if (type) {
-      filtered = filtered.filter((m) => m.movementType === type);
+      filtered = filtered.filter((m) => m.type === type);
     }
 
     const totalItems = filtered.length;
