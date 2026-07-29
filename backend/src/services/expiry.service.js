@@ -1,83 +1,135 @@
-const expiryRepository = require('../repositories/expiry.repository');
-const lotRepository = require('../repositories/lot.repository');
+const prisma = require('../utils/prisma');
 const { getPaginationParams, formatPaginationMeta } = require('../utils/pagination');
 
 class ExpiryService {
   async scanAndGenerateExpiryAlerts(companyId) {
-    const { items: batches } = await lotRepository.findAll({
-      companyId,
-      skip: 0,
-      limit: 1000,
-      sortBy: 'expiryDate',
-      sortOrder: 'asc',
+    const batches = await prisma.batch.findMany({
+      where: companyId ? { companyId } : {},
+      orderBy: { expiryDate: 'asc' },
     });
 
     const now = new Date();
-    const alertsGenerated = [];
+    let scannedCount = 0;
+    let alertsCount = 0;
 
     for (const batch of batches) {
+      scannedCount++;
       if (!batch.expiryDate) continue;
 
       const expiry = new Date(batch.expiryDate);
       const diffTime = expiry.getTime() - now.getTime();
       const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      let alertTier = null;
       if (daysRemaining <= 0) {
-        alertTier = 'EXPIRED';
-      } else if (daysRemaining <= 7) {
-        alertTier = 'ALERT_7D';
-      } else if (daysRemaining <= 15) {
-        alertTier = 'ALERT_15D';
-      } else if (daysRemaining <= 30) {
-        alertTier = 'ALERT_30D';
-      }
-
-      if (alertTier) {
-        const alert = await expiryRepository.upsertAlert({
-          lotId: batch.id,
-          productId: batch.productId,
-          expiryDate: expiry,
-          daysRemaining,
-          alertTier,
-          companyId,
+        await prisma.batch.update({
+          where: { id: batch.id },
+          data: { status: 'EXPIRED' },
         });
-
-        // Update batch status to EXPIRED if expired
-        if (alertTier === 'EXPIRED') {
-          await lotRepository.updateStatus(batch.id, companyId, 'EXPIRED');
-        }
-
-        alertsGenerated.push(alert);
+        alertsCount++;
+      } else if (daysRemaining <= 30) {
+        alertsCount++;
       }
     }
 
     return {
-      scannedBatches: batches.length,
-      alertsGeneratedCount: alertsGenerated.length,
-      alerts: alertsGenerated,
+      scannedBatches: scannedCount,
+      alertsGeneratedCount: alertsCount,
     };
   }
 
   async getExpiryAlerts(companyId, query) {
     const { page, limit, skip } = getPaginationParams(query);
-    const alertTier = query.alertTier || null;
-    const resolved = query.resolved;
+    const search = query.search || '';
+    const statusFilter = query.status || '';
 
-    const { items, total } = await expiryRepository.findAll({
-      companyId,
-      alertTier,
-      resolved,
-      skip,
-      limit,
+    const where = {
+      ...(companyId ? { companyId } : {}),
+      ...(search
+        ? {
+            OR: [
+              { lotNumber: { contains: search } },
+              { lotId: { contains: search } },
+              { product: { name: { contains: search } } },
+              { product: { sku: { contains: search } } },
+            ],
+          }
+        : {}),
+    };
+
+    const [batches, total] = await Promise.all([
+      prisma.batch.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { expiryDate: 'asc' },
+        include: {
+          product: true,
+          locationInventories: {
+            include: { location: true },
+          },
+        },
+      }),
+      prisma.batch.count({ where }),
+    ]);
+
+    const now = new Date();
+
+    const items = batches.map((batch) => {
+      const expiry = batch.expiryDate ? new Date(batch.expiryDate) : null;
+      let daysRemaining = 0;
+      let status = 'Safe';
+
+      if (expiry) {
+        const diffTime = expiry.getTime() - now.getTime();
+        daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (daysRemaining <= 0) {
+          status = 'Expired';
+        } else if (daysRemaining <= 7) {
+          status = '7 Days';
+        } else if (daysRemaining <= 15) {
+          status = '15 Days';
+        } else if (daysRemaining <= 30) {
+          status = '30 Days';
+        } else {
+          status = 'Safe';
+        }
+      }
+
+      // Calculate total available quantity across bin locations or acceptedQty
+      const locQty = batch.locationInventories?.reduce((sum, li) => sum + (li.quantity || 0), 0);
+      const availableQuantity = locQty > 0 ? locQty : batch.acceptedQty || 0;
+
+      // Storage location formatting
+      const locNames = batch.locationInventories?.map((li) => li.location?.code || `Bin ${li.location?.bin || 'A1'}`).filter(Boolean);
+      const storageLocation = locNames?.length > 0 ? locNames.join(', ') : 'Unassigned';
+
+      return {
+        id: batch.id,
+        lotNumber: batch.lotNumber || batch.lotId || `LOT-${batch.id.substring(0, 6)}`,
+        productName: batch.product?.name || 'N/A',
+        sku: batch.product?.sku || 'N/A',
+        mfgDate: batch.mfgDate,
+        expiryDate: batch.expiryDate,
+        daysRemaining,
+        status,
+        availableQuantity,
+        storageLocation,
+        batchStatus: batch.status,
+      };
     });
 
+    const filteredItems = statusFilter ? items.filter((i) => i.status.toLowerCase() === statusFilter.toLowerCase()) : items;
+
     const meta = formatPaginationMeta(total, page, limit);
-    return { items, meta };
+    return { items: filteredItems, meta };
   }
 
   async resolveAlert(id, companyId) {
-    await expiryRepository.resolveAlert(id, companyId);
+    await prisma.expiryAlert.updateMany({
+      where: { id, ...(companyId ? { companyId } : {}) },
+      data: { resolved: true },
+    });
     return { id, resolved: true };
   }
 }

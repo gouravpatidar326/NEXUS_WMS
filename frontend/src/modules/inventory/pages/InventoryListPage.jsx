@@ -15,6 +15,14 @@ import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import LoadingState from '@/components/feedback/LoadingState';
 
+const normalizeArray = (res) => {
+  if (!res) return [];
+  if (Array.isArray(res)) return res;
+  if (Array.isArray(res.data)) return res.data;
+  if (Array.isArray(res.items)) return res.items;
+  return [];
+};
+
 export const InventoryListPage = () => {
   const { notifySuccess, notifyError } = useNotification();
   const [activeTab, setActiveTab] = useState('bins'); // 'bins' | 'ledger'
@@ -27,18 +35,20 @@ export const InventoryListPage = () => {
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Adjustment Modal state
+  // Adjustment Form state
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
-  const [productsList, setProductsList] = useState([]);
-  const [selectedProductId, setSelectedProductId] = useState('');
-  const [adjustQty, setAdjustQty] = useState('');
-  const [adjustReason, setAdjustReason] = useState('Physical Stock Count Discrepancy');
+  const [productId, setProductId] = useState('');
+  const [lotId, setLotId] = useState('');
+  const [locationId, setLocationId] = useState('');
+  const [quantityDelta, setQuantityDelta] = useState('');
+  const [reasonCode, setReasonCode] = useState('PHYSICAL_COUNT');
+  const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [binList, txList, prodRes, locList, batchList] = await Promise.all([
+      const [binRes, txRes, prodRes, locRes, batchRes] = await Promise.all([
         inventoryService.getBinInventory(),
         inventoryService.getMovements({ limit: 100 }),
         productService.getProducts({ limit: 100 }),
@@ -46,16 +56,23 @@ export const InventoryListPage = () => {
         batchService.getBatches(),
       ]);
 
-      setBins(binList || []);
-      setTransactions(txList.items || []);
-      setProducts(prodRes.items || []);
-      setLocations(locList || []);
-      setBatches(batchList || []);
+      const binList = normalizeArray(binRes);
+      const txList = normalizeArray(txRes);
+      const prodList = normalizeArray(prodRes);
+      const locList = normalizeArray(locRes);
+      const batchList = normalizeArray(batchRes);
 
-      if (prodRes.items && prodRes.items.length > 0) setProductId(prodRes.items[0].id);
-      if (batchList && batchList.length > 0) setLotId(batchList[0].id);
-      if (locList && locList.length > 0) setLocationId(locList[0].id);
-    } catch {
+      setBins(binList);
+      setTransactions(txList);
+      setProducts(prodList);
+      setLocations(locList);
+      setBatches(batchList);
+
+      if (prodList.length > 0 && !productId) setProductId(prodList[0].id);
+      if (batchList.length > 0 && !lotId) setLotId(batchList[0].id);
+      if (locList.length > 0 && !locationId) setLocationId(locList[0].id);
+    } catch (err) {
+      console.error('Inventory fetch error:', err);
       notifyError('Failed to fetch inventory data');
     } finally {
       setLoading(false);
@@ -70,7 +87,7 @@ export const InventoryListPage = () => {
     setIsAdjustModalOpen(true);
   };
 
-  const handleConfirmAdjustment = async (e) => {
+  const handleAdjustSubmit = async (e) => {
     e.preventDefault();
     if (!productId || !lotId || !locationId || !quantityDelta) {
       notifyError('Product, Lot, Location, and Quantity Delta are required');
@@ -89,6 +106,7 @@ export const InventoryListPage = () => {
       });
       notifySuccess(`Audited stock adjustment of ${quantityDelta > 0 ? '+' : ''}${quantityDelta} units applied.`);
       setIsAdjustModalOpen(false);
+      setQuantityDelta('');
       setNotes('');
       fetchData();
     } catch (err) {
@@ -109,7 +127,7 @@ export const InventoryListPage = () => {
             {row.location?.code || `Bin ${row.location?.bin || row.locationId}`}
           </span>
           <span className="text-[11px] text-slate-500 font-mono">
-            Zone {row.location?.zone || 'A'} &rarr; Bin {row.location?.bin || 'A1'}
+            Zone {row.location?.zone || 'A'} &rarr; Aisle {row.location?.aisle || '01'} &rarr; Bin {row.location?.bin || 'A1'}
           </span>
         </div>
       ),
@@ -158,15 +176,12 @@ export const InventoryListPage = () => {
       cell: (row) => (
         <Badge
           variant={
-            row.movementType === 'RECEIVE'
+            row.movementType === 'RECEIVE' || row.movementType === 'INBOUND'
               ? 'success'
-              : row.movementType === 'TRANSFER'
-              ? 'info'
-              : row.movementType === 'ADJUSTMENT'
+              : row.movementType === 'ADJUST'
               ? 'warning'
-              : 'default'
+              : 'primary'
           }
-          dot
         >
           {row.movementType}
         </Badge>
@@ -175,118 +190,179 @@ export const InventoryListPage = () => {
     {
       header: 'Product',
       accessor: 'product',
-      cell: (row) => row.product?.name || 'Product',
+      cell: (row) => (
+        <div>
+          <span className="font-semibold text-slate-800 block">{row.product?.name || 'N/A'}</span>
+          <span className="text-[11px] font-mono text-slate-500">{row.product?.sku || 'N/A'}</span>
+        </div>
+      ),
     },
     {
-      header: 'Quantity Delta',
+      header: 'Location',
+      accessor: 'locRef',
+      cell: (row) => <span className="font-mono text-xs text-slate-600">{row.locRef?.code || row.locationId}</span>,
+    },
+    {
+      header: 'Quantity Change',
       accessor: 'quantityDelta',
       cell: (row) => (
-        <span className={`font-mono font-bold ${row.quantityDelta >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-          {row.quantityDelta >= 0 ? `+${row.quantityDelta}` : row.quantityDelta} Units
+        <span
+          className={`font-mono font-bold ${
+            row.quantityDelta > 0 ? 'text-green-600' : row.quantityDelta < 0 ? 'text-red-600' : 'text-slate-600'
+          }`}
+        >
+          {row.quantityDelta > 0 ? `+${row.quantityDelta}` : row.quantityDelta}
         </span>
       ),
     },
     {
-      header: 'Notes / Reference',
+      header: 'Reference ID / Notes',
       accessor: 'notes',
-      cell: (row) => row.notes || row.referenceId || 'N/A',
+      cell: (row) => (
+        <div className="text-xs">
+          <div className="font-mono font-semibold text-slate-700">{row.referenceId || 'LOG-SYSTEM'}</div>
+          <div className="text-slate-500 truncate max-w-xs">{row.notes || '-'}</div>
+        </div>
+      ),
     },
   ];
 
-  if (loading) return <LoadingState message="Loading Bin Inventory & Transaction Ledger..." />;
+  if (loading) return <LoadingState message="Loading storage bin mappings and inventory transaction ledgers..." />;
 
   return (
-    <section className="space-y-6 flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden">
-      <PageHeader
-        title="Inventory & Bin Mapping"
-        description="Real-time storage bin stock mapping and immutable inventory transaction ledger"
-        breadcrumbs={[{ label: 'Inventory' }, { label: 'Bin Mapping' }]}
-        actions={
-          <div className="flex gap-3">
-            <Button variant="outline" leftIcon={RefreshCw} onClick={fetchData}>
-              Refresh
-            </Button>
-            <Button variant="primary" leftIcon={Plus} onClick={handleOpenAdjustModal}>
-              Audit Stock Adjustment
-            </Button>
-          </div>
-        }
-      />
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden sm:gap-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-3xl font-bold text-on-surface">Inventory & Bin Mapping</h2>
+          <p className="text-sm text-on-surface-variant mt-1">
+            Real-time storage bin stock mapping and immutable inventory transaction ledger
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <Button variant="outline" leftIcon={RefreshCw} onClick={fetchData}>
+            Refresh
+          </Button>
+          <Button variant="primary" leftIcon={Plus} onClick={handleOpenAdjustModal}>
+            Audit Stock Adjustment
+          </Button>
+        </div>
+      </div>
 
-      {/* Tabs Header */}
-      <div className="flex border-b border-slate-200">
+      {/* Tabs */}
+      <div className="flex border-b border-outline-variant">
         <button
           onClick={() => setActiveTab('bins')}
-          className={`px-4 py-2 font-bold text-sm border-b-2 transition-colors ${activeTab === 'bins' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition ${
+            activeTab === 'bins'
+              ? 'border-primary text-primary font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
         >
           Bin Location Stock ({bins.length})
         </button>
         <button
           onClick={() => setActiveTab('ledger')}
-          className={`px-4 py-2 font-bold text-sm border-b-2 transition-colors ${activeTab === 'ledger' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition ${
+            activeTab === 'ledger'
+              ? 'border-primary text-primary font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
         >
           Immutable Transaction Ledger ({transactions.length})
         </button>
       </div>
 
-      {/* Tab Content */}
-      <div className="flex-1">
+      {/* Content */}
+      <div className="bg-surface-container-low rounded-2xl border border-outline-variant p-4 overflow-hidden flex-1">
         {activeTab === 'bins' ? (
-          <DataTable columns={binColumns} data={bins} />
+          <DataTable
+            data={bins}
+            columns={binColumns}
+            emptyMessage="No bin location stock mappings recorded in database."
+          />
         ) : (
-          <DataTable columns={txColumns} data={transactions} />
+          <DataTable
+            data={transactions}
+            columns={txColumns}
+            emptyMessage="No transaction ledger records recorded."
+          />
         )}
       </div>
 
-      {/* Stock Adjustment Modal */}
+      {/* Audit Stock Adjustment Modal */}
       <Modal
         isOpen={isAdjustModalOpen}
         onClose={() => setIsAdjustModalOpen(false)}
-        title="Audited Stock Adjustment"
+        title="Transactional Stock Adjustment (Prisma Transaction)"
         size="md"
         footer={
           <>
-            <Button variant="outline" onClick={() => setIsAdjustModalOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleConfirmAdjustment} disabled={submitting}>
-              {submitting ? 'Processing...' : 'Apply Stock Adjustment'}
+            <Button variant="outline" onClick={() => setIsAdjustModalOpen(false)} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleAdjustSubmit} isLoading={submitting}>
+              Apply Stock Mutation
             </Button>
           </>
         }
       >
-        <form onSubmit={handleConfirmAdjustment} className="space-y-4">
-          <FormField label="Target Product" required>
+        <form onSubmit={handleAdjustSubmit} className="space-y-4">
+          <p className="text-xs text-amber-700 bg-amber-50 p-3 rounded-lg border border-amber-200">
+            ⚠️ Every stock mutation updates <strong>LocationInventory</strong>, <strong>Inventory Aggregate</strong>, and <strong>InventoryLedger</strong> inside a single database transaction.
+          </p>
+
+          <FormField label="Target Storage Location" required>
             <Select
-              value={selectedProductId}
-              onChange={(e) => setSelectedProductId(e.target.value)}
-              options={productsList.map((p) => ({
-                value: p.id,
-                label: `${p.sku} — ${p.name} (Current: ${p.availableStock || 0})`,
-              }))}
+              value={locationId}
+              onChange={(e) => setLocationId(e.target.value)}
+              options={locations.map((l) => ({ value: l.id, label: `Zone ${l.zone} - Bin ${l.bin} (${l.code})` }))}
             />
           </FormField>
 
-          <FormField label="Quantity Adjustment (+/- Delta)" required hint="Use positive number to add stock, negative number to reduce stock">
-            <Input
-              type="number"
-              value={adjustQty}
-              onChange={(e) => setAdjustQty(e.target.value)}
-              placeholder="e.g. -5 or 25"
-              required
-            />
-          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Product SKU" required>
+              <Select
+                value={productId}
+                onChange={(e) => setProductId(e.target.value)}
+                options={products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))}
+              />
+            </FormField>
+            <FormField label="Batch / Lot ID" required>
+              <Select
+                value={lotId}
+                onChange={(e) => setLotId(e.target.value)}
+                options={batches.map((b) => ({ value: b.id, label: `Lot ${b.lotId}` }))}
+              />
+            </FormField>
+          </div>
 
-          <FormField label="Adjustment Reason / Justification" required>
-            <Select
-              value={adjustReason}
-              onChange={(e) => setAdjustReason(e.target.value)}
-              options={[
-                'Physical Stock Count Discrepancy',
-                'Damaged During Transport',
-                'Expired Stock Removal',
-                'Unrecorded Dock Receipt',
-                'Quality Inspection Hold',
-              ]}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Quantity Change (+/-)" required>
+              <Input
+                type="number"
+                value={quantityDelta}
+                onChange={(e) => setQuantityDelta(e.target.value)}
+                placeholder="e.g. 50 or -10"
+                required
+              />
+            </FormField>
+            <FormField label="Adjustment Reason Code">
+              <Select
+                value={reasonCode}
+                onChange={(e) => setReasonCode(e.target.value)}
+                options={[
+                  { value: 'PHYSICAL_COUNT', label: 'Physical Audit Count' },
+                  { value: 'DAMAGED', label: 'Damaged Goods Quarantine' },
+                  { value: 'EXPIRED', label: 'Expired Stock Removal' },
+                  { value: 'MANUAL_CORRECTION', label: 'Manual Correction' },
+                ]}
+              />
+            </FormField>
+          </div>
+
+          <FormField label="Audit Notes / Reference">
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Quarter audit count correction" />
           </FormField>
         </form>
       </Modal>

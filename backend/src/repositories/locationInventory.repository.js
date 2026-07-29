@@ -65,7 +65,7 @@ class LocationInventoryRepository {
 
   async findAll({ companyId, productId, locationId, lotId, skip, limit }) {
     const where = {
-      companyId,
+      ...(companyId ? { companyId } : {}),
       ...(productId ? { productId } : {}),
       ...(locationId ? { locationId } : {}),
       ...(lotId ? { lotId } : {}),

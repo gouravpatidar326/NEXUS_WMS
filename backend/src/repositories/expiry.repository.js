@@ -6,7 +6,7 @@ class ExpiryRepository {
       where: {
         lotId: data.lotId,
         alertTier: data.alertTier,
-        companyId: data.companyId,
+        ...(data.companyId ? { companyId: data.companyId } : {}),
       },
     });
 
@@ -22,7 +22,7 @@ class ExpiryRepository {
 
   async findAll({ companyId, alertTier, resolved, skip, limit }) {
     const where = {
-      companyId,
+      ...(companyId ? { companyId } : {}),
       ...(alertTier ? { alertTier } : {}),
       ...(resolved !== undefined ? { resolved: resolved === 'true' } : {}),
     };
@@ -45,8 +45,9 @@ class ExpiryRepository {
   }
 
   async resolveAlert(id, companyId) {
+    const where = { id, ...(companyId ? { companyId } : {}) };
     return await prisma.expiryAlert.updateMany({
-      where: { id, companyId },
+      where,
       data: { resolved: true },
     });
   }

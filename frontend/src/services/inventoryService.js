@@ -1,53 +1,42 @@
 import { api } from './api';
 
 export const inventoryService = {
-  async getMovements({ search = '', type = '', page = 1, pageSize = 10 } = {}) {
+  async getMovements(params = {}) {
+    const { search = '', type = '', page = 1, limit = 100 } = params || {};
     const query = new URLSearchParams();
     if (search) query.append('search', search);
     if (type) query.append('movementType', type);
     if (page) query.append('page', page);
-    if (pageSize) query.append('limit', pageSize);
+    if (limit) query.append('limit', limit);
 
-    const mappedMovements = movementsStore.map(m => ({
-      ...m,
-      productName: m.product?.name || 'Unknown',
-      sku: m.product?.sku || 'Unknown',
-      type: m.movementType === 'INBOUND' ? 'Inbound Receipt' : 'Stock Adjustment',
-      quantity: m.quantityDelta,
-      sourceLocation: m.quantityDelta < 0 ? m.location : '-',
-      destLocation: m.quantityDelta > 0 ? m.location : '-',
-      reason: m.movementType,
-      performedBy: 'System',
-      timestamp: new Date(m.timestamp).toLocaleString()
-    }));
-
-    let filtered = [...mappedMovements];
-
-    if (search) {
-      const q = search.toLowerCase();
-      filtered = filtered.filter(
-        (m) =>
-          m.productName.toLowerCase().includes(q) ||
-          m.sku.toLowerCase().includes(q) ||
-          m.reason.toLowerCase().includes(q)
-      );
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    const res = await api.get(`/v1/inventory/transactions${queryString}`);
+    
+    if (res && res.data) {
+      return {
+        items: res.data,
+        totalItems: res.pagination?.totalItems || res.data.length,
+        totalPages: res.pagination?.totalPages || 1,
+        currentPage: res.pagination?.currentPage || 1,
+      };
     }
-
-    if (type) {
-      filtered = filtered.filter((m) => m.type === type);
-    }
-
-    const totalItems = filtered.length;
-    const totalPages = Math.ceil(totalItems / pageSize);
-    const start = (page - 1) * pageSize;
-    const items = filtered.slice(start, start + pageSize);
-
-    return { items, totalItems, totalPages, currentPage: page, pageSize };
+    return { items: Array.isArray(res) ? res : (res?.items || []), totalItems: 0, totalPages: 1, currentPage: 1 };
   },
 
   async getBinInventory(params = {}) {
     const res = await api.get('/v1/inventory/bins');
-    return res.data || [];
+    if (res && res.data) {
+      return res.data;
+    }
+    return Array.isArray(res) ? res : (res?.items || []);
+  },
+
+  async getInventorySummary(params = {}) {
+    const res = await api.get('/v1/inventory/summary');
+    if (res && res.data) {
+      return res.data;
+    }
+    return Array.isArray(res) ? res : (res?.items || []);
   },
 
   async adjustStock({ productId, lotId, locationId, quantityDelta, reasonCode, notes }) {
