@@ -5,7 +5,6 @@ import { batchService } from '@/services/batchService';
 import { productService } from '@/services/productService';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
-import Modal from '@/components/ui/Modal';
 import LoadingState from '@/components/feedback/LoadingState';
 import { QrCode, Lock, CheckCircle2, ShieldAlert } from 'lucide-react';
 
