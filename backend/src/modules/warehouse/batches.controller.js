@@ -4,11 +4,74 @@ const getBatches = async (req, res) => {
   try {
     const batches = await prisma.batch.findMany({
       where: { companyId: req.user.companyId },
-      include: { product: true }
+      include: { product: true },
+      orderBy: { createdAt: 'desc' }
     });
     res.json(batches);
   } catch (error) {
     console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+const createBatch = async (req, res) => {
+  try {
+    const { companyId } = req.user;
+    const { lotId, productId, mfgDate, expiryDate } = req.body;
+
+    if (!lotId || !productId) {
+      return res.status(400).json({ message: 'lotId and productId are required' });
+    }
+
+    const newBatch = await prisma.batch.create({
+      data: {
+        lotId,
+        productId,
+        companyId,
+        mfgDate: mfgDate ? new Date(mfgDate) : null,
+        expiryDate: expiryDate ? new Date(expiryDate) : null,
+        quarantine: false,
+        coaLocked: true,
+      },
+      include: {
+        product: true
+      }
+    });
+
+    res.status(201).json(newBatch);
+  } catch (error) {
+    console.error('Error creating batch:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+const updateBatch = async (req, res) => {
+  try {
+    const { companyId } = req.user;
+    const { id } = req.params;
+    const { quarantine } = req.body;
+
+    const batch = await prisma.batch.findFirst({
+      where: { id, companyId }
+    });
+
+    if (!batch) {
+      return res.status(404).json({ message: 'Batch not found' });
+    }
+
+    const updatedBatch = await prisma.batch.update({
+      where: { id },
+      data: {
+        quarantine: quarantine !== undefined ? quarantine : batch.quarantine
+      },
+      include: {
+        product: true
+      }
+    });
+
+    res.json(updatedBatch);
+  } catch (error) {
+    console.error('Error updating batch:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -50,4 +113,4 @@ const unlockCoa = async (req, res) => {
   }
 };
 
-module.exports = { getBatches, unlockCoa };
+module.exports = { getBatches, createBatch, updateBatch, unlockCoa };

@@ -11,6 +11,8 @@ router.post('/pick-lists/:id/pick', opsController.completePick);
 router.post('/locations/update', opsController.updateLocation);
 router.post('/shipping/label', opsController.generateShippingLabel);
 router.get('/shipping', opsController.getShipments);
+router.delete('/shipping/:id', opsController.deleteShipment);
+router.get('/carriers', opsController.getCarriers);
 
 module.exports = router;
 

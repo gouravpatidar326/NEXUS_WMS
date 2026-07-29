@@ -3,7 +3,10 @@ const prisma = require('../../utils/prisma');
 const getProducts = async (req, res) => {
   try {
     const products = await prisma.product.findMany({
-      where: { companyId: req.user.companyId }
+      where: { 
+        companyId: req.user.companyId,
+        status: { not: 'DELETED' }
+      }
     });
 
     const isClient = req.user.role === 'CLIENT';
@@ -45,4 +48,20 @@ const createProduct = async (req, res) => {
   }
 };
 
-module.exports = { getProducts, createProduct };
+const deleteProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await prisma.product.update({
+      where: { id },
+      data: { status: 'DELETED' }
+    });
+
+    res.json({ message: 'Product deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+module.exports = { getProducts, createProduct, deleteProduct };

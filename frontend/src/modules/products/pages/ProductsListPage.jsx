@@ -53,7 +53,7 @@ export const ProductsListPage = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [prodRes, catList] = await Promise.all([
+      const [prodsData, catsData] = await Promise.all([
         productService.getProducts({
           search: searchTerm,
           categoryId: selectedCategory,
@@ -61,10 +61,10 @@ export const ProductsListPage = () => {
         }),
         categoryService.getCategories(),
       ]);
-      setProducts(prodRes.items || []);
-      setCategories(catList || []);
+      setProducts(Array.isArray(prodsData) ? prodsData : prodsData.items || []);
+      setCategories(Array.isArray(catsData) ? catsData : catsData.items || []);
     } catch (err) {
-      notifyError('Failed to fetch product catalog');
+      notifyError('Failed to load products or categories');
     } finally {
       setLoading(false);
     }
@@ -230,127 +230,126 @@ export const ProductsListPage = () => {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white border border-outline-variant rounded-xl overflow-x-auto custom-scrollbar flex-1">
-        <table className="w-full text-left border-collapse text-xs min-w-[700px]">
+      {/* Products Table Grid */}
+      <div className="bg-surface-container-low rounded-2xl border border-outline-variant p-4 overflow-x-auto">
+        <table className="w-full text-left text-sm">
           <thead>
-            <tr className="bg-surface-container-low font-bold text-on-surface-variant uppercase tracking-wider border-b border-outline-variant">
-              <th className="px-4 py-3">Product Name & SKU</th>
-              <th className="px-4 py-3">Category</th>
-              <th className="px-4 py-3">Barcode</th>
-              {showUnitCost && <th className="px-4 py-3">Unit Cost</th>}
-              <th className="px-4 py-3">Wholesale Price</th>
-              <th className="px-4 py-3">Available Stock</th>
-              <th className="px-4 py-3">Status</th>
-              {!isClient && <th className="px-4 py-3 text-right">Actions</th>}
+            <tr className="border-b border-outline-variant text-xs uppercase font-bold text-on-surface-variant">
+              <th className="p-3">SKU / Barcode</th>
+              <th className="p-3">Product Name</th>
+              <th className="p-3">Category</th>
+              <th className="p-3 font-right">Available Stock</th>
+              {showUnitCost && <th className="p-3 font-right">Unit Cost</th>}
+              <th className="p-3 font-right">Wholesale Price</th>
+              <th className="p-3">Status</th>
+              <th className="p-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-outline-variant">
-            {products.map((prod) => (
-              <tr key={prod.id} className="hover:bg-surface-container-low transition-colors">
-                <td className="px-4 py-3">
-                  <div className="font-semibold text-on-surface text-sm">{prod.name}</div>
-                  <div className="font-mono text-on-surface-variant text-[11px]">{prod.sku}</div>
+            {products.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="p-8 text-center text-slate-500">
+                  No products found. Click "Create Product" to add items to master catalog.
                 </td>
-                <td className="px-4 py-3">{prod.categoryRef?.name || prod.category || 'N/A'}</td>
-                <td className="px-4 py-3 font-mono">{prod.barcode || 'N/A'}</td>
-                {showUnitCost && (
-                  <td className="px-4 py-3 font-semibold text-on-surface">${(prod.unitCost || 0).toFixed(2)}</td>
-                )}
-                <td className="px-4 py-3 font-semibold text-primary">${(prod.wholesalePrice || 0).toFixed(2)}</td>
-                <td className="px-4 py-3 font-bold">{prod.availableStock ?? prod.calculatedTotalStock ?? 0} Units</td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${prod.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-700'}`}>
-                    {prod.status || 'ACTIVE'}
-                  </span>
-                </td>
-                {!isClient && (
-                  <td className="px-4 py-3 text-right">
+              </tr>
+            ) : (
+              products.map((prod) => (
+                <tr key={prod.id} className="hover:bg-slate-50 transition">
+                  <td className="p-3 font-mono">
+                    <div className="font-bold text-slate-900">{prod.sku}</div>
+                    <div className="text-[11px] text-slate-500">{prod.barcode || 'NO BARCODE'}</div>
+                  </td>
+                  <td className="p-3 font-semibold text-slate-800">{prod.name}</td>
+                  <td className="p-3 text-xs text-slate-600">{prod.category?.name || 'Uncategorized'}</td>
+                  <td className="p-3 font-mono font-bold text-slate-900 text-right">
+                    {prod.availableStock || 0} units
+                  </td>
+                  {showUnitCost && (
+                    <td className="p-3 font-mono text-right text-slate-700">
+                      ${Number(prod.unitCost || 0).toFixed(2)}
+                    </td>
+                  )}
+                  <td className="p-3 font-mono text-right font-bold text-green-700">
+                    ${Number(prod.wholesalePrice || 0).toFixed(2)}
+                  </td>
+                  <td className="p-3">
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${prod.status === 'INACTIVE' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                      {prod.status || 'ACTIVE'}
+                    </span>
+                  </td>
+                  <td className="p-3 text-right">
                     <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => openEditProductModal(prod)}
-                        className="p-1.5 rounded text-surface-500 hover:text-primary transition-colors"
-                        title="Edit Product"
-                      >
+                      <button onClick={() => openEditProductModal(prod)} className="p-1 text-slate-400 hover:text-blue-600">
                         <Edit2 className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={() => handleDeleteProduct(prod.id, prod.name)}
-                        className="p-1.5 rounded text-surface-500 hover:text-red-600 transition-colors"
-                        title="Delete Product"
-                      >
+                      <button onClick={() => handleDeleteProduct(prod.id, prod.name)} className="p-1 text-slate-400 hover:text-red-600">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
-                )}
-              </tr>
-            ))}
-            {!products.length && (
-              <tr>
-                <td colSpan="8" className="px-4 py-8 text-center text-on-surface-variant">
-                  No products found in catalog. Click "Create Product" to add items.
-                </td>
-              </tr>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Create / Edit Product Modal */}
+      {/* Product Form Modal */}
       <Modal
         isOpen={isProductModalOpen}
         onClose={() => setIsProductModalOpen(false)}
-        title={editingProduct ? `Edit ${editingProduct.name}` : 'Create Product Catalog Entry'}
-        size="md"
+        title={editingProduct ? 'Edit Product SKU' : 'Create Master Product'}
+        size="lg"
         footer={
           <>
             <Button variant="outline" onClick={() => setIsProductModalOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleSaveProduct}>
-              {editingProduct ? 'Save Changes' : 'Create Product'}
-            </Button>
+            <Button variant="primary" onClick={handleSaveProduct}>Save Product</Button>
           </>
         }
       >
         <form onSubmit={handleSaveProduct} className="space-y-4">
-          <FormField label="Product Name" required>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Industrial Barcode Scanner X-200" required />
-          </FormField>
           <div className="grid grid-cols-2 gap-4">
-            <FormField label="SKU Code" required>
-              <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="SKU-ELEC-001" required />
+            <FormField label="Product Name" required>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Semaglutide 5mg Vial" required />
             </FormField>
-            <FormField label="Barcode">
-              <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="WMS-BAR-1002" />
+            <FormField label="SKU Code" required>
+              <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="e.g. SKU-SEM-005" required />
             </FormField>
           </div>
-          <FormField label="Category">
-            <Select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              options={categories.map((c) => ({ value: c.id, label: c.name }))}
-            />
-          </FormField>
           <div className="grid grid-cols-2 gap-4">
-            <FormField label="Unit Cost ($)">
-              <Input type="number" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
+            <FormField label="Barcode (ShipStation Linked)">
+              <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="e.g. 890123456789" />
             </FormField>
+            <FormField label="Category">
+              <Select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                options={categories.map((c) => ({ value: c.id, label: c.name }))}
+              />
+            </FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {showUnitCost && (
+              <FormField label="Unit Cost ($)">
+                <Input type="number" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
+              </FormField>
+            )}
             <FormField label="Wholesale Price ($)">
               <Input type="number" step="0.01" value={wholesalePrice} onChange={(e) => setWholesalePrice(e.target.value)} />
             </FormField>
           </div>
-          <FormField label="Description">
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="High-speed 2D barcode scanner" />
+          <FormField label="Product Description">
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Enter details or storage notes..." />
           </FormField>
         </form>
       </Modal>
 
-      {/* Create Category Modal */}
+      {/* Category Form Modal */}
       <Modal
         isOpen={isCategoryModalOpen}
         onClose={() => setIsCategoryModalOpen(false)}
         title="Create Product Category"
-        size="sm"
+        size="md"
         footer={
           <>
             <Button variant="outline" onClick={() => setIsCategoryModalOpen(false)}>Cancel</Button>
@@ -360,16 +359,17 @@ export const ProductsListPage = () => {
       >
         <form onSubmit={handleCreateCategory} className="space-y-4">
           <FormField label="Category Name" required>
-            <Input value={catName} onChange={(e) => setCatName(e.target.value)} placeholder="Electronics" required />
+            <Input value={catName} onChange={(e) => setCatName(e.target.value)} placeholder="e.g. Peptides" required />
           </FormField>
           <FormField label="Category Code">
-            <Input value={catCode} onChange={(e) => setCatCode(e.target.value)} placeholder="ELEC" />
+            <Input value={catCode} onChange={(e) => setCatCode(e.target.value)} placeholder="e.g. PEP" />
           </FormField>
           <FormField label="Description">
-            <Input value={catDescription} onChange={(e) => setCatDescription(e.target.value)} placeholder="Hardware and electronic devices" />
+            <Input value={catDescription} onChange={(e) => setCatDescription(e.target.value)} placeholder="Description..." />
           </FormField>
         </form>
       </Modal>
+
       {/* Delete Product Confirmation Modal */}
       <ConfirmModal
         isOpen={deleteProdState.isOpen}

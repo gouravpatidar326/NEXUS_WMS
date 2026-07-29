@@ -1,13 +1,11 @@
 import { api } from './api';
 
 export const productService = {
-  async getProducts(params = {}) {
-    const query = new URLSearchParams();
-    if (params.search) query.append('search', params.search);
-    if (params.categoryId) query.append('categoryId', params.categoryId);
-    if (params.status) query.append('status', params.status);
-    if (params.page) query.append('page', params.page);
-    if (params.limit) query.append('limit', params.limit || params.pageSize || 10);
+  async getProducts({ search = '', category = '', status = '', page = 1, pageSize = 10 } = {}) {
+    const products = await api.get('/products');
+    
+    // Front-end local filtering/pagination since backend GET /api/products returns all
+    let filtered = [...products];
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     const res = await api.get(`/v1/products${queryString}`);
@@ -29,7 +27,7 @@ export const productService = {
   },
 
   async createProduct(productData) {
-    return await api.post('/v1/products', productData);
+    return await api.post('/products', productData);
   },
 
   async updateProduct(id, updates) {
@@ -37,6 +35,6 @@ export const productService = {
   },
 
   async deleteProduct(id) {
-    return await api.delete(`/v1/products/${id}`);
+    return await api.delete(`/products/${id}`);
   },
 };

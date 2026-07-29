@@ -14,13 +14,13 @@ export const WmsStoreProvider = ({ children }) => {
       try {
         return JSON.parse(stored).map((product, index) => ({
           ...product,
-          image: product.image?.startsWith('/') ? product.image : localProductImages[index % localProductImages.length],
+          image: (product && typeof product.image === 'string' && product.image.startsWith('/')) ? product.image : localProductImages[index % localProductImages.length],
         }));
       } catch { /* ignore */ }
     }
-    return MOCK_PRODUCTS.map((p, idx) => ({
+    return (MOCK_PRODUCTS || []).map((p, idx) => ({
       ...p,
-      image: p.image?.startsWith('/') ? p.image : localProductImages[idx % localProductImages.length],
+      image: (p && typeof p.image === 'string' && p.image.startsWith('/')) ? p.image : localProductImages[idx % localProductImages.length],
       unitCost: (120 + idx * 15).toFixed(2),
       wholesalePrice: (195 + idx * 25).toFixed(2),
       margin: '+42%',

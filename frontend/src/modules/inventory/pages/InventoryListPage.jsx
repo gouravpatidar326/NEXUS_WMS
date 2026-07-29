@@ -29,12 +29,10 @@ export const InventoryListPage = () => {
 
   // Adjustment Modal state
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
-  const [productId, setProductId] = useState('');
-  const [lotId, setLotId] = useState('');
-  const [locationId, setLocationId] = useState('');
-  const [quantityDelta, setQuantityDelta] = useState('10');
-  const [reasonCode, setReasonCode] = useState('MANUAL_CORRECTION');
-  const [notes, setNotes] = useState('');
+  const [productsList, setProductsList] = useState([]);
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [adjustQty, setAdjustQty] = useState('');
+  const [adjustReason, setAdjustReason] = useState('Physical Stock Count Discrepancy');
   const [submitting, setSubmitting] = useState(false);
 
   const fetchData = async () => {
@@ -258,46 +256,37 @@ export const InventoryListPage = () => {
         <form onSubmit={handleConfirmAdjustment} className="space-y-4">
           <FormField label="Target Product" required>
             <Select
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
-              options={products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))}
+              value={selectedProductId}
+              onChange={(e) => setSelectedProductId(e.target.value)}
+              options={productsList.map((p) => ({
+                value: p.id,
+                label: `${p.sku} — ${p.name} (Current: ${p.availableStock || 0})`,
+              }))}
             />
           </FormField>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Lot / Batch" required>
-              <Select
-                value={lotId}
-                onChange={(e) => setLotId(e.target.value)}
-                options={batches.map((b) => ({ value: b.id, label: b.lotNumber || b.lotId }))}
-              />
-            </FormField>
-            <FormField label="Bin Location" required>
-              <Select
-                value={locationId}
-                onChange={(e) => setLocationId(e.target.value)}
-                options={locations.map((l) => ({ value: l.id, label: `Zone ${l.zone} - Bin ${l.bin}` }))}
-              />
-            </FormField>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Quantity Delta (+/-)" required>
-              <Input type="number" value={quantityDelta} onChange={(e) => setQuantityDelta(e.target.value)} required />
-            </FormField>
-            <FormField label="Reason Code" required>
-              <Select
-                value={reasonCode}
-                onChange={(e) => setReasonCode(e.target.value)}
-                options={[
-                  { value: 'MANUAL_CORRECTION', label: 'Manual Correction' },
-                  { value: 'AUDIT_CORRECTION', label: 'Audit Count Mismatch' },
-                  { value: 'DAMAGE', label: 'Damaged Goods (-)' },
-                  { value: 'LOST', label: 'Lost Inventory (-)' },
-                ]}
-              />
-            </FormField>
-          </div>
-          <FormField label="Audit Notes / Explanation">
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Physical inventory count variance" />
+
+          <FormField label="Quantity Adjustment (+/- Delta)" required hint="Use positive number to add stock, negative number to reduce stock">
+            <Input
+              type="number"
+              value={adjustQty}
+              onChange={(e) => setAdjustQty(e.target.value)}
+              placeholder="e.g. -5 or 25"
+              required
+            />
+          </FormField>
+
+          <FormField label="Adjustment Reason / Justification" required>
+            <Select
+              value={adjustReason}
+              onChange={(e) => setAdjustReason(e.target.value)}
+              options={[
+                'Physical Stock Count Discrepancy',
+                'Damaged During Transport',
+                'Expired Stock Removal',
+                'Unrecorded Dock Receipt',
+                'Quality Inspection Hold',
+              ]}
+            />
           </FormField>
         </form>
       </Modal>

@@ -12,10 +12,14 @@ export const batchService = {
   },
 
   async createBatch(batchData) {
-    return await api.post('/v1/lots', batchData);
+    return await api.post('/batches', batchData);
   },
 
-  async updateLotStatus(id, status) {
-    return await api.patch(`/v1/lots/${id}/status`, { status });
+  async updateBatch(id, updateData) {
+    return await api.put(`/batches/${id}`, updateData);
   },
+
+  async unlockCoa(id, paymentToken) {
+    return await api.post(`/batches/${id}/unlock-coa`, { paymentToken });
+  }
 };

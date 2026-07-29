@@ -60,12 +60,35 @@ const getManagerSummary = async (req, res) => {
       }
     });
 
+    // 6. Recent Shipments
+    const recentShipments = await prisma.shipment.findMany({
+      where: { companyId },
+      orderBy: { createdAt: 'desc' },
+      take: 5
+    });
+
+    // 7. Warehouse Capacity
+    const locations = await prisma.location.aggregate({
+      where: { companyId },
+      _sum: {
+        maxCapacity: true,
+        occupied: true
+      }
+    });
+    
+    let capacityPercentage = 0;
+    if (locations._sum.maxCapacity && locations._sum.maxCapacity > 0) {
+      capacityPercentage = Math.round((locations._sum.occupied / locations._sum.maxCapacity) * 100);
+    }
+
     res.json({
       pendingSalesOrders,
       lowStockProducts,
       nearExpiryBatches,
       pendingPickLists,
-      pendingPurchaseOrders
+      pendingPurchaseOrders,
+      recentShipments,
+      capacityPercentage
     });
   } catch (error) {
     console.error('Error fetching manager summary:', error);
