@@ -34,6 +34,7 @@
 
   .page-shell {
     @apply mx-auto w-full min-w-0 max-w-[1600px] space-y-4 p-3 sm:space-y-6 sm:p-5 lg:p-7 xl:p-8;
+    padding-bottom: max(6rem, calc(4.5rem + env(safe-area-inset-bottom)));
   }
 
   .responsive-scroll {
@@ -44,7 +45,7 @@
 
 @media (max-width: 639px) {
   .page-shell h1 { font-size: 1.25rem; line-height: 1.75rem; }
-  .page-shell h2 { overflow-wrap: anywhere; }
+  .page-shell h2 { font-size: 1.125rem; line-height: 1.5rem; overflow-wrap: anywhere; }
   .page-shell table { font-size: 0.75rem; }
   .page-shell .responsive-scroll th,
   .page-shell .responsive-scroll td { white-space: nowrap; }
