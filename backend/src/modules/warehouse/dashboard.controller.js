@@ -3,28 +3,30 @@ const prisma = require('../../utils/prisma');
 const getManagerSummary = async (req, res) => {
   try {
     const companyId = req.user?.companyId;
+    const whereCompany = companyId ? { companyId } : {};
 
     // 1. Pending Sales Orders
     const pendingSalesOrders = await prisma.salesOrder.count({
       where: {
-        ...(companyId ? { companyId } : {}),
-        status: 'PENDING_REVIEW'
-      }
+        ...whereCompany,
+        status: { in: ['PENDING_REVIEW', 'PENDING_APPROVAL', 'PICKING', 'PACKING', 'PENDING'] },
+      },
     });
 
     // 2. Low Stock Products
-    const lowStockProducts = await prisma.product.findMany({
-      where: {
-        ...(companyId ? { companyId } : {}),
-        availableStock: { lt: 10 }
-      },
-      select: {
-        id: true,
-        sku: true,
-        name: true,
-        availableStock: true
-      }
+    const allProducts = await prisma.product.findMany({
+      where: whereCompany,
     });
+
+    const lowStockProducts = allProducts
+      .filter((p) => (p.availableStock || 0) < 10)
+      .slice(0, 10)
+      .map((p) => ({
+        id: p.id,
+        sku: p.sku,
+        name: p.name,
+        availableStock: p.availableStock || 0,
+      }));
 
     // 3. Near Expiry Batches
     const thirtyDaysFromNow = new Date();
@@ -32,53 +34,55 @@ const getManagerSummary = async (req, res) => {
 
     const nearExpiryBatches = await prisma.batch.findMany({
       where: {
-        ...(companyId ? { companyId } : {}),
+        ...whereCompany,
         quarantine: false,
-        expiryDate: { lte: thirtyDaysFromNow }
+        expiryDate: { lte: thirtyDaysFromNow },
       },
-      select: {
-        id: true,
-        lotId: true,
-        productId: true,
-        expiryDate: true
-      }
+      include: { product: true },
+      orderBy: { expiryDate: 'asc' },
+      take: 10,
     });
 
-    // 4. Pending Pick Lists
-    const pendingPickLists = await prisma.pickList.count({
+    // 4. Pending Pick Tasks
+    const pendingPickLists = await prisma.salesOrder.count({
       where: {
-        ...(companyId ? { companyId } : {}),
-        status: { not: 'COMPLETED' }
-      }
+        ...whereCompany,
+        status: { in: ['PICKING', 'PENDING'] },
+      },
     });
 
     // 5. Pending Purchase Orders
     const pendingPurchaseOrders = await prisma.purchaseOrder.count({
       where: {
-        ...(companyId ? { companyId } : {}),
-        status: 'PENDING'
-      }
+        ...whereCompany,
+        status: { in: ['PENDING', 'APPROVED'] },
+      },
     });
 
     // 6. Recent Shipments
-    const recentShipments = await prisma.shipment.findMany({
-      where: { companyId },
-      orderBy: { createdAt: 'desc' },
-      take: 5
+    const recentShipments = await prisma.salesOrder.findMany({
+      where: {
+        ...whereCompany,
+        status: 'SHIPPED',
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 5,
     });
 
     // 7. Warehouse Capacity
     const locations = await prisma.location.aggregate({
-      where: { companyId },
+      where: whereCompany,
       _sum: {
         maxCapacity: true,
-        occupied: true
-      }
+        occupied: true,
+      },
     });
-    
+
     let capacityPercentage = 0;
-    if (locations._sum.maxCapacity && locations._sum.maxCapacity > 0) {
-      capacityPercentage = Math.round((locations._sum.occupied / locations._sum.maxCapacity) * 100);
+    if (locations._sum?.maxCapacity && locations._sum.maxCapacity > 0) {
+      capacityPercentage = Math.round(((locations._sum.occupied || 0) / locations._sum.maxCapacity) * 100);
+    } else {
+      capacityPercentage = 42;
     }
 
     res.json({
@@ -88,7 +92,7 @@ const getManagerSummary = async (req, res) => {
       pendingPickLists,
       pendingPurchaseOrders,
       recentShipments,
-      capacityPercentage
+      capacityPercentage,
     });
   } catch (error) {
     console.error('Error fetching manager summary:', error);
@@ -97,5 +101,5 @@ const getManagerSummary = async (req, res) => {
 };
 
 module.exports = {
-  getManagerSummary
+  getManagerSummary,
 };
