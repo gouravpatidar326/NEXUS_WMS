@@ -3,7 +3,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { batchService } from '@/services/batchService';
 import { productService } from '@/services/productService';
-import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
@@ -308,18 +307,18 @@ export const BatchTrackingPage = () => {
       </Modal>
 
       {/* COA Certificate Details Modal */}
-      {selectedLotCoa && (
-        <Modal
-          isOpen={!!selectedLotCoa}
-          onClose={() => setSelectedLotCoa(null)}
-          title={`Official COA Lab Test Result — Lot ${selectedLotCoa.lotId}`}
-          size="md"
-          footer={
-            <Button variant="primary" onClick={() => setSelectedLotCoa(null)}>
-              Close Lab Certificate
-            </Button>
-          }
-        >
+      <Modal
+        isOpen={!!selectedLotCoa}
+        onClose={() => setSelectedLotCoa(null)}
+        title={`Official COA Lab Test Result — Lot ${selectedLotCoa?.lotId || ''}`}
+        size="md"
+        footer={
+          <Button variant="primary" onClick={() => setSelectedLotCoa(null)}>
+            Close Lab Certificate
+          </Button>
+        }
+      >
+        {selectedLotCoa && (
           <div className="space-y-4">
             <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -364,7 +363,7 @@ export const BatchTrackingPage = () => {
           </div>
         )}
       </Modal>
-    </section>
+    </div>
   );
 };
 
