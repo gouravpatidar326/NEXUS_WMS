@@ -23,13 +23,8 @@ export const SUPER_ADMIN_ITEMS = [
 
 export const WAREHOUSE_MANAGER_ITEMS = [
   { id: 'dashboard', title: 'Dashboard', path: '/dashboard', iconName: 'dashboard' },
-<<<<<<< HEAD
-  { id: 'products', title: 'Products', path: '/products', iconName: 'category' },
-  { id: 'inventory', title: 'Inventory', path: '/inventory', iconName: 'inventory_2' },
-=======
   { id: 'products', title: 'Products', path: '/products', iconName: 'inventory_2' },
   { id: 'inventory', title: 'Inventory', path: '/inventory', iconName: 'inventory' },
->>>>>>> 7511d25f4dcd52580c3fa16211aba1fcfc509b36
   { id: 'lots', title: 'Lots & Batches', path: '/batch-tracking', iconName: 'qr_code_2' },
   { id: 'expiry', title: 'Expiry Tracking', path: '/expiry-tracking', iconName: 'calendar_clock' },
   { id: 'locations', title: 'Locations', path: '/warehouse-ops', iconName: 'location_on' },

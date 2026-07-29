@@ -29,19 +29,10 @@ export const InventoryListPage = () => {
 
   // Adjustment Modal state
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
-<<<<<<< HEAD
   const [productsList, setProductsList] = useState([]);
   const [selectedProductId, setSelectedProductId] = useState('');
   const [adjustQty, setAdjustQty] = useState('');
   const [adjustReason, setAdjustReason] = useState('Physical Stock Count Discrepancy');
-=======
-  const [productId, setProductId] = useState('');
-  const [lotId, setLotId] = useState('');
-  const [locationId, setLocationId] = useState('');
-  const [quantityDelta, setQuantityDelta] = useState('10');
-  const [reasonCode, setReasonCode] = useState('MANUAL_CORRECTION');
-  const [notes, setNotes] = useState('');
->>>>>>> 7511d25f4dcd52580c3fa16211aba1fcfc509b36
   const [submitting, setSubmitting] = useState(false);
 
   const fetchData = async () => {
@@ -265,7 +256,6 @@ export const InventoryListPage = () => {
         <form onSubmit={handleConfirmAdjustment} className="space-y-4">
           <FormField label="Target Product" required>
             <Select
-<<<<<<< HEAD
               value={selectedProductId}
               onChange={(e) => setSelectedProductId(e.target.value)}
               options={productsList.map((p) => ({
@@ -297,48 +287,6 @@ export const InventoryListPage = () => {
                 'Quality Inspection Hold',
               ]}
             />
-=======
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
-              options={products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))}
-            />
-          </FormField>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Lot / Batch" required>
-              <Select
-                value={lotId}
-                onChange={(e) => setLotId(e.target.value)}
-                options={batches.map((b) => ({ value: b.id, label: b.lotNumber || b.lotId }))}
-              />
-            </FormField>
-            <FormField label="Bin Location" required>
-              <Select
-                value={locationId}
-                onChange={(e) => setLocationId(e.target.value)}
-                options={locations.map((l) => ({ value: l.id, label: `Zone ${l.zone} - Bin ${l.bin}` }))}
-              />
-            </FormField>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Quantity Delta (+/-)" required>
-              <Input type="number" value={quantityDelta} onChange={(e) => setQuantityDelta(e.target.value)} required />
-            </FormField>
-            <FormField label="Reason Code" required>
-              <Select
-                value={reasonCode}
-                onChange={(e) => setReasonCode(e.target.value)}
-                options={[
-                  { value: 'MANUAL_CORRECTION', label: 'Manual Correction' },
-                  { value: 'AUDIT_CORRECTION', label: 'Audit Count Mismatch' },
-                  { value: 'DAMAGE', label: 'Damaged Goods (-)' },
-                  { value: 'LOST', label: 'Lost Inventory (-)' },
-                ]}
-              />
-            </FormField>
-          </div>
-          <FormField label="Audit Notes / Explanation">
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Physical inventory count variance" />
->>>>>>> 7511d25f4dcd52580c3fa16211aba1fcfc509b36
           </FormField>
         </form>
       </Modal>

@@ -6,27 +6,12 @@ import Modal from '@/components/ui/Modal';
 import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
-<<<<<<< HEAD
 import LoadingState from '@/components/feedback/LoadingState';
 import { productService } from '@/services/productService';
-=======
-import Select from '@/components/ui/Select';
-import LoadingState from '@/components/feedback/LoadingState';
-import { productService } from '@/services/productService';
-import { categoryService } from '@/services/categoryService';
-import { Plus, Edit2, Trash2, Tag } from 'lucide-react';
->>>>>>> 7511d25f4dcd52580c3fa16211aba1fcfc509b36
 
 export const ProductsListPage = () => {
   const { user } = useAuth();
   const { notifySuccess, notifyError } = useNotification();
-<<<<<<< HEAD
-=======
-
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
->>>>>>> 7511d25f4dcd52580c3fa16211aba1fcfc509b36
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +43,6 @@ export const ProductsListPage = () => {
   const isClerk = user?.role === ROLES.INVENTORY_CLERK;
   const showUnitCost = !isClient && !isClerk; // Cost price hidden from Clients & Clerks
 
-<<<<<<< HEAD
   const fetchProducts = async () => {
     try {
       setLoading(true);
@@ -104,26 +88,6 @@ export const ProductsListPage = () => {
     } catch (error) {
       notifyError('Failed to delete product');
     }
-=======
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [prodRes, catList] = await Promise.all([
-        productService.getProducts({
-          search: searchTerm,
-          categoryId: selectedCategory,
-          status: selectedStatus,
-        }),
-        categoryService.getCategories(),
-      ]);
-      setProducts(prodRes.items || []);
-      setCategories(catList || []);
-    } catch (err) {
-      notifyError('Failed to fetch product catalog');
-    } finally {
-      setLoading(false);
-    }
->>>>>>> 7511d25f4dcd52580c3fa16211aba1fcfc509b36
   };
 
   useEffect(() => {
@@ -310,7 +274,6 @@ export const ProductsListPage = () => {
                 {showUnitCost && (
                   <td className="px-4 py-3 font-semibold text-on-surface">${(prod.unitCost || 0).toFixed(2)}</td>
                 )}
-<<<<<<< HEAD
                 <th className="px-4 py-3 text-xs font-semibold text-primary uppercase tracking-wider text-right">
                   Wholesale Price
                 </th>
@@ -386,46 +349,6 @@ export const ProductsListPage = () => {
             </tbody>
           </table>
         </div>
-=======
-                <td className="px-4 py-3 font-semibold text-primary">${(prod.wholesalePrice || 0).toFixed(2)}</td>
-                <td className="px-4 py-3 font-bold">{prod.availableStock ?? prod.calculatedTotalStock ?? 0} Units</td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${prod.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-700'}`}>
-                    {prod.status || 'ACTIVE'}
-                  </span>
-                </td>
-                {!isClient && (
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => openEditProductModal(prod)}
-                        className="p-1.5 rounded text-surface-500 hover:text-primary transition-colors"
-                        title="Edit Product"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteProduct(prod.id, prod.name)}
-                        className="p-1.5 rounded text-surface-500 hover:text-red-600 transition-colors"
-                        title="Delete Product"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
-            {!products.length && (
-              <tr>
-                <td colSpan="8" className="px-4 py-8 text-center text-on-surface-variant">
-                  No products found in catalog. Click "Create Product" to add items.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
->>>>>>> 7511d25f4dcd52580c3fa16211aba1fcfc509b36
       </div>
 
       {/* Create / Edit Product Modal */}
