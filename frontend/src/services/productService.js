@@ -1,24 +1,27 @@
 import { api } from './api';
 
 export const productService = {
-  async getProducts({ search = '', category = '', status = '', page = 1, pageSize = 10 } = {}) {
-    const products = await api.get('/products');
+  async getProducts(params = {}) {
+    const { search = '', category = '', categoryId, status = '', page = 1, pageSize = 50 } = params || {};
     
-    // Front-end local filtering/pagination since backend GET /api/products returns all
-    let filtered = [...products];
+    const queryParams = new URLSearchParams();
+    if (search) queryParams.append('search', search);
+    if (category || categoryId) queryParams.append('categoryId', category || categoryId);
+    if (status) queryParams.append('status', status);
+    if (page) queryParams.append('page', page);
+    if (pageSize) queryParams.append('limit', pageSize);
 
-    const queryString = query.toString() ? `?${query.toString()}` : '';
+    const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
     const res = await api.get(`/v1/products${queryString}`);
+
+    // If backend returns { data: [...], pagination: {...} } or array
     if (res && res.data) {
-      return {
-        items: res.data,
-        totalItems: res.pagination?.totalItems || res.data.length,
-        totalPages: res.pagination?.totalPages || 1,
-        currentPage: res.pagination?.currentPage || 1,
-        pageSize: res.pagination?.limit || 10,
-      };
+      const items = res.data;
+      items.items = res.data;
+      items.meta = res.pagination;
+      return items;
     }
-    return { items: Array.isArray(res) ? res : [], totalItems: 0, totalPages: 1, currentPage: 1, pageSize: 10 };
+    return Array.isArray(res) ? res : (res?.items || []);
   },
 
   async getProductById(id) {
@@ -27,7 +30,7 @@ export const productService = {
   },
 
   async createProduct(productData) {
-    return await api.post('/products', productData);
+    return await api.post('/v1/products', productData);
   },
 
   async updateProduct(id, updates) {
@@ -35,6 +38,6 @@ export const productService = {
   },
 
   async deleteProduct(id) {
-    return await api.delete(`/products/${id}`);
+    return await api.delete(`/v1/products/${id}`);
   },
 };
