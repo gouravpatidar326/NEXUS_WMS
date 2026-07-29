@@ -108,6 +108,8 @@ model Product {
   unitCost       Float     @default(0.0)
   wholesalePrice Float     @default(0.0)
   status         String    @default("ACTIVE")
+  availableStock Int       @default(0)
+  committedStock Int       @default(0)
   companyId      String
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
