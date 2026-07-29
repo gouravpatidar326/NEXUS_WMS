@@ -22,7 +22,7 @@ export const WAREHOUSE_MANAGER_ITEMS = [
   { id: 'expiry', title: 'Expiry Tracking', path: '/expiry-tracking', iconName: 'calendar_clock' },
   { id: 'locations', title: 'Locations', path: '/warehouse-ops', iconName: 'location_on' },
   { id: 'sales-orders', title: 'Sales Orders', path: '/sales-orders', iconName: 'shopping_cart' },
-  { id: 'picking', title: 'Picking', path: '/warehouse-ops', iconName: 'conveyor_belt' },
+  { id: 'picking', title: 'Picking', path: '/picking', iconName: 'conveyor_belt' },
   { id: 'shipping', title: 'Shipping', path: '/shipping', iconName: 'local_shipping' },
   { id: 'transfers', title: 'Transfers', path: '/transfer-orders', iconName: 'sync_alt' },
   { id: 'receiving', title: 'Receiving', path: '/purchase-orders', iconName: 'move_to_inbox' },

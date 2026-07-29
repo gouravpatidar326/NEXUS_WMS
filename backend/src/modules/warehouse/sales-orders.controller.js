@@ -56,7 +56,25 @@ const approveSalesOrder = async (req, res) => {
         });
       }
 
-      // 3. Update order status
+      // 3. Create a PickList
+      const pickListItems = order.items.map(item => ({
+        productId: item.productId,
+        binLocation: 'A-01-RACK-1', // Defaulting to a mock location for now
+        targetQuantity: item.quantity
+      }));
+
+      await tx.pickList.create({
+        data: {
+          orderId: order.id,
+          companyId: req.user.companyId,
+          status: 'PENDING',
+          items: {
+            create: pickListItems
+          }
+        }
+      });
+
+      // 4. Update order status
       await tx.salesOrder.update({
         where: { id },
         data: { status: 'PICKING' }
@@ -136,4 +154,62 @@ const rejectSalesOrder = async (req, res) => {
   }
 };
 
-module.exports = { getSalesOrders, approveSalesOrder, rejectSalesOrder };
+const createSalesOrder = async (req, res) => {
+  try {
+    const { clientId, priority, items } = req.body;
+
+    if (!clientId || !items || items.length === 0) {
+      return res.status(400).json({ message: 'Client ID and items are required' });
+    }
+
+    // Calculate total cost and generate order number
+    let totalCost = 0;
+    const orderItemsData = [];
+
+    for (const item of items) {
+      const product = await prisma.product.findUnique({ where: { id: item.productId } });
+      if (!product) {
+        return res.status(404).json({ message: `Product ${item.productId} not found` });
+      }
+      totalCost += product.wholesalePrice * item.quantity;
+      orderItemsData.push({
+        productId: product.id,
+        quantity: item.quantity
+      });
+    }
+
+    const orderNumber = `SO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const newOrder = await prisma.salesOrder.create({
+      data: {
+        orderNumber,
+        clientId,
+        companyId: req.user.companyId,
+        priority: priority || 'NORMAL',
+        totalCost,
+        items: {
+          create: orderItemsData
+        }
+      },
+      include: {
+        items: { include: { product: true } },
+        client: true
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        event: 'SALES_ORDER_CREATED',
+        userId: req.user.id,
+        ipAddress: req.ip
+      }
+    });
+
+    res.status(201).json(newOrder);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+module.exports = { getSalesOrders, approveSalesOrder, rejectSalesOrder, createSalesOrder };

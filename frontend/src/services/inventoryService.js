@@ -2,7 +2,7 @@ import { api } from './api';
 
 export const inventoryService = {
   async getMovements({ search = '', type = '', page = 1, pageSize = 10 } = {}) {
-    const movementsStore = await api.get('/warehouse/inventory');
+    const movementsStore = await api.get('/inventory');
 
     let filtered = [...movementsStore];
 
@@ -30,7 +30,7 @@ export const inventoryService = {
 
   async adjustStock({ productId, quantity, reason, location }) {
     // Map frontend args to backend body
-    return await api.post('/warehouse/inventory/adjust', {
+    return await api.post('/inventory/adjust', {
       productId,
       location: location || 'Warehouse Shelf',
       quantityDelta: Number(quantity),

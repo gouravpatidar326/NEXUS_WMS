@@ -15,6 +15,7 @@ export const PurchaseOrdersPage = lazy(() => import('@/modules/purchase-orders/p
 export const TransferOrdersPage = lazy(() => import('@/modules/transfer-orders/pages/TransferOrdersPage'));
 export const SalesOrdersPage = lazy(() => import('@/modules/sales-orders/pages/SalesOrdersPage'));
 export const WarehouseOpsPage = lazy(() => import('@/modules/warehouse-ops/pages/WarehouseOpsPage'));
+export const PickingPage = lazy(() => import('@/modules/warehouse-ops/pages/PickingPage'));
 export const BarcodePage = lazy(() => import('@/modules/barcode/pages/BarcodePage'));
 export const ShippingPage = lazy(() => import('@/modules/shipping/pages/ShippingPage'));
 export const ClientPortalPage = lazy(() => import('@/modules/client-portal/pages/ClientPortalPage'));
@@ -36,6 +37,7 @@ export const PROTECTED_ROUTES = [
   { path: 'transfer-orders', Component: TransferOrdersPage, permission: PERMISSIONS.TO_VIEW },
   { path: 'sales-orders', Component: SalesOrdersPage, permission: PERMISSIONS.SO_VIEW },
   { path: 'warehouse-ops', Component: WarehouseOpsPage, permission: PERMISSIONS.WAREHOUSE_VIEW },
+  { path: 'picking', Component: PickingPage, permission: PERMISSIONS.WAREHOUSE_VIEW },
   { path: 'barcode', Component: BarcodePage, permission: PERMISSIONS.BARCODE_VIEW },
   { path: 'shipping', Component: ShippingPage, permission: PERMISSIONS.SHIPPING_VIEW },
   { path: 'client-portal', Component: ClientPortalPage, permission: PERMISSIONS.CLIENT_PORTAL_VIEW },

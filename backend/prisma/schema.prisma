@@ -27,6 +27,8 @@ model Company {
   
   salesOrders        SalesOrder[]
   notifications      Notification[]
+  locations          Location[]
+  shipments          Shipment[]
 }
 
 model User {
@@ -93,6 +95,7 @@ model Product {
   transferOrders TransferOrder[]
   pickListItems  PickListItem[]
   salesOrderItems SalesOrderItem[]
+  purchaseOrderItems PurchaseOrderItem[]
 }
 
 model InventoryLedger {
@@ -128,6 +131,7 @@ model Batch {
 
 model PurchaseOrder {
   id               String   @id @default(uuid())
+  poNumber         String   @unique
   supplier         String
   expectedDelivery DateTime?
   totalCost        Float    @default(0.0)
@@ -137,6 +141,18 @@ model PurchaseOrder {
   updatedAt        DateTime @updatedAt
 
   company          Company  @relation(fields: [companyId], references: [id])
+  items            PurchaseOrderItem[]
+}
+
+model PurchaseOrderItem {
+  id               String   @id @default(uuid())
+  purchaseOrderId  String
+  productId        String
+  quantity         Int
+  unitCost         Float    @default(0.0)
+
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  product          Product       @relation(fields: [productId], references: [id])
 }
 
 model TransferOrder {
@@ -185,8 +201,10 @@ model PickListItem {
 
 model SalesOrder {
   id              String   @id @default(uuid())
+  orderNumber     String?  @unique
   clientId        String
   companyId       String
+  priority        String?  @default("NORMAL")
   status          String   @default("PENDING_REVIEW") // PENDING_REVIEW, PICKING, REJECTED, COMPLETED
   rejectionReason String?
   totalCost       Float    @default(0.0)
@@ -219,4 +237,37 @@ model Notification {
 
   user      User?    @relation(fields: [userId], references: [id])
   company   Company  @relation(fields: [companyId], references: [id])
+}
+
+model Location {
+  id          String   @id @default(uuid())
+  zone        String
+  aisle       String
+  rack        String
+  shelf       String
+  maxCapacity Int
+  occupied    Int      @default(0)
+  status      String   @default("Active")
+  companyId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company  @relation(fields: [companyId], references: [id])
+}
+
+model Shipment {
+  id                String   @id @default(uuid())
+  trackingNumber    String   @unique
+  carrier           String
+  orderId           String
+  recipient         String
+  destination       String
+  estimatedDelivery String?
+  status            String   @default("LABEL_CREATED")
+  labelUrl          String?
+  companyId         String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  company           Company  @relation(fields: [companyId], references: [id])
 }

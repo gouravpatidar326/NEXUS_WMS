@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
 import { ROLES } from '@/permissions/roles';
+import { dashboardService } from '@/services/dashboardService';
 
 export const DashboardPage = () => {
   const { user } = useAuth();
@@ -267,7 +268,20 @@ const SuperAdminDashboard = ({ user }) => {
 // Warehouse Manager Dashboard (Fixed Overflow & Layout)
 const WarehouseManagerDashboard = ({ user }) => {
   const navigate = useNavigate();
-  const { notifySuccess } = useNotification();
+  const { notifySuccess, notifyError } = useNotification();
+  const [summary, setSummary] = useState(null);
+
+  useEffect(() => {
+    const fetchSummary = async () => {
+      try {
+        const data = await dashboardService.getManagerSummary();
+        setSummary(data);
+      } catch (error) {
+        notifyError('Failed to fetch dashboard summary');
+      }
+    };
+    fetchSummary();
+  }, [notifyError]);
 
   const handleClearance = (lotId) => {
     notifySuccess(`Lot ${lotId} marked for priority clearance.`);
@@ -296,18 +310,18 @@ const WarehouseManagerDashboard = ({ user }) => {
           <p className="text-[11px] text-outline mt-1">8,420 / 10,000 bins occupied</p>
         </div>
         <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
-          <p className="text-xs text-on-surface-variant">Pending Tasks</p>
-          <h3 className="text-2xl font-bold text-primary">127</h3>
-          <p className="text-[11px] text-red-500 font-bold mt-2">↑ +12% from yesterday</p>
+          <p className="text-xs text-on-surface-variant">Pending Pick Lists</p>
+          <h3 className="text-2xl font-bold text-primary">{summary ? summary.pendingPickLists : '...'}</h3>
+          <p className="text-[11px] text-on-surface-variant font-bold mt-2">Active picking tasks</p>
         </div>
         <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
-          <p className="text-xs text-on-surface-variant">Today's Shipments</p>
-          <h3 className="text-2xl font-bold text-primary">48</h3>
-          <p className="text-[11px] text-primary font-bold mt-2">✓ 32 Dispatched / 16 remaining</p>
+          <p className="text-xs text-on-surface-variant">Pending Sales Orders</p>
+          <h3 className="text-2xl font-bold text-primary">{summary ? summary.pendingSalesOrders : '...'}</h3>
+          <p className="text-[11px] text-primary font-bold mt-2">Needs review</p>
         </div>
         <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
           <p className="text-xs text-on-surface-variant">Near Expiry (&lt;30d)</p>
-          <h3 className="text-2xl font-bold text-red-600">12</h3>
+          <h3 className="text-2xl font-bold text-red-600">{summary ? summary.nearExpiryBatches?.length || 0 : '...'}</h3>
           <p onClick={() => navigate('/expiry-tracking')} className="text-[11px] text-red-600 font-bold underline mt-2 cursor-pointer">
             View critical lots
           </p>
@@ -411,36 +425,31 @@ const WarehouseManagerDashboard = ({ user }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant text-xs">
-                <tr className="hover:bg-surface-container-low transition-colors">
-                  <td className="px-4 py-3 font-mono font-bold text-primary">LOT-88219</td>
-                  <td className="px-4 py-3 font-semibold text-on-surface">Premium Grade Steel Coil</td>
-                  <td className="px-4 py-3 text-red-600 font-bold">2023-11-25</td>
-                  <td className="px-4 py-3">120 Units</td>
-                  <td className="px-4 py-3 font-mono">B1-A4-02</td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => handleClearance('LOT-88219')}
-                      className="px-3 py-1 bg-primary/10 text-primary rounded font-bold hover:bg-primary/20 transition-colors whitespace-nowrap cursor-pointer"
-                    >
-                      Mark for Clearance
-                    </button>
-                  </td>
-                </tr>
-                <tr className="hover:bg-surface-container-low transition-colors">
-                  <td className="px-4 py-3 font-mono font-bold text-primary">LOT-88402</td>
-                  <td className="px-4 py-3 font-semibold text-on-surface">Industrial Lubricant 5L</td>
-                  <td className="px-4 py-3 text-red-600 font-bold">2023-11-28</td>
-                  <td className="px-4 py-3">45 Units</td>
-                  <td className="px-4 py-3 font-mono">A4-G9-11</td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => handleClearance('LOT-88402')}
-                      className="px-3 py-1 bg-primary/10 text-primary rounded font-bold hover:bg-primary/20 transition-colors whitespace-nowrap cursor-pointer"
-                    >
-                      Mark for Clearance
-                    </button>
-                  </td>
-                </tr>
+                {summary && summary.nearExpiryBatches && summary.nearExpiryBatches.length > 0 ? (
+                  summary.nearExpiryBatches.map((batch) => (
+                    <tr key={batch.id} className="hover:bg-surface-container-low transition-colors">
+                      <td className="px-4 py-3 font-mono font-bold text-primary">{batch.lotId}</td>
+                      <td className="px-4 py-3 font-semibold text-on-surface">Product {batch.productId.substring(0,8)}</td>
+                      <td className="px-4 py-3 text-red-600 font-bold">{new Date(batch.expiryDate).toISOString().split('T')[0]}</td>
+                      <td className="px-4 py-3">--</td>
+                      <td className="px-4 py-3 font-mono">--</td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => handleClearance(batch.lotId)}
+                          className="px-3 py-1 bg-primary/10 text-primary rounded font-bold hover:bg-primary/20 transition-colors whitespace-nowrap cursor-pointer"
+                        >
+                          Mark for Clearance
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6" className="px-4 py-6 text-center text-on-surface-variant font-medium">
+                      No expiring lots found.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

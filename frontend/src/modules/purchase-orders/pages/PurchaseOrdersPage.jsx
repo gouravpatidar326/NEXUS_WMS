@@ -1,7 +1,6 @@
-import { useState } from 'react';
-import { ShoppingCart, Plus, CheckCircle2, PackageCheck, Clock3, CircleDollarSign } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ShoppingCart, Plus, CheckCircle2, PackageCheck, Clock3, CircleDollarSign, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useWmsStore } from '@/contexts/WmsStoreContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { PERMISSIONS } from '@/permissions/permissions';
 import PermissionGuard from '@/guards/PermissionGuard';
@@ -15,10 +14,17 @@ import Modal from '@/components/ui/Modal';
 import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
 
+import { purchaseOrderService } from '@/services/purchaseOrderService';
+import { productService } from '@/services/productService';
+
 export const PurchaseOrdersPage = () => {
   const { user } = useAuth();
-  const { purchaseOrders, receivePurchaseOrder, createPurchaseOrder } = useWmsStore();
   const { notifySuccess, notifyError } = useNotification();
+
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -26,56 +32,106 @@ export const PurchaseOrdersPage = () => {
 
   // New PO state
   const [supplier, setSupplier] = useState('');
-  const [expectedDate, setExpectedDate] = useState('2026-08-15');
-  const [totalAmount, setTotalAmount] = useState(5000);
-  const [itemName, setItemName] = useState('Industrial Barcode Scanner X-200');
-  const [quantity, setQuantity] = useState(25);
+  const [expectedDate, setExpectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [totalAmount, setTotalAmount] = useState(0);
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [quantity, setQuantity] = useState(10);
 
   // Goods Receiving Dock state
   const [recLotId, setRecLotId] = useState('');
-  const [recQty, setRecQty] = useState(100);
-  const [recExpiryDate, setRecExpiryDate] = useState('2026-12-31');
+  const [recQty, setRecQty] = useState(0);
+  const [recExpiryDate, setRecExpiryDate] = useState(new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]);
   const [recLocation, setRecLocation] = useState('Receiving Dock Bin B-04');
 
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      const pos = await purchaseOrderService.fetchPurchaseOrders();
+      const prodsData = await productService.getProducts({ pageSize: 100 });
+      
+      setPurchaseOrders(pos);
+      setProducts(prodsData.items);
+    } catch (error) {
+      console.error(error);
+      notifyError('Failed to load purchase orders');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const filteredOrders = purchaseOrders.filter(po =>
-    po.poNumber.toLowerCase().includes(search.toLowerCase()) ||
-    po.supplier.toLowerCase().includes(search.toLowerCase())
+    po.poNumber?.toLowerCase().includes(search.toLowerCase()) ||
+    po.supplier?.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleOpenReceiveModal = (po) => {
     setReceivingPo(po);
     setRecLotId(`LOT-PO-${Math.floor(10000 + Math.random() * 90000)}`);
-    setRecQty(po.items?.[0]?.qty || 100);
+    setRecQty(po.items?.[0]?.quantity || 100);
   };
 
-  const handleCreatePurchaseOrder = (e) => {
+  const handleCreatePurchaseOrder = async (e) => {
     e.preventDefault();
-    if (!supplier.trim() || !expectedDate || Number(totalAmount) <= 0 || Number(quantity) <= 0) {
+    if (!supplier.trim() || !expectedDate || Number(totalAmount) <= 0 || Number(quantity) <= 0 || !selectedProductId) {
       notifyError('Complete all purchase order fields with valid values.');
       return;
     }
-    const created = createPurchaseOrder({
-      supplier: supplier.trim(), expectedDate, totalAmount: Number(totalAmount), createdBy: user?.name,
-      items: [{ productId: 'PRD-1001', sku: 'SKU-ELEC-001', name: itemName, qty: Number(quantity), qtyOrdered: Number(quantity), unitCost: Number(totalAmount) / Number(quantity) }],
-    });
-    notifySuccess(`${created.poNumber} created and submitted for approval.`);
-    setIsModalOpen(false);
-    setSupplier('');
+    
+    setIsSubmitting(true);
+    try {
+      await purchaseOrderService.createPurchaseOrder({
+        supplier: supplier.trim(),
+        expectedDelivery: expectedDate,
+        totalCost: Number(totalAmount),
+        items: [{
+          productId: selectedProductId,
+          quantity: Number(quantity),
+          unitCost: Number(totalAmount) / Number(quantity)
+        }]
+      });
+      notifySuccess(`Purchase Order created successfully.`);
+      setIsModalOpen(false);
+      setSupplier('');
+      setSelectedProductId('');
+      setTotalAmount(0);
+      fetchData(); // Refresh list
+    } catch (error) {
+      notifyError('Failed to create purchase order');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleConfirmReceive = (e) => {
+  const handleConfirmReceive = async (e) => {
     e.preventDefault();
     if (!receivingPo) return;
 
-    receivePurchaseOrder(receivingPo.id, {
-      lotId: recLotId,
-      qty: Number(recQty),
-      expiryDate: recExpiryDate,
-      location: recLocation,
-    });
+    setIsSubmitting(true);
+    try {
+      const productId = receivingPo.items?.[0]?.productId;
+      if (!productId) throw new Error("No product ID found in this PO");
 
-    notifySuccess(`Goods Received for ${receivingPo.poNumber}! Lot ${recLotId} created and posted to inventory.`);
-    setReceivingPo(null);
+      await purchaseOrderService.receivePurchaseOrder(receivingPo.id, [{
+        lotId: recLotId,
+        productId: productId,
+        quantity: Number(recQty),
+        expiryDate: recExpiryDate,
+        binLocation: recLocation,
+        mfgDate: new Date().toISOString()
+      }]);
+
+      notifySuccess(`Goods Received for ${receivingPo.poNumber}! Lot ${recLotId} created and posted to inventory.`);
+      setReceivingPo(null);
+      fetchData(); // Refresh list
+    } catch (error) {
+      notifyError('Failed to receive goods');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const columns = [
@@ -84,25 +140,29 @@ export const PurchaseOrdersPage = () => {
       accessor: 'poNumber',
       cell: (row) => (
         <span className="font-mono text-xs font-bold text-primary-600 dark:text-primary-400">
-          {row.poNumber}
+          {row.poNumber || row.id.substring(0, 8)}
         </span>
       ),
     },
     { header: 'Supplier Name', accessor: 'supplier' },
-    { header: 'Expected Delivery', accessor: 'expectedDate' },
+    { 
+      header: 'Expected Delivery', 
+      accessor: 'expectedDelivery',
+      cell: (row) => row.expectedDelivery ? new Date(row.expectedDelivery).toLocaleDateString() : 'N/A'
+    },
     {
       header: 'Order Total',
-      accessor: 'totalAmount',
-      cell: (row) => `$${Number(row.totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+      accessor: 'totalCost',
+      cell: (row) => `$${Number(row.totalCost || row.totalAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
     },
     {
       header: 'Status',
       accessor: 'status',
       cell: (row) => {
         const variant =
-          row.status === 'Approved'
+          row.status === 'APPROVED' || row.status === 'Approved'
             ? 'primary'
-            : row.status === 'Received'
+            : row.status === 'RECEIVED' || row.status === 'Received'
             ? 'success'
             : 'warning';
         return <Badge variant={variant}>{row.status}</Badge>;
@@ -113,7 +173,7 @@ export const PurchaseOrdersPage = () => {
       accessor: 'actions',
       cell: (row) => (
         <PermissionGuard permission={PERMISSIONS.PO_RECEIVE}>
-          {row.status === 'Approved' ? (
+          {row.status !== 'RECEIVED' && row.status !== 'Received' ? (
             <Button
               size="sm"
               variant="outline"
@@ -130,6 +190,10 @@ export const PurchaseOrdersPage = () => {
     },
   ];
 
+  if (isLoading) {
+    return <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary-600" /></div>;
+  }
+
   return (
     <div className="space-y-6 min-h-[calc(100vh-4rem)] flex flex-col">
       <PageHeader
@@ -145,8 +209,8 @@ export const PurchaseOrdersPage = () => {
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="card flex items-center gap-3 p-4"><ShoppingCart className="h-9 w-9 rounded-xl bg-primary-50 p-2 text-primary-600" /><div><p className="text-xs text-surface-500">Total purchase orders</p><p className="text-xl font-bold">{purchaseOrders.length}</p></div></div>
-        <div className="card flex items-center gap-3 p-4"><Clock3 className="h-9 w-9 rounded-xl bg-warning-50 p-2 text-warning-600" /><div><p className="text-xs text-surface-500">Awaiting action</p><p className="text-xl font-bold">{purchaseOrders.filter((po) => po.status !== 'Received').length}</p></div></div>
-        <div className="card flex items-center gap-3 p-4"><CircleDollarSign className="h-9 w-9 rounded-xl bg-success-50 p-2 text-success-600" /><div><p className="text-xs text-surface-500">Procurement value</p><p className="text-xl font-bold">${purchaseOrders.reduce((sum, po) => sum + Number(po.totalAmount || 0), 0).toLocaleString()}</p></div></div>
+        <div className="card flex items-center gap-3 p-4"><Clock3 className="h-9 w-9 rounded-xl bg-warning-50 p-2 text-warning-600" /><div><p className="text-xs text-surface-500">Awaiting action</p><p className="text-xl font-bold">{purchaseOrders.filter((po) => po.status !== 'RECEIVED' && po.status !== 'Received').length}</p></div></div>
+        <div className="card flex items-center gap-3 p-4"><CircleDollarSign className="h-9 w-9 rounded-xl bg-success-50 p-2 text-success-600" /><div><p className="text-xs text-surface-500">Procurement value</p><p className="text-xl font-bold">${purchaseOrders.reduce((sum, po) => sum + Number(po.totalCost || po.totalAmount || 0), 0).toLocaleString()}</p></div></div>
       </div>
 
       <div className="card p-4"><SearchBar value={search} onChange={setSearch} placeholder="Search POs by PO# or supplier..." /></div>
@@ -160,14 +224,28 @@ export const PurchaseOrdersPage = () => {
         onClose={() => setIsModalOpen(false)}
         title="Create Purchase Order"
         size="md"
-        footer={<><Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button><Button onClick={handleCreatePurchaseOrder}>Submit for Approval</Button></>}
+        footer={<><Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button><Button onClick={handleCreatePurchaseOrder} disabled={isSubmitting}>{isSubmitting ? 'Submitting...' : 'Submit for Approval'}</Button></>}
       >
         <form onSubmit={handleCreatePurchaseOrder} className="space-y-4">
           <FormField label="Supplier" required><Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="Supplier company name" required /></FormField>
-          <FormField label="Item / Product" required><Input value={itemName} onChange={(e) => setItemName(e.target.value)} required /></FormField>
+          
+          <FormField label="Item / Product" required>
+            <select 
+              value={selectedProductId}
+              onChange={(e) => setSelectedProductId(e.target.value)}
+              className="flex h-10 w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm text-surface-900 shadow-sm transition-colors placeholder:text-surface-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-surface-50 disabled:text-surface-500"
+              required
+            >
+              <option value="">-- Select a Product --</option>
+              {products.map(p => (
+                <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
+              ))}
+            </select>
+          </FormField>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Quantity" required><Input type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} required /></FormField>
-            <FormField label="Order Total" required><Input type="number" min="1" value={totalAmount} onChange={(e) => setTotalAmount(e.target.value)} required /></FormField>
+            <FormField label="Order Total ($)" required><Input type="number" min="1" value={totalAmount} onChange={(e) => setTotalAmount(e.target.value)} required /></FormField>
           </div>
           <FormField label="Expected Delivery" required><Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} required /></FormField>
         </form>
@@ -178,15 +256,15 @@ export const PurchaseOrdersPage = () => {
         <Modal
           isOpen={!!receivingPo}
           onClose={() => setReceivingPo(null)}
-          title={`Receiving Dock Gate — ${receivingPo.poNumber}`}
+          title={`Receiving Dock Gate — ${receivingPo.poNumber || receivingPo.id.substring(0,8)}`}
           size="md"
           footer={
             <>
               <Button variant="outline" onClick={() => setReceivingPo(null)}>
                 Cancel
               </Button>
-              <Button variant="primary" onClick={handleConfirmReceive}>
-                Confirm Goods Receipt & Create Lot
+              <Button variant="primary" onClick={handleConfirmReceive} disabled={isSubmitting}>
+                {isSubmitting ? 'Processing...' : 'Confirm Goods Receipt & Create Lot'}
               </Button>
             </>
           }
@@ -194,7 +272,7 @@ export const PurchaseOrdersPage = () => {
           <form onSubmit={handleConfirmReceive} className="space-y-4">
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs">
               <span className="font-bold text-blue-900 block">Vendor: {receivingPo.supplier}</span>
-              <span className="text-blue-700">Item: {receivingPo.items?.[0]?.name || 'Supplier Goods'}</span>
+              <span className="text-blue-700">Item: {receivingPo.items?.[0]?.product?.name || 'Supplier Goods'}</span>
             </div>
 
             <FormField label="Assigned New Lot ID" required>

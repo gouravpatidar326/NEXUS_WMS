@@ -7,6 +7,7 @@ router.use(verifyToken, requireRole(['SUPER_ADMIN', 'WAREHOUSE_MANAGER', 'INVENT
 
 // Managers/Clerks can view all orders
 router.get('/sales-orders', salesOrdersController.getSalesOrders);
+router.post('/sales-orders', salesOrdersController.createSalesOrder);
 
 // Only Managers can approve or reject
 router.post('/sales-orders/:id/approve', requireRole(['SUPER_ADMIN', 'WAREHOUSE_MANAGER']), salesOrdersController.approveSalesOrder);

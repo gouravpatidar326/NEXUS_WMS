@@ -3,7 +3,7 @@ import { api } from './api';
 export const orderService = {
   // Purchase Orders
   async getPurchaseOrders({ search = '', status = '' } = {}) {
-    const poStore = await api.get('/warehouse/purchase-orders');
+    const poStore = await api.get('/purchase-orders');
     
     let filtered = [...poStore];
     if (search) {
@@ -33,7 +33,7 @@ export const orderService = {
 
   // Transfer Orders
   async getTransferOrders() {
-    return await api.get('/warehouse/transfer-orders');
+    return await api.get('/transfer-orders');
   },
 
   async createTransferOrder(toData) {
@@ -50,7 +50,7 @@ export const orderService = {
     
     let soStore = [];
     try {
-      soStore = await api.get('/warehouse/sales-orders');
+      soStore = await api.get('/sales-orders');
     } catch (error) {
       // Fallback if user is a CLIENT and blocked from warehouse routes
       soStore = await api.get('/client/sales-orders');

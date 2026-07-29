@@ -26,7 +26,7 @@ const getTransferOrders = async (req, res) => {
 const createTransferOrder = async (req, res) => {
   try {
     const { destinationCompanyId, productId, quantity } = req.body;
-    
+
     if (!destinationCompanyId || !productId || !quantity || quantity <= 0) {
       return res.status(400).json({ message: 'Invalid transfer parameters' });
     }
@@ -35,16 +35,22 @@ const createTransferOrder = async (req, res) => {
       return res.status(400).json({ message: 'Destination company cannot be the same as source' });
     }
 
-    // Verify stock exists in source
-    const product = await prisma.product.findFirst({
+    // Verify product & stock exist in source company
+    const sourceProduct = await prisma.product.findFirst({
       where: { id: productId, companyId: req.user.companyId }
     });
 
-    if (!product || product.availableStock < quantity) {
-      return res.status(400).json({ message: 'Insufficient stock for transfer' });
+    if (!sourceProduct) {
+      return res.status(404).json({ message: 'Product not found in your company catalog' });
     }
 
-    // Wrap in transaction for double-entry stock movement
+    if (sourceProduct.availableStock < quantity) {
+      return res.status(400).json({
+        message: `Insufficient stock. Available: ${sourceProduct.availableStock}, Requested: ${quantity}`
+      });
+    }
+
+    // Atomic transaction: deduct source, credit destination
     const order = await prisma.$transaction(async (tx) => {
       const to = await tx.transferOrder.create({
         data: {
@@ -52,11 +58,11 @@ const createTransferOrder = async (req, res) => {
           destinationCompanyId,
           productId,
           quantity,
-          status: 'COMPLETED' // Simplifying the state machine for Phase 2 implementation
+          status: 'COMPLETED'
         }
       });
 
-      // Deduct from source
+      // 1. Deduct stock from source company
       await tx.product.update({
         where: { id: productId },
         data: { availableStock: { decrement: quantity } }
@@ -71,21 +77,32 @@ const createTransferOrder = async (req, res) => {
         }
       });
 
-      // Add to destination (Requires product to exist in dest company catalog too, or we create it)
-      // For this implementation, we assume the product SKU exists in dest, or we just fail if not.
-      const destProduct = await tx.product.findFirst({
-        where: { sku: product.sku, companyId: destinationCompanyId }
+      // 2. Find or auto-create product in destination company catalog
+      let destProduct = await tx.product.findFirst({
+        where: { sku: sourceProduct.sku, companyId: destinationCompanyId }
       });
 
       if (!destProduct) {
-        throw new Error('Product SKU does not exist in destination company catalog');
+        destProduct = await tx.product.create({
+          data: {
+            sku: sourceProduct.sku,
+            name: sourceProduct.name,
+            category: sourceProduct.category,
+            unitCost: sourceProduct.unitCost,
+            wholesalePrice: sourceProduct.wholesalePrice,
+            availableStock: 0,
+            committedStock: 0,
+            companyId: destinationCompanyId,
+            status: 'ACTIVE',
+          }
+        });
       }
 
+      // 3. Credit stock to destination company
       await tx.product.update({
         where: { id: destProduct.id },
         data: { availableStock: { increment: quantity } }
       });
-      
       await tx.inventoryLedger.create({
         data: {
           productId: destProduct.id,
@@ -99,6 +116,7 @@ const createTransferOrder = async (req, res) => {
       return to;
     });
 
+    // Audit log
     await prisma.auditLog.create({
       data: {
         event: 'TRANSFER_ORDER_COMPLETED',
@@ -107,13 +125,20 @@ const createTransferOrder = async (req, res) => {
       }
     });
 
-    res.status(201).json(order);
+    // Return enriched order for UI
+    const enriched = await prisma.transferOrder.findUnique({
+      where: { id: order.id },
+      include: {
+        sourceCompany: { select: { name: true } },
+        destinationCompany: { select: { name: true } },
+        product: { select: { name: true, sku: true } }
+      }
+    });
+
+    res.status(201).json(enriched);
   } catch (error) {
     console.error(error);
-    if (error.message.includes('destination company catalog')) {
-      return res.status(400).json({ message: error.message });
-    }
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: error.message || 'Internal server error' });
   }
 };
 

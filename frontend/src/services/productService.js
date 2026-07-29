@@ -2,7 +2,7 @@ import { api } from './api';
 
 export const productService = {
   async getProducts({ search = '', category = '', status = '', page = 1, pageSize = 10 } = {}) {
-    const products = await api.get('/warehouse/products');
+    const products = await api.get('/products');
     
     // Front-end local filtering/pagination since backend GET /api/warehouse/products returns all
     let filtered = [...products];
@@ -33,7 +33,7 @@ export const productService = {
   },
 
   async getProductById(id) {
-    const products = await api.get('/warehouse/products');
+    const products = await api.get('/products');
     return products.find(p => p.id === id);
   },
 

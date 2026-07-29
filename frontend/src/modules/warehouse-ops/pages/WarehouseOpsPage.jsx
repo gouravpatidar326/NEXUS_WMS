@@ -7,7 +7,6 @@ import PermissionGuard from '@/guards/PermissionGuard';
 
 import PageHeader from '@/components/navigation/PageHeader';
 import DataTable from '@/components/data-display/DataTable';
-import QRScannerPlaceholder from '@/components/forms/QRScannerPlaceholder';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
@@ -20,7 +19,6 @@ export const WarehouseOpsPage = () => {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('locations');
 
   const [zone, setZone] = useState('Zone A - High Value');
   const [aisle, setAisle] = useState('A-05');
@@ -52,7 +50,7 @@ export const WarehouseOpsPage = () => {
         aisle,
         rack,
         shelf,
-        capacity: Number(capacity),
+        maxCapacity: Number(capacity),
         type: 'Standard Rack',
       });
       notifySuccess('Storage Bin Location provisioned.');
@@ -66,11 +64,11 @@ export const WarehouseOpsPage = () => {
   const columns = [
     {
       header: 'Bin Barcode ID',
-      accessor: 'barcode',
+      accessor: 'id',
       cell: (row) => (
         <span className="font-mono text-xs font-bold text-primary-600 dark:text-primary-400 flex items-center gap-1">
           <QrCode className="h-3.5 w-3.5" />
-          {row.barcode}
+          LOC-{row.id.substring(0, 8).toUpperCase()}
         </span>
       ),
     },
@@ -91,15 +89,15 @@ export const WarehouseOpsPage = () => {
       cell: (row) => (
         <div className="space-y-1 w-36">
           <div className="flex justify-between text-xs font-mono">
-            <span>{row.occupied}/{row.capacity}</span>
-            <span>{Math.round((row.occupied / row.capacity) * 100)}%</span>
+            <span>{row.occupied}/{row.maxCapacity}</span>
+            <span>{Math.round((row.occupied / row.maxCapacity) * 100) || 0}%</span>
           </div>
           <div className="h-1.5 w-full bg-surface-200 dark:bg-surface-700 rounded-full overflow-hidden">
             <div
               className={`h-full ${
-                row.occupied / row.capacity > 0.9 ? 'bg-danger-500' : 'bg-primary-600'
+                row.occupied / row.maxCapacity > 0.9 ? 'bg-danger-500' : 'bg-primary-600'
               }`}
-              style={{ width: `${(row.occupied / row.capacity) * 100}%` }}
+              style={{ width: `${(row.occupied / row.maxCapacity) * 100 || 0}%` }}
             />
           </div>
         </div>
@@ -119,7 +117,7 @@ export const WarehouseOpsPage = () => {
     <div className="space-y-6">
       <PageHeader
         title="Warehouse Operations & Bins"
-        description="Zone layouts, bin location capacity control, and barcode scanner verification"
+        description="Zone layouts and bin location capacity control"
         breadcrumbs={[{ label: 'Operations & Logistics' }, { label: 'Warehouse Bins' }]}
         actions={
           <PermissionGuard permission={PERMISSIONS.WAREHOUSE_MANAGE}>
@@ -146,40 +144,7 @@ export const WarehouseOpsPage = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-2 border-b border-surface-200 dark:border-surface-800 sm:flex sm:gap-4">
-        <button
-          onClick={() => setActiveTab('locations')}
-          className={`min-w-0 whitespace-normal pb-2 text-xs font-semibold leading-4 transition border-b-2 sm:text-sm ${
-            activeTab === 'locations'
-              ? 'border-primary-600 text-primary-600'
-              : 'border-transparent text-surface-500 hover:text-surface-800'
-          }`}
-        >
-          Bin Locations Ledger
-        </button>
-        <button
-          onClick={() => setActiveTab('scanner')}
-          className={`min-w-0 whitespace-normal pb-2 text-xs font-semibold leading-4 transition border-b-2 sm:text-sm ${
-            activeTab === 'scanner'
-              ? 'border-primary-600 text-primary-600'
-              : 'border-transparent text-surface-500 hover:text-surface-800'
-          }`}
-        >
-          Live Camera QR/Bin Scanner
-        </button>
-      </div>
-
-      {activeTab === 'locations' ? (
-        <DataTable columns={columns} data={locations} isLoading={loading} />
-      ) : (
-        <div className="py-6">
-          <QRScannerPlaceholder
-            onScanComplete={(code) =>
-              notifySuccess(`Scanned location bin code: ${code}. Bin verified!`)
-            }
-          />
-        </div>
-      )}
+      <DataTable columns={columns} data={locations} isLoading={loading} />
 
       <Modal
         isOpen={isModalOpen}

@@ -2,11 +2,11 @@ import { api } from './api';
 
 export const batchService = {
   async getBatches() {
-    return await api.get('/warehouse/batches');
+    return await api.get('/batches');
   },
 
   async getExpiringBatches(daysThreshold = 60) {
-    const batches = await api.get('/warehouse/batches');
+    const batches = await api.get('/batches');
     const thresholdDate = new Date();
     thresholdDate.setDate(thresholdDate.getDate() + daysThreshold);
 

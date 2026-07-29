@@ -1,5 +1,18 @@
 const prisma = require('../../utils/prisma');
 
+const getCompanies = async (req, res) => {
+  try {
+    const companies = await prisma.company.findMany({
+      select: { id: true, name: true, industry: true },
+      orderBy: { name: 'asc' },
+    });
+    res.json(companies);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 const getPickLists = async (req, res) => {
   try {
     const pickLists = await prisma.pickList.findMany({
@@ -37,11 +50,35 @@ const completePick = async (req, res) => {
 
     await prisma.$transaction(async (tx) => {
       for (const item of items) {
+        const pickItem = await tx.pickListItem.findUnique({
+          where: { id: item.pickListItemId }
+        });
+
+        let assignedBatchId = pickItem.batchId;
+
+        if (!assignedBatchId) {
+          const batch = await tx.batch.findFirst({
+            where: {
+              productId: pickItem.productId,
+              companyId: req.user.companyId,
+              quarantine: false
+            },
+            orderBy: {
+              expiryDate: 'asc'
+            }
+          });
+
+          if (batch) {
+            assignedBatchId = batch.id;
+          }
+        }
+
         await tx.pickListItem.update({
           where: { id: item.pickListItemId },
           data: {
             pickedQuantity: item.pickedQuantity,
-            picked: true
+            picked: true,
+            ...(assignedBatchId && { batchId: assignedBatchId })
           }
         });
       }
@@ -50,6 +87,28 @@ const completePick = async (req, res) => {
         where: { id },
         data: { status: 'COMPLETED' }
       });
+
+      // Update SalesOrder status to PACKING
+      if (pickList.orderId) {
+        // We assume orderId is the SalesOrder ID
+        const salesOrder = await tx.salesOrder.findUnique({
+          where: { id: pickList.orderId }
+        });
+        if (salesOrder) {
+          await tx.salesOrder.update({
+            where: { id: pickList.orderId },
+            data: { status: 'PACKING' }
+          });
+        }
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        event: 'PICK_LIST_COMPLETED',
+        userId: req.user.id,
+        ipAddress: req.ip
+      }
     });
 
     res.json({ id, status: 'COMPLETED' });
@@ -83,37 +142,72 @@ const updateLocation = async (req, res) => {
   }
 };
 
-const generateShippingLabel = async (req, res) => {
-  // Interface-compatible mock for ShipStation label generation
+const getShipments = async (req, res) => {
   try {
-    const { orderId, carrier } = req.body;
-
-    if (!orderId || !carrier) {
-      return res.status(400).json({ message: 'Order ID and carrier required' });
-    }
-
-    // Mock ShipStation response structure
-    const mockResponse = {
-      trackingId: `SS-TRACK-${Math.floor(Math.random() * 90000) + 10000}`,
-      carrier: carrier,
-      labelUrl: 'https://mock.shipstation.com/labels/sample.pdf',
-      status: 'LABEL_CREATED',
-      timestamp: new Date().toISOString()
-    };
-
-    await prisma.auditLog.create({
-      data: {
-        event: 'SHIPSTATION_LABEL_GENERATED',
-        userId: req.user.id,
-        ipAddress: req.ip
-      }
+    const shipments = await prisma.shipment.findMany({
+      where: { companyId: req.user.companyId },
+      orderBy: { createdAt: 'desc' }
     });
-
-    res.json(mockResponse);
+    res.json(shipments);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-module.exports = { getPickLists, completePick, updateLocation, generateShippingLabel };
+const generateShippingLabel = async (req, res) => {
+  try {
+    const { orderId, carrier, recipient, destination } = req.body;
+
+    if (!orderId || !carrier) {
+      return res.status(400).json({ message: 'Order ID and carrier required' });
+    }
+
+    const mockTrackingId = `SS-TRACK-${Math.floor(Math.random() * 90000) + 10000}`;
+    const mockLabelUrl = 'https://mock.shipstation.com/labels/sample.pdf';
+
+    const shipment = await prisma.$transaction(async (tx) => {
+      const newShipment = await tx.shipment.create({
+        data: {
+          trackingNumber: mockTrackingId,
+          carrier,
+          orderId,
+          recipient: recipient || 'Unknown',
+          destination: destination || 'Unknown',
+          estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          status: 'LABEL_CREATED',
+          labelUrl: mockLabelUrl,
+          companyId: req.user.companyId
+        }
+      });
+
+      await tx.auditLog.create({
+        data: {
+          event: 'SHIPSTATION_LABEL_GENERATED',
+          userId: req.user.id,
+          ipAddress: req.ip
+        }
+      });
+
+      // Update SalesOrder status to SHIPPED
+      const salesOrder = await tx.salesOrder.findUnique({
+        where: { id: orderId }
+      });
+      if (salesOrder) {
+        await tx.salesOrder.update({
+          where: { id: orderId },
+          data: { status: 'SHIPPED' }
+        });
+      }
+
+      return newShipment;
+    });
+
+    res.json(shipment);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+module.exports = { getPickLists, completePick, updateLocation, generateShippingLabel, getShipments, getCompanies };
