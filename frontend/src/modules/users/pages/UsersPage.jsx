@@ -9,6 +9,7 @@ import DataTable from '@/components/data-display/DataTable';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
@@ -22,6 +23,7 @@ export const UsersPage = () => {
   const [usersList, setUsersList] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deleteUserState, setDeleteUserState] = useState({ isOpen: false, user: null });
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -89,11 +91,16 @@ export const UsersPage = () => {
     }
   };
 
-  const handleDeleteUser = async (user) => {
-    if (!window.confirm(`Are you sure you want to delete user "${user.name}"?`)) return;
+  const handleDeleteUser = (user) => {
+    setDeleteUserState({ isOpen: true, user });
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!deleteUserState.user) return;
     try {
-      await userService.deleteUser(user.id);
-      notifySuccess(`User ${user.name} deleted.`);
+      await userService.deleteUser(deleteUserState.user.id);
+      notifySuccess(`User ${deleteUserState.user.name} deleted.`);
+      setDeleteUserState({ isOpen: false, user: null });
       fetchData();
     } catch (err) {
       notifyError(err.message || 'Failed to delete user');
@@ -222,6 +229,16 @@ export const UsersPage = () => {
           )}
         </form>
       </Modal>
+      {/* Delete User Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteUserState.isOpen}
+        onClose={() => setDeleteUserState({ isOpen: false, user: null })}
+        onConfirm={confirmDeleteUser}
+        title="Delete User Account"
+        message={`Are you sure you want to delete user account "${deleteUserState.user?.name}" (${deleteUserState.user?.email})? This action cannot be undone.`}
+        confirmText="Yes, Delete User"
+        variant="danger"
+      />
     </section>
   );
 };

@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ROLES } from '@/permissions/roles';
 import { useNotification } from '@/contexts/NotificationContext';
 import Modal from '@/components/ui/Modal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
@@ -19,6 +20,7 @@ export const ProductsListPage = () => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deleteProdState, setDeleteProdState] = useState({ isOpen: false, id: null, name: '' });
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -133,11 +135,16 @@ export const ProductsListPage = () => {
     }
   };
 
-  const handleDeleteProduct = async (id, prodName) => {
-    if (!window.confirm(`Are you sure you want to delete product "${prodName}"?`)) return;
+  const handleDeleteProduct = (id, prodName) => {
+    setDeleteProdState({ isOpen: true, id, name: prodName });
+  };
+
+  const confirmDeleteProduct = async () => {
+    if (!deleteProdState.id) return;
     try {
-      await productService.deleteProduct(id);
-      notifySuccess(`Product "${prodName}" deleted.`);
+      await productService.deleteProduct(deleteProdState.id);
+      notifySuccess(`Product "${deleteProdState.name}" deleted.`);
+      setDeleteProdState({ isOpen: false, id: null, name: '' });
       fetchData();
     } catch (err) {
       notifyError(err.message || 'Failed to delete product');
@@ -363,6 +370,16 @@ export const ProductsListPage = () => {
           </FormField>
         </form>
       </Modal>
+      {/* Delete Product Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteProdState.isOpen}
+        onClose={() => setDeleteProdState({ isOpen: false, id: null, name: '' })}
+        onConfirm={confirmDeleteProduct}
+        title="Delete Product"
+        message={`Are you sure you want to delete product "${deleteProdState.name}"? This action will remove the product SKU entry.`}
+        confirmText="Yes, Delete Product"
+        variant="danger"
+      />
     </section>
   );
 };

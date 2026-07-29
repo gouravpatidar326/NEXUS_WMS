@@ -6,6 +6,7 @@ import DataTable from '@/components/data-display/DataTable';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
@@ -33,6 +34,7 @@ export const WarehouseOpsPage = () => {
   const [shelf, setShelf] = useState('1');
   const [bin, setBin] = useState('A1');
   const [maxCapacity, setMaxCapacity] = useState('1000');
+  const [deleteLocState, setDeleteLocState] = useState({ isOpen: false, locationId: null, locationCode: '' });
 
   // Receiving Modals State
   const [isCreateRecModalOpen, setIsCreateRecModalOpen] = useState(false);
@@ -107,11 +109,16 @@ export const WarehouseOpsPage = () => {
     }
   };
 
-  const handleDeleteLocation = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this storage location?')) return;
+  const handleDeleteLocation = (row) => {
+    setDeleteLocState({ isOpen: true, locationId: row.id, locationCode: row.code || `Bin ${row.bin}` });
+  };
+
+  const confirmDeleteLocation = async () => {
+    if (!deleteLocState.locationId) return;
     try {
-      await locationService.deleteLocation(id);
+      await locationService.deleteLocation(deleteLocState.locationId);
       notifySuccess('Storage location deleted.');
+      setDeleteLocState({ isOpen: false, locationId: null, locationCode: '' });
       fetchAllData();
     } catch (err) {
       notifyError(err.message || 'Failed to delete location');
@@ -272,7 +279,7 @@ export const WarehouseOpsPage = () => {
       accessor: 'actions',
       cell: (row) => (
         <div className="flex gap-2">
-          <button onClick={() => handleDeleteLocation(row.id)} className="p-1 text-slate-400 hover:text-red-600">
+          <button onClick={() => handleDeleteLocation(row)} className="p-1 text-slate-400 hover:text-red-600">
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
@@ -522,6 +529,16 @@ export const WarehouseOpsPage = () => {
           </div>
         </form>
       </Modal>
+      {/* Delete Location Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteLocState.isOpen}
+        onClose={() => setDeleteLocState({ isOpen: false, locationId: null, locationCode: '' })}
+        onConfirm={confirmDeleteLocation}
+        title="Delete Storage Location"
+        message={`Are you sure you want to delete storage bin location "${deleteLocState.locationCode}"? This operation will remove the location bin record.`}
+        confirmText="Yes, Delete Location"
+        variant="danger"
+      />
     </section>
   );
 };

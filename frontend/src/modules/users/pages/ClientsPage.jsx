@@ -6,6 +6,7 @@ import DataTable from '@/components/data-display/DataTable';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
@@ -16,6 +17,7 @@ export const ClientsPage = () => {
   const { notifySuccess, notifyError } = useNotification();
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deleteCliState, setDeleteCliState] = useState({ isOpen: false, client: null });
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -88,11 +90,16 @@ export const ClientsPage = () => {
     }
   };
 
-  const handleDeleteClient = async (cli) => {
-    if (!window.confirm(`Are you sure you want to delete client ${cli.name}?`)) return;
+  const handleDeleteClient = (cli) => {
+    setDeleteCliState({ isOpen: true, client: cli });
+  };
+
+  const confirmDeleteClient = async () => {
+    if (!deleteCliState.client) return;
     try {
-      await clientService.deleteClient(cli.id);
-      notifySuccess(`Client ${cli.name} deleted.`);
+      await clientService.deleteClient(deleteCliState.client.id);
+      notifySuccess(`Client ${deleteCliState.client.name} deleted.`);
+      setDeleteCliState({ isOpen: false, client: null });
       fetchClients();
     } catch (err) {
       notifyError(err.message || 'Failed to delete client');
@@ -201,6 +208,16 @@ export const ClientsPage = () => {
           </div>
         </form>
       </Modal>
+      {/* Delete Client Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteCliState.isOpen}
+        onClose={() => setDeleteCliState({ isOpen: false, client: null })}
+        onConfirm={confirmDeleteClient}
+        title="Delete Client Company"
+        message={`Are you sure you want to delete client account "${deleteCliState.client?.name}"?`}
+        confirmText="Yes, Delete Client"
+        variant="danger"
+      />
     </div>
   );
 };
