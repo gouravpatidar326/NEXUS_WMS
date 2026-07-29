@@ -4,26 +4,33 @@ const getStockValuation = async (req, res) => {
   try {
     const { companyId } = req.user;
 
+    const where = companyId ? { companyId } : {};
+
     const products = await prisma.product.findMany({
-      where: { companyId }
+      where,
+      include: { category: true },
     });
 
     const valuationByCategory = {};
 
     for (const product of products) {
-      const category = product.category || 'Uncategorized';
-      if (!valuationByCategory[category]) {
-        valuationByCategory[category] = { totalUnits: 0, totalValue: 0 };
+      const categoryName = product.category?.name || product.category || 'General Inventory';
+      if (!valuationByCategory[categoryName]) {
+        valuationByCategory[categoryName] = { totalUnits: 0, totalValue: 0 };
       }
-      
-      valuationByCategory[category].totalUnits += product.availableStock;
-      valuationByCategory[category].totalValue += product.availableStock * product.unitCost;
+
+      const stock = product.availableStock || 0;
+      const cost = product.unitCost || 0;
+      valuationByCategory[categoryName].totalUnits += stock;
+      valuationByCategory[categoryName].totalValue += stock * cost;
     }
 
     const result = Object.entries(valuationByCategory).map(([category, data]) => ({
       category,
+      name: category,
       totalUnits: data.totalUnits,
-      totalValue: data.totalValue
+      totalValue: Math.round(data.totalValue * 100) / 100,
+      value: data.totalUnits > 0 ? data.totalUnits : 1,
     }));
 
     res.json(result);
@@ -40,20 +47,22 @@ const getInventoryVelocity = async (req, res) => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+    const where = {
+      ...(companyId ? { companyId } : {}),
+      timestamp: { gte: thirtyDaysAgo },
+    };
+
     const movements = await prisma.inventoryLedger.groupBy({
       by: ['movementType'],
-      where: {
-        companyId,
-        timestamp: { gte: thirtyDaysAgo }
-      },
+      where,
       _count: {
-        movementType: true
-      }
+        movementType: true,
+      },
     });
 
-    const result = movements.map(m => ({
+    const result = movements.map((m) => ({
       movementType: m.movementType,
-      count: m._count.movementType
+      count: m._count.movementType,
     }));
 
     res.json(result);
@@ -65,5 +74,5 @@ const getInventoryVelocity = async (req, res) => {
 
 module.exports = {
   getStockValuation,
-  getInventoryVelocity
+  getInventoryVelocity,
 };
