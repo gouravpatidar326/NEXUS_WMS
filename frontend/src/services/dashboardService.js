@@ -2,30 +2,27 @@ import { api } from './api';
 
 export const dashboardService = {
   async getManagerSummary() {
-    const response = await api.get('/dashboard/manager-summary');
-    return response;
+    return await api.get('/dashboard/manager');
   },
   getSuperAdminDashboard: async () => {
-    return await api.request('/dashboard/super-admin');
+    return await api.get('/dashboard/super-admin');
   },
   getManagerDashboard: async () => {
-    return await api.request('/dashboard/manager');
+    return await api.get('/dashboard/manager');
   },
   getClerkDashboard: async () => {
-    return await api.request('/dashboard/clerk');
+    return await api.get('/dashboard/clerk');
   },
   getClientDashboard: async () => {
-    return await api.request('/dashboard/client');
+    return await api.get('/dashboard/client');
   }
 };
 
 export const reportsService = {
   async getStockValuation() {
-    const response = await api.get('/reports/stock-valuation');
-    return response;
+    return await api.get('/reports/stock-valuation');
   },
   async getInventoryVelocity() {
-    const response = await api.get('/reports/inventory-velocity');
-    return response;
+    return await api.get('/reports/inventory-velocity');
   }
 };
