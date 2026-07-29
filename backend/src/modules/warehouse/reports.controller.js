@@ -8,13 +8,13 @@ const getStockValuation = async (req, res) => {
 
     const products = await prisma.product.findMany({
       where,
-      include: { category: true },
+      include: { categoryRef: true },
     });
 
     const valuationByCategory = {};
 
     for (const product of products) {
-      const categoryName = product.category?.name || product.category || 'General Inventory';
+      const categoryName = product.categoryRef?.name || product.category || 'General Inventory';
       if (!valuationByCategory[categoryName]) {
         valuationByCategory[categoryName] = { totalUnits: 0, totalValue: 0 };
       }
@@ -36,7 +36,7 @@ const getStockValuation = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error in getStockValuation:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 };
 
@@ -68,7 +68,7 @@ const getInventoryVelocity = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error in getInventoryVelocity:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 };
 
