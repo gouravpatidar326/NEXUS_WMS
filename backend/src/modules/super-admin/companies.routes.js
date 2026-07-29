@@ -7,5 +7,7 @@ router.use(verifyToken, requireRole(['SUPER_ADMIN']));
 
 router.get('/', companiesController.getCompanies);
 router.post('/', companiesController.createCompany);
+router.put('/:id', companiesController.updateCompany);
+router.delete('/:id', companiesController.deleteCompany);
 
 module.exports = router;

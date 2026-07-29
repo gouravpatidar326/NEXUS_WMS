@@ -236,6 +236,7 @@ const SuperAdminDashboard = ({ user }) => {
 const WarehouseManagerDashboard = ({ user }) => {
   const navigate = useNavigate();
   const { notifySuccess, notifyError } = useNotification();
+<<<<<<< HEAD
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -246,11 +247,27 @@ const WarehouseManagerDashboard = ({ user }) => {
         setSummary(data);
       } catch (error) {
         notifyError('Failed to fetch dashboard summary');
+=======
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await dashboardService.getManagerDashboard();
+        setData(response.data);
+      } catch (err) {
+        notifyError('Failed to load dashboard data');
+>>>>>>> 7511d25f4dcd52580c3fa16211aba1fcfc509b36
       } finally {
         setLoading(false);
       }
     };
+<<<<<<< HEAD
     fetchSummary();
+=======
+    fetchData();
+>>>>>>> 7511d25f4dcd52580c3fa16211aba1fcfc509b36
   }, [notifyError]);
 
   const handleClearance = (lotId) => {
@@ -281,6 +298,7 @@ const WarehouseManagerDashboard = ({ user }) => {
           </div>
         </div>
         <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
+<<<<<<< HEAD
           <p className="text-xs text-on-surface-variant">Pending Pick Lists</p>
           <h3 className="text-2xl font-bold text-primary">{summary ? summary.pendingPickLists : '...'}</h3>
           <p className="text-[11px] text-on-surface-variant font-bold mt-2">Active picking tasks</p>
@@ -293,6 +311,18 @@ const WarehouseManagerDashboard = ({ user }) => {
         <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
           <p className="text-xs text-on-surface-variant">Near Expiry (&lt;30d)</p>
           <h3 className="text-2xl font-bold text-red-600">{summary ? summary.nearExpiryBatches?.length || 0 : '...'}</h3>
+=======
+          <p className="text-xs text-on-surface-variant">Pending Tasks</p>
+          <h3 className="text-2xl font-bold text-primary">{data?.pendingTasks || 0}</h3>
+        </div>
+        <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
+          <p className="text-xs text-on-surface-variant">Today's Shipments</p>
+          <h3 className="text-2xl font-bold text-primary">{data?.todaysShipments || 0}</h3>
+        </div>
+        <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
+          <p className="text-xs text-on-surface-variant">Near Expiry (&lt;30d)</p>
+          <h3 className="text-2xl font-bold text-red-600">{data?.nearExpiryCount || 0}</h3>
+>>>>>>> 7511d25f4dcd52580c3fa16211aba1fcfc509b36
           <p onClick={() => navigate('/expiry-tracking')} className="text-[11px] text-red-600 font-bold underline mt-2 cursor-pointer">
             View critical lots
           </p>
@@ -396,6 +426,7 @@ const WarehouseManagerDashboard = ({ user }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant text-xs">
+<<<<<<< HEAD
                 {summary && summary.nearExpiryBatches && summary.nearExpiryBatches.length > 0 ? (
                   summary.nearExpiryBatches.map((batch) => (
                     <tr key={batch.id} className="hover:bg-surface-container-low transition-colors">
@@ -418,6 +449,29 @@ const WarehouseManagerDashboard = ({ user }) => {
                   <tr>
                     <td colSpan="6" className="px-4 py-6 text-center text-on-surface-variant font-medium">
                       No expiring lots found.
+=======
+                {data?.expiringLots?.map((lot) => (
+                  <tr key={lot.id} className="hover:bg-surface-container-low transition-colors">
+                    <td className="px-4 py-3 font-mono font-bold text-primary">{lot.batchNumber || lot.lotId}</td>
+                    <td className="px-4 py-3 font-semibold text-on-surface">{lot.product?.name || 'Unknown'}</td>
+                    <td className="px-4 py-3 text-red-600 font-bold">{new Date(lot.expiryDate).toLocaleDateString()}</td>
+                    <td className="px-4 py-3">{lot.quantity || '--'} Units</td>
+                    <td className="px-4 py-3 font-mono">N/A</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => handleClearance(lot.batchNumber || lot.lotId)}
+                        className="px-3 py-1 bg-primary/10 text-primary rounded font-bold hover:bg-primary/20 transition-colors whitespace-nowrap cursor-pointer"
+                      >
+                        Mark for Clearance
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {!data?.expiringLots?.length && (
+                  <tr>
+                    <td colSpan="6" className="px-4 py-6 text-center text-sm text-on-surface-variant">
+                      No lots expiring soon.
+>>>>>>> 7511d25f4dcd52580c3fa16211aba1fcfc509b36
                     </td>
                   </tr>
                 )}

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Building2, Plus, Globe, Warehouse, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { useNotification } from '@/contexts/NotificationContext';
 import PageHeader from '@/components/navigation/PageHeader';
 import DataTable from '@/components/data-display/DataTable';
@@ -9,39 +9,98 @@ import Modal from '@/components/ui/Modal';
 import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
+import LoadingState from '@/components/feedback/LoadingState';
+import { companyService } from '@/services/companyService';
 
 export const CompaniesPage = () => {
-  const { notifySuccess } = useNotification();
-  const [companies, setCompanies] = useState([
-    { id: 'cmp_001', code: 'NEX-GT-001', name: 'GlobalTech Corp', industry: 'Consumer Electronics', activeOrders: 45204, inventoryVal: '$142.5M', mrr: '$24,500', status: 'Active', warehouses: 'Logistics Hub East, Rotterdam Prime' },
-    { id: 'cmp_002', code: 'NEX-AP-002', name: 'Apex Logistics LLC', industry: 'Industrial Parts', activeOrders: 28910, inventoryVal: '$89.2M', mrr: '$18,200', status: 'Active', warehouses: 'Logistics Hub East, Singapore Central' },
-    { id: 'cmp_003', code: 'NEX-ZR-003', name: 'Zenith Retailers', industry: 'Apparel & Goods', activeOrders: 14050, inventoryVal: '$54.0M', mrr: '$12,800', status: 'Active', warehouses: 'Tokyo Alpha' },
-    { id: 'cmp_004', code: 'NEX-AC-004', name: 'Acme Corp', industry: 'Chemicals & Materials', activeOrders: 9820, inventoryVal: '$31.4M', mrr: '$9,500', status: 'Active', warehouses: 'Logistics Hub East' },
-  ]);
+  const { notifySuccess, notifyError } = useNotification();
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  // Add / Edit Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState(null);
   const [name, setName] = useState('');
   const [industry, setIndustry] = useState('Consumer Electronics');
   const [code, setCode] = useState('');
 
-  const handleAddCompany = (e) => {
-    e.preventDefault();
-    const newCompany = {
-      id: `cmp_${Date.now()}`,
-      code: code || `NEX-${name.slice(0,2).toUpperCase()}-005`,
-      name,
-      industry,
-      activeOrders: 0,
-      inventoryVal: '$0.00',
-      mrr: '$5,000',
-      status: 'Active',
-      warehouses: 'Logistics Hub East',
-    };
-    setCompanies([...companies, newCompany]);
-    notifySuccess(`Company ${name} onboarded successfully.`);
-    setIsModalOpen(false);
+  // Delete Modal States
+  const [deletingCompany, setDeletingCompany] = useState(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+  const fetchCompanies = async () => {
+    try {
+      setLoading(true);
+      const data = await companyService.getCompanies();
+      setCompanies(Array.isArray(data) ? data : []);
+    } catch (err) {
+      notifyError('Failed to fetch companies from database');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCompanies();
+  }, []);
+
+  const openAddModal = () => {
+    setEditingCompany(null);
     setName('');
+    setIndustry('Consumer Electronics');
     setCode('');
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (company) => {
+    setEditingCompany(company);
+    setName(company.name || '');
+    setIndustry(company.industry || 'Consumer Electronics');
+    setCode(company.code || '');
+    setIsModalOpen(true);
+  };
+
+  const handleSaveCompany = async (e) => {
+    e.preventDefault();
+    if (!name) {
+      notifyError('Company name is required');
+      return;
+    }
+
+    try {
+      if (editingCompany) {
+        await companyService.updateCompany(editingCompany.id, { name, industry });
+        notifySuccess(`Company ${name} updated successfully.`);
+      } else {
+        await companyService.createCompany({ name, industry });
+        notifySuccess(`Company ${name} onboarded successfully.`);
+      }
+      setIsModalOpen(false);
+      setName('');
+      setCode('');
+      setEditingCompany(null);
+      fetchCompanies();
+    } catch (err) {
+      notifyError(err.message || 'Failed to save company');
+    }
+  };
+
+  const openDeleteModal = (company) => {
+    setDeletingCompany(company);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleDeleteCompany = async () => {
+    if (!deletingCompany) return;
+    try {
+      await companyService.deleteCompany(deletingCompany.id);
+      notifySuccess(`Company ${deletingCompany.name} deleted successfully.`);
+      setIsDeleteModalOpen(false);
+      setDeletingCompany(null);
+      fetchCompanies();
+    } catch (err) {
+      notifyError(err.message || 'Failed to delete company');
+    }
   };
 
   const columns = [
@@ -51,26 +110,51 @@ export const CompaniesPage = () => {
       cell: (row) => (
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-lg bg-primary-100 text-primary-700 dark:bg-primary-950 dark:text-primary-300 font-bold flex items-center justify-center text-xs">
-            {row.name.slice(0, 2).toUpperCase()}
+            {(row.name || 'CO').slice(0, 2).toUpperCase()}
           </div>
           <div>
             <span className="font-semibold text-surface-900 dark:text-surface-100 block">{row.name}</span>
-            <span className="text-xs font-mono text-surface-400">{row.code}</span>
+            <span className="text-xs font-mono text-surface-400">{row.id?.substring(0, 8)}</span>
           </div>
         </div>
       ),
     },
-    { header: 'Industry', accessor: 'industry' },
-    { header: 'Assigned Warehouses', accessor: 'warehouses' },
-    { header: 'Active Orders', accessor: 'activeOrders', cell: (row) => row.activeOrders.toLocaleString() },
-    { header: 'Inventory Value', accessor: 'inventoryVal' },
-    { header: 'MRR Contribution', accessor: 'mrr' },
+    { header: 'Industry', accessor: 'industry', cell: (row) => row.industry || 'N/A' },
+    {
+      header: 'Created At',
+      accessor: 'createdAt',
+      cell: (row) => (row.createdAt ? new Date(row.createdAt).toLocaleDateString() : 'N/A'),
+    },
     {
       header: 'Status',
       accessor: 'status',
-      cell: (row) => <Badge variant="success" dot>{row.status}</Badge>,
+      cell: () => <Badge variant="success" dot>Active</Badge>,
+    },
+    {
+      header: 'Actions',
+      accessor: 'actions',
+      cell: (row) => (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => openEditModal(row)}
+            className="p-1.5 rounded-lg text-surface-500 hover:text-primary-600 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+            title="Edit Company"
+          >
+            <Edit2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => openDeleteModal(row)}
+            className="p-1.5 rounded-lg text-surface-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+            title="Delete Company"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      ),
     },
   ];
+
+  if (loading) return <LoadingState message="Fetching real companies from database..." />;
 
   return (
     <div className="space-y-6 min-h-[calc(100vh-4rem)] flex flex-col">
@@ -79,7 +163,7 @@ export const CompaniesPage = () => {
         description="Onboard client companies, manage multi-tenant accounts, and assign warehouse allocations"
         breadcrumbs={[{ label: 'Administration' }, { label: 'Companies' }]}
         actions={
-          <Button variant="primary" leftIcon={Plus} onClick={() => setIsModalOpen(true)}>
+          <Button variant="primary" leftIcon={Plus} onClick={openAddModal}>
             Onboard New Company
           </Button>
         }
@@ -89,23 +173,24 @@ export const CompaniesPage = () => {
         <DataTable columns={columns} data={companies} />
       </div>
 
+      {/* Add / Edit Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Onboard Enterprise Client Company"
+        title={editingCompany ? `Edit ${editingCompany.name}` : 'Onboard Enterprise Client Company'}
         size="md"
         footer={
           <>
             <Button variant="outline" onClick={() => setIsModalOpen(false)}>
               Cancel
             </Button>
-            <Button variant="primary" onClick={handleAddCompany}>
-              Save & Provision Company Account
+            <Button variant="primary" onClick={handleSaveCompany}>
+              {editingCompany ? 'Save Changes' : 'Save & Provision Company Account'}
             </Button>
           </>
         }
       >
-        <form onSubmit={handleAddCompany} className="space-y-4">
+        <form onSubmit={handleSaveCompany} className="space-y-4">
           <FormField label="Company Legal Name" required>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Apex International Ltd" required />
           </FormField>
@@ -124,10 +209,33 @@ export const CompaniesPage = () => {
                 { value: 'Apparel & Goods', label: 'Apparel & Goods' },
                 { value: 'Chemicals & Materials', label: 'Chemicals & Materials' },
                 { value: 'Pharmaceuticals', label: 'Pharmaceuticals' },
+                { value: 'Logistics', label: 'Logistics' },
               ]}
             />
           </FormField>
         </form>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        title="Confirm Delete Company"
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleDeleteCompany}>
+              Delete Company
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-surface-600 dark:text-surface-300">
+          Are you sure you want to delete company <strong className="text-surface-900 dark:text-surface-100">{deletingCompany?.name}</strong>? This action will remove the company from the system.
+        </p>
       </Modal>
     </div>
   );

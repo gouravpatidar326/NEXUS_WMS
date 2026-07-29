@@ -6,31 +6,59 @@ import Modal from '@/components/ui/Modal';
 import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
+<<<<<<< HEAD
 import LoadingState from '@/components/feedback/LoadingState';
 import { productService } from '@/services/productService';
+=======
+import Select from '@/components/ui/Select';
+import LoadingState from '@/components/feedback/LoadingState';
+import { productService } from '@/services/productService';
+import { categoryService } from '@/services/categoryService';
+import { Plus, Edit2, Trash2, Tag } from 'lucide-react';
+>>>>>>> 7511d25f4dcd52580c3fa16211aba1fcfc509b36
 
 export const ProductsListPage = () => {
   const { user } = useAuth();
   const { notifySuccess, notifyError } = useNotification();
+<<<<<<< HEAD
+=======
+
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+>>>>>>> 7511d25f4dcd52580c3fa16211aba1fcfc509b36
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All Categories');
-  const [selectedStatus, setSelectedStatus] = useState('Status: All');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
 
+  // Modals state
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+
+  // Form states - Product
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
-  const [category, setCategory] = useState('Electronics');
-  const [unitCost, setUnitCost] = useState('120.00');
-  const [wholesalePrice, setWholesalePrice] = useState('195.00');
-  const [totalStock, setTotalStock] = useState('100');
+  const [barcode, setBarcode] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [unitCost, setUnitCost] = useState('0');
+  const [wholesalePrice, setWholesalePrice] = useState('0');
+  const [description, setDescription] = useState('');
 
+  // Form states - Category
+  const [catName, setCatName] = useState('');
+  const [catCode, setCatCode] = useState('');
+  const [catDescription, setCatDescription] = useState('');
+
+  // Role permissions
   const isClient = user?.role === ROLES.CLIENT;
   const isClerk = user?.role === ROLES.INVENTORY_CLERK;
-  const showFinancials = !isClient && !isClerk;
+  const showUnitCost = !isClient && !isClerk; // Cost price hidden from Clients & Clerks
 
+<<<<<<< HEAD
   const fetchProducts = async () => {
     try {
       setLoading(true);
@@ -76,119 +104,213 @@ export const ProductsListPage = () => {
     } catch (error) {
       notifyError('Failed to delete product');
     }
+=======
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [prodRes, catList] = await Promise.all([
+        productService.getProducts({
+          search: searchTerm,
+          categoryId: selectedCategory,
+          status: selectedStatus,
+        }),
+        categoryService.getCategories(),
+      ]);
+      setProducts(prodRes.items || []);
+      setCategories(catList || []);
+    } catch (err) {
+      notifyError('Failed to fetch product catalog');
+    } finally {
+      setLoading(false);
+    }
+>>>>>>> 7511d25f4dcd52580c3fa16211aba1fcfc509b36
   };
 
-  const filteredProducts = products.filter((prd) => {
-    const matchesSearch =
-      prd.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prd.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prd.category.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCat =
-      selectedCategory === 'All Categories' || prd.category.includes(selectedCategory);
-    const matchesStatus =
-      selectedStatus === 'Status: All' || prd.status === selectedStatus;
-    return matchesSearch && matchesCat && matchesStatus;
-  });
+  useEffect(() => {
+    fetchData();
+  }, [selectedCategory, selectedStatus]);
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    fetchData();
+  };
+
+  const openCreateProductModal = () => {
+    setEditingProduct(null);
+    setName('');
+    setSku('');
+    setBarcode('');
+    setCategoryId(categories.length > 0 ? categories[0].id : '');
+    setUnitCost('0');
+    setWholesalePrice('0');
+    setDescription('');
+    setIsProductModalOpen(true);
+  };
+
+  const openEditProductModal = (prod) => {
+    setEditingProduct(prod);
+    setName(prod.name || '');
+    setSku(prod.sku || '');
+    setBarcode(prod.barcode || '');
+    setCategoryId(prod.categoryId || '');
+    setUnitCost(String(prod.unitCost || 0));
+    setWholesalePrice(String(prod.wholesalePrice || 0));
+    setDescription(prod.description || '');
+    setIsProductModalOpen(true);
+  };
+
+  const handleSaveProduct = async (e) => {
+    e.preventDefault();
+    if (!name || !sku) {
+      notifyError('Product Name and SKU are required');
+      return;
+    }
+
+    try {
+      const payload = {
+        name,
+        sku,
+        barcode,
+        categoryId: categoryId || null,
+        unitCost: parseFloat(unitCost || '0'),
+        wholesalePrice: parseFloat(wholesalePrice || '0'),
+        description,
+      };
+
+      if (editingProduct) {
+        await productService.updateProduct(editingProduct.id, payload);
+        notifySuccess(`Product "${name}" updated successfully.`);
+      } else {
+        await productService.createProduct(payload);
+        notifySuccess(`Product "${name}" created in master catalog.`);
+      }
+      setIsProductModalOpen(false);
+      fetchData();
+    } catch (err) {
+      notifyError(err.message || 'Failed to save product');
+    }
+  };
+
+  const handleDeleteProduct = async (id, prodName) => {
+    if (!window.confirm(`Are you sure you want to delete product "${prodName}"?`)) return;
+    try {
+      await productService.deleteProduct(id);
+      notifySuccess(`Product "${prodName}" deleted.`);
+      fetchData();
+    } catch (err) {
+      notifyError(err.message || 'Failed to delete product');
+    }
+  };
+
+  const handleCreateCategory = async (e) => {
+    e.preventDefault();
+    if (!catName) {
+      notifyError('Category Name is required');
+      return;
+    }
+
+    try {
+      await categoryService.createCategory({
+        name: catName,
+        code: catCode,
+        description: catDescription,
+      });
+      notifySuccess(`Category "${catName}" created.`);
+      setIsCategoryModalOpen(false);
+      setCatName('');
+      setCatCode('');
+      setCatDescription('');
+      fetchData();
+    } catch (err) {
+      notifyError(err.message || 'Failed to create category');
+    }
+  };
+
+  if (loading) return <LoadingState message="Loading Master Product Catalog & Categories..." />;
 
   if (loading) return <LoadingState />;
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden sm:gap-6">
-      {/* Page Header & Stats */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
           <h2 className="text-3xl font-bold text-on-surface">Product Master Catalog</h2>
           <p className="text-sm text-on-surface-variant mt-1">
-            Manage {products.length} active stock keeping units across 14 zones.
+            Manage {products.length} active SKUs and product categories.
           </p>
         </div>
-        <div className="grid w-full grid-cols-2 gap-3 sm:flex sm:w-auto sm:gap-4">
-          <div className="bg-white border border-outline-variant p-4 rounded-xl flex items-center gap-4 min-w-[160px] shadow-sm">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-              <span className="material-symbols-outlined">inventory</span>
-            </div>
-            <div>
-              <p className="text-xs text-on-surface-variant">Total SKUs</p>
-              <p className="text-xl font-bold text-on-surface">{products.length + 1420}</p>
-            </div>
-          </div>
-          <div className="bg-white border border-outline-variant p-4 rounded-xl flex items-center gap-4 min-w-[160px] shadow-sm">
-            <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center text-red-600">
-              <span className="material-symbols-outlined">warning</span>
-            </div>
-            <div>
-              <p className="text-xs text-on-surface-variant">Low Stock</p>
-              <p className="text-xl font-bold text-on-surface">24</p>
-            </div>
-          </div>
+        <div className="flex gap-3">
+          <Button variant="outline" leftIcon={Tag} onClick={() => setIsCategoryModalOpen(true)}>
+            New Category
+          </Button>
+          {!isClient && (
+            <Button variant="primary" leftIcon={Plus} onClick={openCreateProductModal}>
+              Create Product
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Filters & Actions */}
+      {/* Filters */}
       <div className="flex flex-col sm:flex-row justify-between items-center bg-surface-container-low p-4 rounded-xl border border-outline-variant gap-4">
-        <div className="flex flex-wrap gap-4 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-64">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">
-              search
-            </span>
-            <input
-              type="text"
-              placeholder="Search products, SKUs..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-white border border-outline-variant rounded-lg text-sm focus:outline-none focus:border-primary"
-            />
-          </div>
-          <select
+        <form onSubmit={handleSearchSubmit} className="flex gap-2 flex-1 w-full sm:w-auto">
+          <Input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by Product Name, SKU, Barcode..."
+          />
+          <Button variant="outline" type="submit">Search</Button>
+        </form>
+        <div className="flex gap-3 w-full sm:w-auto">
+          <Select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="bg-white border border-outline-variant rounded-lg px-4 py-2 text-sm text-on-surface focus:ring-primary cursor-pointer"
-          >
-            <option>All Categories</option>
-            <option>Aviation/Electronics</option>
-            <option>Hardware</option>
-            <option>PPE</option>
-            <option>Packaging</option>
-            <option>Electronics</option>
-          </select>
-          <select
+            options={[
+              { value: '', label: 'All Categories' },
+              ...categories.map((c) => ({ value: c.id, label: c.name })),
+            ]}
+          />
+          <Select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="bg-white border border-outline-variant rounded-lg px-4 py-2 text-sm text-on-surface focus:ring-primary cursor-pointer"
-          >
-            <option>Status: All</option>
-            <option>In Stock</option>
-            <option>Low Stock</option>
-            <option>Reorder Soon</option>
-          </select>
+            options={[
+              { value: '', label: 'All Statuses' },
+              { value: 'ACTIVE', label: 'Active' },
+              { value: 'INACTIVE', label: 'Inactive' },
+            ]}
+          />
         </div>
-        {!isClient && (
-          <div className="flex gap-2 w-full sm:w-auto justify-end">
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="bg-primary text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-semibold hover:bg-primary-container transition-all cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[18px]">add</span>
-              New Product SKU
-            </button>
-          </div>
-        )}
       </div>
 
-      {/* High-Density Data Table */}
-      <div className="flex-1 bg-white border border-outline-variant rounded-xl overflow-hidden flex flex-col shadow-sm">
-        <div className="overflow-x-auto custom-scrollbar flex-1">
-          <table className="w-full text-left border-collapse min-w-[1000px]">
-            <thead className="sticky top-0 bg-surface-container-highest z-20 border-b border-outline-variant">
-              <tr>
-                <th className="px-4 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Product</th>
-                <th className="px-4 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">SKU</th>
-                <th className="px-4 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Category</th>
-                {showFinancials && (
-                  <th className="px-4 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider text-right">
-                    Item Unit Cost
-                  </th>
+      {/* Table */}
+      <div className="bg-white border border-outline-variant rounded-xl overflow-x-auto custom-scrollbar flex-1">
+        <table className="w-full text-left border-collapse text-xs min-w-[700px]">
+          <thead>
+            <tr className="bg-surface-container-low font-bold text-on-surface-variant uppercase tracking-wider border-b border-outline-variant">
+              <th className="px-4 py-3">Product Name & SKU</th>
+              <th className="px-4 py-3">Category</th>
+              <th className="px-4 py-3">Barcode</th>
+              {showUnitCost && <th className="px-4 py-3">Unit Cost</th>}
+              <th className="px-4 py-3">Wholesale Price</th>
+              <th className="px-4 py-3">Available Stock</th>
+              <th className="px-4 py-3">Status</th>
+              {!isClient && <th className="px-4 py-3 text-right">Actions</th>}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-outline-variant">
+            {products.map((prod) => (
+              <tr key={prod.id} className="hover:bg-surface-container-low transition-colors">
+                <td className="px-4 py-3">
+                  <div className="font-semibold text-on-surface text-sm">{prod.name}</div>
+                  <div className="font-mono text-on-surface-variant text-[11px]">{prod.sku}</div>
+                </td>
+                <td className="px-4 py-3">{prod.categoryRef?.name || prod.category || 'N/A'}</td>
+                <td className="px-4 py-3 font-mono">{prod.barcode || 'N/A'}</td>
+                {showUnitCost && (
+                  <td className="px-4 py-3 font-semibold text-on-surface">${(prod.unitCost || 0).toFixed(2)}</td>
                 )}
+<<<<<<< HEAD
                 <th className="px-4 py-3 text-xs font-semibold text-primary uppercase tracking-wider text-right">
                   Wholesale Price
                 </th>
@@ -264,52 +386,118 @@ export const ProductsListPage = () => {
             </tbody>
           </table>
         </div>
+=======
+                <td className="px-4 py-3 font-semibold text-primary">${(prod.wholesalePrice || 0).toFixed(2)}</td>
+                <td className="px-4 py-3 font-bold">{prod.availableStock ?? prod.calculatedTotalStock ?? 0} Units</td>
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${prod.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-700'}`}>
+                    {prod.status || 'ACTIVE'}
+                  </span>
+                </td>
+                {!isClient && (
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => openEditProductModal(prod)}
+                        className="p-1.5 rounded text-surface-500 hover:text-primary transition-colors"
+                        title="Edit Product"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProduct(prod.id, prod.name)}
+                        className="p-1.5 rounded text-surface-500 hover:text-red-600 transition-colors"
+                        title="Delete Product"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                )}
+              </tr>
+            ))}
+            {!products.length && (
+              <tr>
+                <td colSpan="8" className="px-4 py-8 text-center text-on-surface-variant">
+                  No products found in catalog. Click "Create Product" to add items.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+>>>>>>> 7511d25f4dcd52580c3fa16211aba1fcfc509b36
       </div>
 
-      {/* New Product Modal */}
+      {/* Create / Edit Product Modal */}
       <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Add New Stock Keeping Unit (SKU)"
+        isOpen={isProductModalOpen}
+        onClose={() => setIsProductModalOpen(false)}
+        title={editingProduct ? `Edit ${editingProduct.name}` : 'Create Product Catalog Entry'}
         size="md"
         footer={
           <>
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleAddProduct}>
-              Save SKU to Master Catalog
+            <Button variant="outline" onClick={() => setIsProductModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleSaveProduct}>
+              {editingProduct ? 'Save Changes' : 'Create Product'}
             </Button>
           </>
         }
       >
-        <form onSubmit={handleAddProduct} className="space-y-4">
+        <form onSubmit={handleSaveProduct} className="space-y-4">
           <FormField label="Product Name" required>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Heavy Duty Steel Washer M10" required />
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Industrial Barcode Scanner X-200" required />
           </FormField>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="SKU Code">
-              <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="SKU-8820" />
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="SKU Code" required>
+              <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="SKU-ELEC-001" required />
             </FormField>
-
-            <FormField label="Category">
-              <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Hardware" />
+            <FormField label="Barcode">
+              <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="WMS-BAR-1002" />
             </FormField>
           </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Internal Item Cost ($)" required>
-              <Input value={unitCost} onChange={(e) => setUnitCost(e.target.value)} required />
+          <FormField label="Category">
+            <Select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              options={categories.map((c) => ({ value: c.id, label: c.name }))}
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Unit Cost ($)">
+              <Input type="number" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
             </FormField>
-
-            <FormField label="Wholesale Price ($)" required>
-              <Input value={wholesalePrice} onChange={(e) => setWholesalePrice(e.target.value)} required />
+            <FormField label="Wholesale Price ($)">
+              <Input type="number" step="0.01" value={wholesalePrice} onChange={(e) => setWholesalePrice(e.target.value)} />
             </FormField>
           </div>
+          <FormField label="Description">
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="High-speed 2D barcode scanner" />
+          </FormField>
+        </form>
+      </Modal>
 
-          <FormField label="Initial Stock Quantity">
-            <Input type="number" value={totalStock} onChange={(e) => setTotalStock(e.target.value)} />
+      {/* Create Category Modal */}
+      <Modal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        title="Create Product Category"
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setIsCategoryModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleCreateCategory}>Save Category</Button>
+          </>
+        }
+      >
+        <form onSubmit={handleCreateCategory} className="space-y-4">
+          <FormField label="Category Name" required>
+            <Input value={catName} onChange={(e) => setCatName(e.target.value)} placeholder="Electronics" required />
+          </FormField>
+          <FormField label="Category Code">
+            <Input value={catCode} onChange={(e) => setCatCode(e.target.value)} placeholder="ELEC" />
+          </FormField>
+          <FormField label="Description">
+            <Input value={catDescription} onChange={(e) => setCatDescription(e.target.value)} placeholder="Hardware and electronic devices" />
           </FormField>
         </form>
       </Modal>
