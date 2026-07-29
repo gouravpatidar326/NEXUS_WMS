@@ -33,8 +33,7 @@
   }
 
   .page-shell {
-    @apply mx-auto w-full min-w-0 max-w-[1600px] space-y-4 p-3 sm:space-y-6 sm:p-5 lg:p-7 xl:p-8;
-    padding-bottom: max(6rem, calc(4.5rem + env(safe-area-inset-bottom)));
+    @apply mx-auto w-full min-w-0 max-w-[1600px] space-y-4 p-3 pb-4 sm:space-y-6 sm:p-5 sm:pb-6 lg:p-7 xl:p-8;
   }
 
   .responsive-scroll {

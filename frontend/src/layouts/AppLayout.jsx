@@ -15,8 +15,8 @@ export const AppLayout = () => {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopBar onOpenSidebar={() => setSidebarOpen(true)} />
 
-        {/* Full-width content with universal safe padding for mobile screens */}
-        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-surface-50 p-2 sm:p-4 lg:p-6 pb-24 sm:pb-12">
+        {/* Full-width content area with balanced mobile padding */}
+        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-surface-50 p-2 sm:p-4 lg:p-6 pb-6 sm:pb-8">
           <div className="page-shell">
             <Outlet />
           </div>
