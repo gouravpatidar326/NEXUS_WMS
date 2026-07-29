@@ -1,6 +1,12 @@
 const bcrypt = require('bcrypt');
 const prisma = require('../../utils/prisma');
 
+const getValidUserId = async (req) => {
+  if (!req.user?.id) return null;
+  const exists = await prisma.user.findUnique({ where: { id: req.user.id } });
+  return exists ? req.user.id : null;
+};
+
 const getUsers = async (req, res) => {
   try {
     const users = await prisma.user.findMany({
@@ -20,7 +26,7 @@ const getUsers = async (req, res) => {
     });
     res.json(users);
   } catch (error) {
-    console.error(error);
+    console.error('Error fetching users:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -52,17 +58,18 @@ const inviteUser = async (req, res) => {
       },
     });
 
+    const auditUserId = await getValidUserId(req);
     await prisma.auditLog.create({
       data: {
         event: 'USER_INVITED',
-        userId: req.user.id,
+        userId: auditUserId,
         ipAddress: req.ip,
       },
     });
 
     res.status(201).json({ id: user.id, message: 'User invited successfully', user });
   } catch (error) {
-    console.error(error);
+    console.error('Error inviting user:', error);
     res.status(500).json({ message: error.message || 'Internal server error' });
   }
 };
@@ -71,6 +78,11 @@ const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, role, companyId, status } = req.body;
+
+    const existingUser = await prisma.user.findUnique({ where: { id } });
+    if (!existingUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
     const user = await prisma.user.update({
       where: { id },
@@ -83,17 +95,18 @@ const updateUser = async (req, res) => {
       },
     });
 
+    const auditUserId = await getValidUserId(req);
     await prisma.auditLog.create({
       data: {
         event: 'USER_UPDATED',
-        userId: req.user.id,
+        userId: auditUserId,
         ipAddress: req.ip,
       },
     });
 
     res.json(user);
   } catch (error) {
-    console.error(error);
+    console.error('Error updating user:', error);
     res.status(400).json({ message: error.message || 'Failed to update user' });
   }
 };
@@ -102,21 +115,37 @@ const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
 
+    const existingUser = await prisma.user.findUnique({ where: { id } });
+    if (!existingUser) {
+      return res.status(200).json({ message: 'User already deleted or not found', id });
+    }
+
+    // Unlink dependent relations before deletion to avoid foreign key errors
+    await prisma.auditLog.updateMany({
+      where: { userId: id },
+      data: { userId: null },
+    });
+
+    await prisma.notification.deleteMany({
+      where: { userId: id },
+    });
+
     await prisma.user.delete({
       where: { id },
     });
 
+    const auditUserId = await getValidUserId(req);
     await prisma.auditLog.create({
       data: {
         event: 'USER_DELETED',
-        userId: req.user.id,
+        userId: auditUserId,
         ipAddress: req.ip,
       },
     });
 
     res.json({ message: 'User deleted successfully', id });
   } catch (error) {
-    console.error(error);
+    console.error('Error deleting user:', error);
     res.status(400).json({ message: error.message || 'Failed to delete user' });
   }
 };
