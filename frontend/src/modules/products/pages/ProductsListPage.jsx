@@ -1,17 +1,16 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { ROLES } from '@/permissions/roles';
-import { useNotification } from '@/contexts/NotificationContext';
+import { Plus, Tag, Edit2, Trash2 } from 'lucide-react';
+import Button from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
+import Select from '@/components/ui/Select';
+import FormField from '@/components/ui/FormField';
 import Modal from '@/components/ui/Modal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import FormField from '@/components/ui/FormField';
-import Input from '@/components/ui/Input';
-import Button from '@/components/ui/Button';
-import Select from '@/components/ui/Select';
 import LoadingState from '@/components/feedback/LoadingState';
+import PageHeader from '@/components/navigation/PageHeader';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNotification } from '@/contexts/NotificationContext';
 import { productService } from '@/services/productService';
-import { categoryService } from '@/services/categoryService';
-import { Plus, Edit2, Trash2, Tag } from 'lucide-react';
 
 export const ProductsListPage = () => {
   const { user } = useAuth();
@@ -20,51 +19,57 @@ export const ProductsListPage = () => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [deleteProdState, setDeleteProdState] = useState({ isOpen: false, id: null, name: '' });
 
+  // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
 
-  // Modals state
+  // Modals
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
-  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
-  // Form states - Product
+  // Product Form State
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
   const [barcode, setBarcode] = useState('');
   const [categoryId, setCategoryId] = useState('');
-  const [unitCost, setUnitCost] = useState('0');
-  const [wholesalePrice, setWholesalePrice] = useState('0');
+  const [unitCost, setUnitCost] = useState('0.00');
+  const [wholesalePrice, setWholesalePrice] = useState('0.00');
   const [description, setDescription] = useState('');
 
-  // Form states - Category
+  // Category Form State
   const [catName, setCatName] = useState('');
   const [catCode, setCatCode] = useState('');
   const [catDescription, setCatDescription] = useState('');
 
-  // Role permissions
-  const isClient = user?.role === ROLES.CLIENT;
-  const isClerk = user?.role === ROLES.INVENTORY_CLERK;
-  const showUnitCost = !isClient && !isClerk; // Cost price hidden from Clients & Clerks
+  // Delete Confirm State
+  const [deleteProdState, setDeleteProdState] = useState({ isOpen: false, id: null, name: '' });
+
+  const isClient = user?.role === 'client';
+  const showUnitCost = user?.role === 'super_admin' || user?.role === 'warehouse_manager';
 
   const fetchData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const [prodsData, catsData] = await Promise.all([
+      const [prodRes, catRes] = await Promise.all([
         productService.getProducts({
           search: searchTerm,
-          categoryId: selectedCategory,
+          category: selectedCategory,
           status: selectedStatus,
         }),
-        categoryService.getCategories(),
+        productService.getCategories(),
       ]);
-      setProducts(Array.isArray(prodsData) ? prodsData : prodsData.items || []);
-      setCategories(Array.isArray(catsData) ? catsData : catsData.items || []);
+
+      const prodList = Array.isArray(prodRes) ? prodRes : prodRes?.items || prodRes?.data || [];
+      const catList = Array.isArray(catRes) ? catRes : catRes?.data || [];
+
+      setProducts(prodList);
+      setCategories(catList);
     } catch (err) {
-      notifyError('Failed to load products or categories');
+      console.error('Error loading products data:', err);
+      notifyError('Failed to load products master catalog');
     } finally {
       setLoading(false);
     }
@@ -84,9 +89,9 @@ export const ProductsListPage = () => {
     setName('');
     setSku('');
     setBarcode('');
-    setCategoryId(categories.length > 0 ? categories[0].id : '');
-    setUnitCost('0');
-    setWholesalePrice('0');
+    setCategoryId(categories[0]?.id || '');
+    setUnitCost('0.00');
+    setWholesalePrice('0.00');
     setDescription('');
     setIsProductModalOpen(true);
   };
@@ -96,9 +101,9 @@ export const ProductsListPage = () => {
     setName(prod.name || '');
     setSku(prod.sku || '');
     setBarcode(prod.barcode || '');
-    setCategoryId(prod.categoryId || '');
-    setUnitCost(String(prod.unitCost || 0));
-    setWholesalePrice(String(prod.wholesalePrice || 0));
+    setCategoryId(prod.categoryId || (categories[0]?.id || ''));
+    setUnitCost(prod.unitCost !== undefined ? String(prod.unitCost) : '0.00');
+    setWholesalePrice(prod.wholesalePrice !== undefined ? String(prod.wholesalePrice) : '0.00');
     setDescription(prod.description || '');
     setIsProductModalOpen(true);
   };
@@ -106,7 +111,7 @@ export const ProductsListPage = () => {
   const handleSaveProduct = async (e) => {
     e.preventDefault();
     if (!name || !sku) {
-      notifyError('Product Name and SKU are required');
+      notifyError('Product Name and SKU are required.');
       return;
     }
 
@@ -123,15 +128,39 @@ export const ProductsListPage = () => {
 
       if (editingProduct) {
         await productService.updateProduct(editingProduct.id, payload);
-        notifySuccess(`Product "${name}" updated successfully.`);
+        notifySuccess(`Product ${name} updated successfully.`);
       } else {
         await productService.createProduct(payload);
-        notifySuccess(`Product "${name}" created in master catalog.`);
+        notifySuccess(`Product ${name} added to catalog.`);
       }
       setIsProductModalOpen(false);
       fetchData();
     } catch (err) {
       notifyError(err.message || 'Failed to save product');
+    }
+  };
+
+  const handleCreateCategory = async (e) => {
+    e.preventDefault();
+    if (!catName) {
+      notifyError('Category Name is required.');
+      return;
+    }
+
+    try {
+      await productService.createCategory({
+        name: catName,
+        code: catCode,
+        description: catDescription,
+      });
+      notifySuccess(`Category ${catName} created.`);
+      setCatName('');
+      setCatCode('');
+      setCatDescription('');
+      setIsCategoryModalOpen(false);
+      fetchData();
+    } catch (err) {
+      notifyError(err.message || 'Failed to create category');
     }
   };
 
@@ -143,7 +172,7 @@ export const ProductsListPage = () => {
     if (!deleteProdState.id) return;
     try {
       await productService.deleteProduct(deleteProdState.id);
-      notifySuccess(`Product "${deleteProdState.name}" deleted.`);
+      notifySuccess(`Product ${deleteProdState.name} deleted.`);
       setDeleteProdState({ isOpen: false, id: null, name: '' });
       fetchData();
     } catch (err) {
@@ -151,65 +180,40 @@ export const ProductsListPage = () => {
     }
   };
 
-  const handleCreateCategory = async (e) => {
-    e.preventDefault();
-    if (!catName) {
-      notifyError('Category Name is required');
-      return;
-    }
-
-    try {
-      await categoryService.createCategory({
-        name: catName,
-        code: catCode,
-        description: catDescription,
-      });
-      notifySuccess(`Category "${catName}" created.`);
-      setIsCategoryModalOpen(false);
-      setCatName('');
-      setCatCode('');
-      setCatDescription('');
-      fetchData();
-    } catch (err) {
-      notifyError(err.message || 'Failed to create category');
-    }
-  };
-
-  if (loading) return <LoadingState message="Loading Master Product Catalog & Categories..." />;
+  if (loading) return <LoadingState message="Loading Master Product Catalog from database..." />;
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden sm:gap-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-        <div>
-          <h2 className="text-3xl font-bold text-on-surface">Product Master Catalog</h2>
-          <p className="text-sm text-on-surface-variant mt-1">
-            Manage {products.length} active SKUs and product categories.
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline" leftIcon={Tag} onClick={() => setIsCategoryModalOpen(true)}>
-            New Category
-          </Button>
-          {!isClient && (
-            <Button variant="primary" leftIcon={Plus} onClick={openCreateProductModal}>
-              Create Product
+      <PageHeader
+        title="Product Master Catalog"
+        description={`Manage ${products.length} active SKUs, unit costs, and categories.`}
+        breadcrumbs={[{ label: 'Catalog' }, { label: 'Products' }]}
+        actions={
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            <Button variant="outline" size="sm" leftIcon={Tag} onClick={() => setIsCategoryModalOpen(true)} className="flex-1 sm:flex-initial">
+              New Category
             </Button>
-          )}
-        </div>
-      </div>
+            {!isClient && (
+              <Button variant="primary" size="sm" leftIcon={Plus} onClick={openCreateProductModal} className="flex-1 sm:flex-initial">
+                Create Product
+              </Button>
+            )}
+          </div>
+        }
+      />
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row justify-between items-center bg-surface-container-low p-4 rounded-xl border border-outline-variant gap-4">
-        <form onSubmit={handleSearchSubmit} className="flex gap-2 flex-1 w-full sm:w-auto">
+      <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center bg-surface-container-low p-3 sm:p-4 rounded-xl border border-outline-variant gap-3">
+        <form onSubmit={handleSearchSubmit} className="flex gap-2 flex-1 w-full">
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by Product Name, SKU, Barcode..."
+            placeholder="Search by Name, SKU, Barcode..."
+            className="w-full text-xs sm:text-sm"
           />
-          <Button variant="outline" type="submit">Search</Button>
+          <Button variant="outline" type="submit" size="sm">Search</Button>
         </form>
-        <div className="flex gap-3 w-full sm:w-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full md:w-auto">
           <Select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
@@ -230,68 +234,70 @@ export const ProductsListPage = () => {
         </div>
       </div>
 
-      {/* Products Table Grid */}
-      <div className="bg-surface-container-low rounded-2xl border border-outline-variant p-4 overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-outline-variant text-xs uppercase font-bold text-on-surface-variant">
-              <th className="p-3">SKU / Barcode</th>
-              <th className="p-3">Product Name</th>
-              <th className="p-3">Category</th>
-              <th className="p-3 font-right">Available Stock</th>
-              {showUnitCost && <th className="p-3 font-right">Unit Cost</th>}
-              <th className="p-3 font-right">Wholesale Price</th>
-              <th className="p-3">Status</th>
-              <th className="p-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-outline-variant">
-            {products.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="p-8 text-center text-slate-500">
-                  No products found. Click "Create Product" to add items to master catalog.
-                </td>
+      {/* Products Table Container */}
+      <div className="card overflow-hidden bg-white">
+        <div className="w-full overflow-x-auto overscroll-x-contain [webkit-overflow-scrolling:touch]">
+          <table className="w-full min-w-[750px] text-left text-xs sm:text-sm">
+            <thead>
+              <tr className="border-b border-outline-variant bg-slate-50 text-[11px] sm:text-xs uppercase font-bold text-slate-600">
+                <th className="p-3">SKU / Barcode</th>
+                <th className="p-3">Product Name</th>
+                <th className="p-3">Category</th>
+                <th className="p-3 text-right">Available Stock</th>
+                {showUnitCost && <th className="p-3 text-right">Unit Cost</th>}
+                <th className="p-3 text-right">Wholesale Price</th>
+                <th className="p-3">Status</th>
+                <th className="p-3 text-right">Actions</th>
               </tr>
-            ) : (
-              products.map((prod) => (
-                <tr key={prod.id} className="hover:bg-slate-50 transition">
-                  <td className="p-3 font-mono">
-                    <div className="font-bold text-slate-900">{prod.sku}</div>
-                    <div className="text-[11px] text-slate-500">{prod.barcode || 'NO BARCODE'}</div>
-                  </td>
-                  <td className="p-3 font-semibold text-slate-800">{prod.name}</td>
-                  <td className="p-3 text-xs text-slate-600">{prod.category?.name || 'Uncategorized'}</td>
-                  <td className="p-3 font-mono font-bold text-slate-900 text-right">
-                    {prod.availableStock || 0} units
-                  </td>
-                  {showUnitCost && (
-                    <td className="p-3 font-mono text-right text-slate-700">
-                      ${Number(prod.unitCost || 0).toFixed(2)}
-                    </td>
-                  )}
-                  <td className="p-3 font-mono text-right font-bold text-green-700">
-                    ${Number(prod.wholesalePrice || 0).toFixed(2)}
-                  </td>
-                  <td className="p-3">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${prod.status === 'INACTIVE' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                      {prod.status || 'ACTIVE'}
-                    </span>
-                  </td>
-                  <td className="p-3 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button onClick={() => openEditProductModal(prod)} className="p-1 text-slate-400 hover:text-blue-600">
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleDeleteProduct(prod.id, prod.name)} className="p-1 text-slate-400 hover:text-red-600">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+            </thead>
+            <tbody className="divide-y divide-outline-variant">
+              {products.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-slate-500">
+                    No products found. Click "Create Product" to add items to master catalog.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                products.map((prod) => (
+                  <tr key={prod.id} className="hover:bg-slate-50 transition">
+                    <td className="p-3 font-mono">
+                      <div className="font-bold text-slate-900">{prod.sku}</div>
+                      <div className="text-[11px] text-slate-500">{prod.barcode || 'NO BARCODE'}</div>
+                    </td>
+                    <td className="p-3 font-semibold text-slate-800">{prod.name}</td>
+                    <td className="p-3 text-xs text-slate-600">{prod.category?.name || 'Uncategorized'}</td>
+                    <td className="p-3 font-mono font-bold text-slate-900 text-right">
+                      {prod.availableStock || 0} units
+                    </td>
+                    {showUnitCost && (
+                      <td className="p-3 font-mono text-right text-slate-700">
+                        ${Number(prod.unitCost || 0).toFixed(2)}
+                      </td>
+                    )}
+                    <td className="p-3 font-mono text-right font-bold text-green-700">
+                      ${Number(prod.wholesalePrice || 0).toFixed(2)}
+                    </td>
+                    <td className="p-3">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${prod.status === 'INACTIVE' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                        {prod.status || 'ACTIVE'}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => openEditProductModal(prod)} className="p-1.5 text-slate-400 hover:text-blue-600 rounded hover:bg-slate-100">
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleDeleteProduct(prod.id, prod.name)} className="p-1.5 text-slate-400 hover:text-red-600 rounded hover:bg-slate-100">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Product Form Modal */}
@@ -307,8 +313,8 @@ export const ProductsListPage = () => {
           </>
         }
       >
-        <form onSubmit={handleSaveProduct} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSaveProduct} className="space-y-3 sm:space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <FormField label="Product Name" required>
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Semaglutide 5mg Vial" required />
             </FormField>
@@ -316,7 +322,7 @@ export const ProductsListPage = () => {
               <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="e.g. SKU-SEM-005" required />
             </FormField>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <FormField label="Barcode (ShipStation Linked)">
               <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="e.g. 890123456789" />
             </FormField>
@@ -328,7 +334,7 @@ export const ProductsListPage = () => {
               />
             </FormField>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {showUnitCost && (
               <FormField label="Unit Cost ($)">
                 <Input type="number" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
@@ -357,7 +363,7 @@ export const ProductsListPage = () => {
           </>
         }
       >
-        <form onSubmit={handleCreateCategory} className="space-y-4">
+        <form onSubmit={handleCreateCategory} className="space-y-3 sm:space-y-4">
           <FormField label="Category Name" required>
             <Input value={catName} onChange={(e) => setCatName(e.target.value)} placeholder="e.g. Peptides" required />
           </FormField>
