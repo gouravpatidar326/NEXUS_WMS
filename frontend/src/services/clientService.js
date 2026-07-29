@@ -2,12 +2,15 @@ import { api } from './api';
 
 export const clientService = {
   fetchClients: async () => {
-    try {
-      const response = await api.get('/warehouse-clients');
-      return response;
-    } catch (error) {
-      console.error('Error fetching clients:', error);
-      throw error;
-    }
-  }
+    return await api.get('/clients');
+  },
+  createClient: async (data) => {
+    return await api.post('/clients', data);
+  },
+  updateClient: async (id, data) => {
+    return await api.put(`/clients/${id}`, data);
+  },
+  deleteClient: async (id) => {
+    return await api.delete(`/clients/${id}`);
+  },
 };

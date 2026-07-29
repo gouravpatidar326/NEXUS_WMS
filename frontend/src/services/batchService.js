@@ -2,26 +2,20 @@ import { api } from './api';
 
 export const batchService = {
   async getBatches() {
-    return await api.get('/batches');
+    const res = await api.get('/v1/lots');
+    return res.data || [];
   },
 
-  async getExpiringBatches(daysThreshold = 60) {
-    const batches = await api.get('/batches');
-    const thresholdDate = new Date();
-    thresholdDate.setDate(thresholdDate.getDate() + daysThreshold);
-
-    return batches.filter(
-      (b) => b.expiryDate && new Date(b.expiryDate) <= thresholdDate
-    );
+  async getExpiringBatches() {
+    const res = await api.get('/v1/expiry/alerts');
+    return res.data || [];
   },
 
   async createBatch(batchData) {
-    // Phase 2 backend automatically creates batches via PO Receipt,
-    // so manual creation isn't implemented in the mock, but we can mock it here for UI continuity
-    return {
-      id: `BAT-2026-0${Math.floor(Math.random() * 1000)}`,
-      status: 'Healthy',
-      ...batchData,
-    };
+    return await api.post('/v1/lots', batchData);
+  },
+
+  async updateLotStatus(id, status) {
+    return await api.patch(`/v1/lots/${id}/status`, { status });
   },
 };

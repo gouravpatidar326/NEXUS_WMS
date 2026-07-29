@@ -5,7 +5,7 @@ const prisma = require('../../utils/prisma');
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    
+
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
@@ -24,7 +24,8 @@ const login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    if (user.status !== 'ACTIVE') {
+    // Case-insensitive status check ('Active' or 'ACTIVE')
+    if (user.status && user.status.toUpperCase() !== 'ACTIVE') {
       return res.status(403).json({ message: 'User account is inactive' });
     }
 
@@ -53,7 +54,6 @@ const login = async (req, res) => {
 };
 
 const forgotPassword = async (req, res) => {
-  // Mock implementation for now, in a real app this would send an email with a reset token.
   res.json({ message: 'Reset link sent' });
 };
 

@@ -2,12 +2,12 @@ const prisma = require('../../utils/prisma');
 
 const getManagerSummary = async (req, res) => {
   try {
-    const { companyId } = req.user;
+    const companyId = req.user?.companyId;
 
     // 1. Pending Sales Orders
     const pendingSalesOrders = await prisma.salesOrder.count({
       where: {
-        companyId,
+        ...(companyId ? { companyId } : {}),
         status: 'PENDING_REVIEW'
       }
     });
@@ -15,7 +15,7 @@ const getManagerSummary = async (req, res) => {
     // 2. Low Stock Products
     const lowStockProducts = await prisma.product.findMany({
       where: {
-        companyId,
+        ...(companyId ? { companyId } : {}),
         availableStock: { lt: 10 }
       },
       select: {
@@ -32,7 +32,7 @@ const getManagerSummary = async (req, res) => {
 
     const nearExpiryBatches = await prisma.batch.findMany({
       where: {
-        companyId,
+        ...(companyId ? { companyId } : {}),
         quarantine: false,
         expiryDate: { lte: thirtyDaysFromNow }
       },
@@ -47,7 +47,7 @@ const getManagerSummary = async (req, res) => {
     // 4. Pending Pick Lists
     const pendingPickLists = await prisma.pickList.count({
       where: {
-        companyId,
+        ...(companyId ? { companyId } : {}),
         status: { not: 'COMPLETED' }
       }
     });
@@ -55,7 +55,7 @@ const getManagerSummary = async (req, res) => {
     // 5. Pending Purchase Orders
     const pendingPurchaseOrders = await prisma.purchaseOrder.count({
       where: {
-        companyId,
+        ...(companyId ? { companyId } : {}),
         status: 'PENDING'
       }
     });
@@ -69,7 +69,7 @@ const getManagerSummary = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching manager summary:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: error.message || 'Internal server error' });
   }
 };
 

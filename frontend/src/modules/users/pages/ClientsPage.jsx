@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { UserCheck, Plus, Building, CreditCard, ShieldCheck } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { useNotification } from '@/contexts/NotificationContext';
 import PageHeader from '@/components/navigation/PageHeader';
 import DataTable from '@/components/data-display/DataTable';
@@ -9,40 +9,94 @@ import Modal from '@/components/ui/Modal';
 import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
+import LoadingState from '@/components/feedback/LoadingState';
+import { clientService } from '@/services/clientService';
 
 export const ClientsPage = () => {
-  const { notifySuccess } = useNotification();
-  const [clients, setClients] = useState([
-    { id: 'cli_001', name: 'Sam Wilson', company: 'Acme Corp', email: 'sam@acmecorp.com', tier: 'Enterprise Tier 1', creditLimit: '$250,000', status: 'Active', totalOrders: 142 },
-    { id: 'cli_002', name: 'Rachel Green', company: 'GlobalTech Corp', email: 'rachel@globaltech.com', tier: 'VIP Preferred', creditLimit: '$500,000', status: 'Active', totalOrders: 389 },
-    { id: 'cli_003', name: 'Michael Scott', company: 'Dunder Mifflin', email: 'mscott@dundermifflin.com', tier: 'Standard Client', creditLimit: '$50,000', status: 'Active', totalOrders: 68 },
-    { id: 'cli_004', name: 'Elena Rostova', company: 'Apex Logistics', email: 'elena@apexlogistics.com', tier: 'Enterprise Tier 2', creditLimit: '$150,000', status: 'Pending Review', totalOrders: 12 },
-  ]);
+  const { notifySuccess, notifyError } = useNotification();
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState(null);
   const [name, setName] = useState('');
-  const [company, setCompany] = useState('');
   const [email, setEmail] = useState('');
-  const [tier, setTier] = useState('Standard Client');
+  const [tier, setTier] = useState('STANDARD');
+  const [creditLimit, setCreditLimit] = useState('100000');
 
-  const handleAddClient = (e) => {
-    e.preventDefault();
-    const newClient = {
-      id: `cli_${Date.now()}`,
-      name,
-      company,
-      email,
-      tier,
-      creditLimit: '$100,000',
-      status: 'Active',
-      totalOrders: 0,
-    };
-    setClients([...clients, newClient]);
-    notifySuccess(`Client portal account created for ${name} (${company}).`);
-    setIsModalOpen(false);
+  const fetchClients = async () => {
+    try {
+      setLoading(true);
+      const data = await clientService.fetchClients();
+      setClients(Array.isArray(data) ? data : []);
+    } catch {
+      notifyError('Failed to fetch client directory');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchClients();
+  }, []);
+
+  const openAddModal = () => {
+    setEditingClient(null);
     setName('');
-    setCompany('');
     setEmail('');
+    setTier('STANDARD');
+    setCreditLimit('100000');
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (cli) => {
+    setEditingClient(cli);
+    setName(cli.name || '');
+    setEmail(cli.email || '');
+    setTier(cli.tier || 'STANDARD');
+    setCreditLimit(String(cli.creditLimit || '100000'));
+    setIsModalOpen(true);
+  };
+
+  const handleSaveClient = async (e) => {
+    e.preventDefault();
+    if (!name) {
+      notifyError('Client contact name is required');
+      return;
+    }
+
+    try {
+      const payload = {
+        name,
+        email,
+        tier,
+        creditLimit: parseFloat(creditLimit || '0'),
+      };
+
+      if (editingClient) {
+        await clientService.updateClient(editingClient.id, payload);
+        notifySuccess(`Client ${name} updated successfully.`);
+      } else {
+        await clientService.createClient(payload);
+        notifySuccess(`Client account created for ${name}.`);
+      }
+      setIsModalOpen(false);
+      fetchClients();
+    } catch (err) {
+      notifyError(err.message || 'Failed to save client');
+    }
+  };
+
+  const handleDeleteClient = async (cli) => {
+    if (!window.confirm(`Are you sure you want to delete client ${cli.name}?`)) return;
+    try {
+      await clientService.deleteClient(cli.id);
+      notifySuccess(`Client ${cli.name} deleted.`);
+      fetchClients();
+    } catch (err) {
+      notifyError(err.message || 'Failed to delete client');
+    }
   };
 
   const columns = [
@@ -51,30 +105,44 @@ export const ClientsPage = () => {
       accessor: 'name',
       cell: (row) => (
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-bold flex items-center justify-center text-xs">
-            {row.name.slice(0, 2).toUpperCase()}
+          <div className="h-9 w-9 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-xs">
+            {(row.name || 'CL').slice(0, 2).toUpperCase()}
           </div>
           <div>
             <span className="font-semibold text-surface-900 dark:text-surface-100 block">{row.name}</span>
-            <span className="text-xs text-surface-400">{row.email}</span>
+            <span className="text-xs text-surface-400">{row.email || 'No email registered'}</span>
           </div>
         </div>
       ),
     },
-    { header: 'Associated Company', accessor: 'company', cell: (row) => <span className="font-semibold">{row.company}</span> },
     { header: 'Account Tier', accessor: 'tier', cell: (row) => <Badge variant="info">{row.tier}</Badge> },
-    { header: 'Approved Credit Limit', accessor: 'creditLimit' },
-    { header: 'Total Orders Placed', accessor: 'totalOrders', cell: (row) => row.totalOrders.toLocaleString() },
     {
-      header: 'Portal Status',
+      header: 'Credit Limit',
+      accessor: 'creditLimit',
+      cell: (row) => <span className="font-bold text-primary">${(row.creditLimit || 0).toLocaleString()}</span>,
+    },
+    {
+      header: 'Status',
       accessor: 'status',
+      cell: () => <Badge variant="success" dot>Active</Badge>,
+    },
+    {
+      header: 'Actions',
+      accessor: 'actions',
       cell: (row) => (
-        <Badge variant={row.status === 'Active' ? 'success' : 'warning'} dot>
-          {row.status}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <button onClick={() => openEditModal(row)} className="p-1.5 text-slate-400 hover:text-primary">
+            <Edit2 className="w-4 h-4" />
+          </button>
+          <button onClick={() => handleDeleteClient(row)} className="p-1.5 text-slate-400 hover:text-red-600">
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
       ),
     },
   ];
+
+  if (loading) return <LoadingState message="Fetching client account directory from database..." />;
 
   return (
     <div className="space-y-6 min-h-[calc(100vh-4rem)] flex flex-col">
@@ -83,7 +151,7 @@ export const ClientsPage = () => {
         description="Manage portal access for client companies, credit terms, and order approval settings"
         breadcrumbs={[{ label: 'Administration' }, { label: 'Clients' }]}
         actions={
-          <Button variant="primary" leftIcon={Plus} onClick={() => setIsModalOpen(true)}>
+          <Button variant="primary" leftIcon={Plus} onClick={openAddModal}>
             Provision Client Portal Account
           </Button>
         }
@@ -93,47 +161,44 @@ export const ClientsPage = () => {
         <DataTable columns={columns} data={clients} />
       </div>
 
+      {/* Add / Edit Client Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Provision Client Portal Account"
+        title={editingClient ? `Edit ${editingClient.name}` : 'Provision Client Portal Account'}
         size="md"
         footer={
           <>
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleAddClient}>
-              Create Client Account
+            <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleSaveClient}>
+              {editingClient ? 'Save Changes' : 'Provision Client Account'}
             </Button>
           </>
         }
       >
-        <form onSubmit={handleAddClient} className="space-y-4">
-          <FormField label="Contact Person Name" required>
+        <form onSubmit={handleSaveClient} className="space-y-4">
+          <FormField label="Client Contact Name" required>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sam Wilson" required />
           </FormField>
-
-          <FormField label="Company Name" required>
-            <Input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="e.g. Acme Corp" required />
+          <FormField label="Email Address">
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="sam@acmecorp.com" />
           </FormField>
-
-          <FormField label="Client Portal Email" required>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="sam@acmecorp.com" required />
-          </FormField>
-
-          <FormField label="Account Tier" required>
-            <Select
-              value={tier}
-              onChange={(e) => setTier(e.target.value)}
-              options={[
-                { value: 'Standard Client', label: 'Standard Client' },
-                { value: 'Enterprise Tier 1', label: 'Enterprise Tier 1' },
-                { value: 'Enterprise Tier 2', label: 'Enterprise Tier 2' },
-                { value: 'VIP Preferred', label: 'VIP Preferred' },
-              ]}
-            />
-          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Account Tier" required>
+              <Select
+                value={tier}
+                onChange={(e) => setTier(e.target.value)}
+                options={[
+                  { value: 'STANDARD', label: 'Standard Client' },
+                  { value: 'VIP', label: 'VIP Preferred' },
+                  { value: 'ENTERPRISE_TIER_1', label: 'Enterprise Tier 1' },
+                ]}
+              />
+            </FormField>
+            <FormField label="Approved Credit Limit ($)">
+              <Input type="number" value={creditLimit} onChange={(e) => setCreditLimit(e.target.value)} />
+            </FormField>
+          </div>
         </form>
       </Modal>
     </div>

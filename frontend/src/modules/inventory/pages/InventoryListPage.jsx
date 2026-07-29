@@ -1,294 +1,307 @@
 import { useState, useEffect } from 'react';
-import { ArrowUpDown, RefreshCw, Download, Plus } from 'lucide-react';
+import { RefreshCw, Plus, Layers, ArrowUpDown } from 'lucide-react';
 import { inventoryService } from '@/services/inventoryService';
 import { productService } from '@/services/productService';
-import { useAuth } from '@/contexts/AuthContext';
+import { locationService } from '@/services/locationService';
+import { batchService } from '@/services/batchService';
 import { useNotification } from '@/contexts/NotificationContext';
-import { PERMISSIONS } from '@/permissions/permissions';
-import PermissionGuard from '@/guards/PermissionGuard';
-
 import PageHeader from '@/components/navigation/PageHeader';
 import DataTable from '@/components/data-display/DataTable';
-import SearchBar from '@/components/forms/SearchBar';
-import FilterPanel from '@/components/forms/FilterPanel';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
 import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
+import LoadingState from '@/components/feedback/LoadingState';
 
 export const InventoryListPage = () => {
-  const { user } = useAuth();
   const { notifySuccess, notifyError } = useNotification();
+  const [activeTab, setActiveTab] = useState('bins'); // 'bins' | 'ledger'
 
-  const [movements, setMovements] = useState([]);
+  // Data states
+  const [bins, setBins] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
-
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
 
   // Adjustment Modal state
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
-  const [productsList, setProductsList] = useState([]);
-  const [selectedProductId, setSelectedProductId] = useState('');
-  const [adjustQty, setAdjustQty] = useState(0);
-  const [adjustReason, setAdjustReason] = useState('Physical Stock Count Discrepancy');
+  const [productId, setProductId] = useState('');
+  const [lotId, setLotId] = useState('');
+  const [locationId, setLocationId] = useState('');
+  const [quantityDelta, setQuantityDelta] = useState('10');
+  const [reasonCode, setReasonCode] = useState('MANUAL_CORRECTION');
+  const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchMovements = async () => {
-    setLoading(true);
+  const fetchData = async () => {
     try {
-      const res = await inventoryService.getMovements({
-        search,
-        type: typeFilter,
-        page: currentPage,
-        pageSize,
-      });
-      setMovements(res.items);
-      setTotalPages(res.totalPages);
-      setTotalItems(res.totalItems);
-    } catch (err) {
-      notifyError('Failed to load inventory movements.');
+      setLoading(true);
+      const [binList, txList, prodRes, locList, batchList] = await Promise.all([
+        inventoryService.getBinInventory(),
+        inventoryService.getMovements({ limit: 100 }),
+        productService.getProducts({ limit: 100 }),
+        locationService.getLocations(),
+        batchService.getBatches(),
+      ]);
+
+      setBins(binList || []);
+      setTransactions(txList.items || []);
+      setProducts(prodRes.items || []);
+      setLocations(locList || []);
+      setBatches(batchList || []);
+
+      if (prodRes.items && prodRes.items.length > 0) setProductId(prodRes.items[0].id);
+      if (batchList && batchList.length > 0) setLotId(batchList[0].id);
+      if (locList && locList.length > 0) setLocationId(locList[0].id);
+    } catch {
+      notifyError('Failed to fetch inventory data');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchMovements();
-  }, [search, typeFilter, currentPage, pageSize]);
+    fetchData();
+  }, []);
 
-  const handleOpenAdjustModal = async () => {
-    try {
-      const res = await productService.getProducts({ pageSize: 100 });
-      setProductsList(res.items);
-      if (res.items.length > 0) setSelectedProductId(res.items[0].id);
-      setIsAdjustModalOpen(true);
-    } catch {
-      notifyError('Failed to load products list');
-    }
+  const handleOpenAdjustModal = () => {
+    setIsAdjustModalOpen(true);
   };
 
   const handleConfirmAdjustment = async (e) => {
     e.preventDefault();
+    if (!productId || !lotId || !locationId || !quantityDelta) {
+      notifyError('Product, Lot, Location, and Quantity Delta are required');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const targetProduct = productsList.find((p) => p.id === selectedProductId);
       await inventoryService.adjustStock({
-        productId: selectedProductId,
-        productName: targetProduct?.name || 'Selected Product',
-        sku: targetProduct?.sku || 'SKU-000',
-        quantity: adjustQty,
-        reason: adjustReason,
-        user,
+        productId,
+        lotId,
+        locationId,
+        quantityDelta: parseInt(quantityDelta, 10),
+        reasonCode,
+        notes,
       });
-      notifySuccess(`Stock adjusted by ${adjustQty > 0 ? '+' : ''}${adjustQty} units.`);
+      notifySuccess(`Audited stock adjustment of ${quantityDelta > 0 ? '+' : ''}${quantityDelta} units applied.`);
       setIsAdjustModalOpen(false);
-      fetchMovements();
+      setNotes('');
+      fetchData();
     } catch (err) {
-      notifyError('Stock adjustment failed');
+      notifyError(err.message || 'Stock adjustment failed');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const columns = [
+  // Bin Inventory Columns
+  const binColumns = [
     {
-      header: 'Movement ID',
-      accessor: 'id',
+      header: 'Storage Bin Location',
+      accessor: 'location',
       cell: (row) => (
-        <span className="font-mono text-xs font-bold text-primary-600 dark:text-primary-400">
-          {row.id}
+        <div>
+          <span className="font-semibold text-primary block">
+            {row.location?.code || `Bin ${row.location?.bin || row.locationId}`}
+          </span>
+          <span className="text-[11px] text-slate-500 font-mono">
+            Zone {row.location?.zone || 'A'} &rarr; Bin {row.location?.bin || 'A1'}
+          </span>
+        </div>
+      ),
+    },
+    {
+      header: 'Product & SKU',
+      accessor: 'product',
+      cell: (row) => (
+        <div>
+          <span className="font-semibold text-on-surface block">{row.product?.name || 'N/A'}</span>
+          <span className="text-[11px] font-mono text-slate-500">{row.product?.sku || 'N/A'}</span>
+        </div>
+      ),
+    },
+    {
+      header: 'Lot / Batch Number',
+      accessor: 'batch',
+      cell: (row) => (
+        <span className="font-mono text-xs font-bold text-slate-700">
+          {row.batch?.lotNumber || row.batch?.lotId || row.lotId}
         </span>
       ),
     },
     {
-      header: 'Product Details',
-      accessor: 'productName',
-      cell: (row) => (
-        <div>
-          <span className="font-semibold text-surface-900 dark:text-surface-100 block">
-            {row.productName}
-          </span>
-          <span className="text-xs font-mono text-surface-400">{row.sku}</span>
-        </div>
-      ),
+      header: 'Bin Stock Quantity',
+      accessor: 'quantity',
+      cell: (row) => <span className="font-bold text-base text-primary">{row.quantity} Units</span>,
+    },
+    {
+      header: 'Last Updated',
+      accessor: 'updatedAt',
+      cell: (row) => (row.updatedAt ? new Date(row.updatedAt).toLocaleString() : 'N/A'),
+    },
+  ];
+
+  // Transaction Ledger Columns
+  const txColumns = [
+    {
+      header: 'Timestamp',
+      accessor: 'timestamp',
+      cell: (row) => (row.timestamp ? new Date(row.timestamp).toLocaleString() : 'N/A'),
     },
     {
       header: 'Movement Type',
-      accessor: 'type',
-      cell: (row) => {
-        const variant =
-          row.type === 'Inbound Receipt'
-            ? 'success'
-            : row.type === 'Stock Adjustment'
-            ? 'warning'
-            : 'info';
-        return <Badge variant={variant}>{row.type}</Badge>;
-      },
+      accessor: 'movementType',
+      cell: (row) => (
+        <Badge
+          variant={
+            row.movementType === 'RECEIVE'
+              ? 'success'
+              : row.movementType === 'TRANSFER'
+              ? 'info'
+              : row.movementType === 'ADJUSTMENT'
+              ? 'warning'
+              : 'default'
+          }
+          dot
+        >
+          {row.movementType}
+        </Badge>
+      ),
+    },
+    {
+      header: 'Product',
+      accessor: 'product',
+      cell: (row) => row.product?.name || 'Product',
     },
     {
       header: 'Quantity Delta',
-      accessor: 'quantity',
+      accessor: 'quantityDelta',
       cell: (row) => (
-        <span
-          className={`font-bold font-mono ${
-            row.quantity > 0 ? 'text-success-600' : 'text-danger-600'
-          }`}
-        >
-          {row.quantity > 0 ? `+${row.quantity}` : row.quantity}
+        <span className={`font-mono font-bold ${row.quantityDelta >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          {row.quantityDelta >= 0 ? `+${row.quantityDelta}` : row.quantityDelta} Units
         </span>
       ),
     },
     {
-      header: 'Source -> Destination',
-      accessor: 'sourceLocation',
-      cell: (row) => (
-        <div className="text-xs text-surface-600 dark:text-surface-300">
-          <span>{row.sourceLocation}</span> &rarr; <strong>{row.destLocation}</strong>
-        </div>
-      ),
+      header: 'Notes / Reference',
+      accessor: 'notes',
+      cell: (row) => row.notes || row.referenceId || 'N/A',
     },
-    { header: 'Reason / Ref', accessor: 'reason' },
-    { header: 'Logged By', accessor: 'performedBy' },
-    { header: 'Timestamp', accessor: 'timestamp', cell: (row) => <span className="text-xs text-surface-400">{row.timestamp}</span> },
   ];
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Stock Inventory & Movements"
-        description="Real-time stock ledger, physical stock counts, and movement tracking"
-        breadcrumbs={[{ label: 'Inventory & Stock' }, { label: 'Stock Inventory' }]}
-        actions={
-          <div className="flex items-center gap-2">
-            <PermissionGuard permission={PERMISSIONS.INVENTORY_EXPORT}>
-              <Button
-                variant="outline"
-                leftIcon={Download}
-                onClick={() => notifySuccess('Exporting movement ledger...')}
-              >
-                Export Ledger
-              </Button>
-            </PermissionGuard>
+  if (loading) return <LoadingState message="Loading Bin Inventory & Transaction Ledger..." />;
 
-            <PermissionGuard permission={PERMISSIONS.INVENTORY_ADJUST}>
-              <Button
-                variant="primary"
-                leftIcon={ArrowUpDown}
-                onClick={handleOpenAdjustModal}
-              >
-                Adjust Stock
-              </Button>
-            </PermissionGuard>
+  return (
+    <section className="space-y-6 flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden">
+      <PageHeader
+        title="Inventory & Bin Mapping"
+        description="Real-time storage bin stock mapping and immutable inventory transaction ledger"
+        breadcrumbs={[{ label: 'Inventory' }, { label: 'Bin Mapping' }]}
+        actions={
+          <div className="flex gap-3">
+            <Button variant="outline" leftIcon={RefreshCw} onClick={fetchData}>
+              Refresh
+            </Button>
+            <Button variant="primary" leftIcon={Plus} onClick={handleOpenAdjustModal}>
+              Audit Stock Adjustment
+            </Button>
           </div>
         }
       />
 
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <SearchBar
-          value={search}
-          onChange={setSearch}
-          placeholder="Search movements by product, SKU, or reason..."
-        />
-        <FilterPanel
-          isOpen={filterPanelOpen}
-          onToggle={() => setFilterPanelOpen(!filterPanelOpen)}
-          values={{ type: typeFilter }}
-          onChange={(key, val) => setTypeFilter(val)}
-          onReset={() => setTypeFilter('')}
-          filters={[
-            {
-              key: 'type',
-              label: 'Movement Type',
-              type: 'select',
-              options: ['Inbound Receipt', 'Stock Adjustment', 'Pick Order', 'Transfer'],
-            },
-          ]}
-        />
+      {/* Tabs Header */}
+      <div className="flex border-b border-slate-200">
+        <button
+          onClick={() => setActiveTab('bins')}
+          className={`px-4 py-2 font-bold text-sm border-b-2 transition-colors ${activeTab === 'bins' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+        >
+          Bin Location Stock ({bins.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('ledger')}
+          className={`px-4 py-2 font-bold text-sm border-b-2 transition-colors ${activeTab === 'ledger' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+        >
+          Immutable Transaction Ledger ({transactions.length})
+        </button>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={movements}
-        isLoading={loading}
-        pagination={{
-          currentPage,
-          totalPages,
-          totalItems,
-          pageSize,
-          onPageChange: setCurrentPage,
-          onPageSizeChange: setPageSize,
-        }}
-      />
+      {/* Tab Content */}
+      <div className="flex-1">
+        {activeTab === 'bins' ? (
+          <DataTable columns={binColumns} data={bins} />
+        ) : (
+          <DataTable columns={txColumns} data={transactions} />
+        )}
+      </div>
 
       {/* Stock Adjustment Modal */}
       <Modal
         isOpen={isAdjustModalOpen}
         onClose={() => setIsAdjustModalOpen(false)}
-        title="Record Stock Adjustment"
-        subtitle="Post positive or negative inventory delta with audit justification"
+        title="Audited Stock Adjustment"
         size="md"
         footer={
           <>
-            <Button variant="outline" onClick={() => setIsAdjustModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleConfirmAdjustment}
-              isLoading={submitting}
-            >
-              Post Stock Delta
+            <Button variant="outline" onClick={() => setIsAdjustModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleConfirmAdjustment} disabled={submitting}>
+              {submitting ? 'Processing...' : 'Apply Stock Adjustment'}
             </Button>
           </>
         }
       >
         <form onSubmit={handleConfirmAdjustment} className="space-y-4">
-          <FormField label="Target Product SKU" required>
+          <FormField label="Target Product" required>
             <Select
-              value={selectedProductId}
-              onChange={(e) => setSelectedProductId(e.target.value)}
-              options={productsList.map((p) => ({
-                value: p.id,
-                label: `${p.sku} — ${p.name} (Current: ${p.totalStock})`,
-              }))}
+              value={productId}
+              onChange={(e) => setProductId(e.target.value)}
+              options={products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))}
             />
           </FormField>
-
-          <FormField label="Quantity Adjustment (+/- Delta)" required hint="Use positive number to add stock, negative number to reduce stock">
-            <Input
-              type="number"
-              value={adjustQty}
-              onChange={(e) => setAdjustQty(Number(e.target.value))}
-              placeholder="e.g. -5 or 25"
-              required
-            />
-          </FormField>
-
-          <FormField label="Adjustment Reason / Justification" required>
-            <Select
-              value={adjustReason}
-              onChange={(e) => setAdjustReason(e.target.value)}
-              options={[
-                'Physical Stock Count Discrepancy',
-                'Damaged During Transport',
-                'Expired Stock Removal',
-                'Unrecorded Dock Receipt',
-                'Quality Inspection Hold',
-              ]}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Lot / Batch" required>
+              <Select
+                value={lotId}
+                onChange={(e) => setLotId(e.target.value)}
+                options={batches.map((b) => ({ value: b.id, label: b.lotNumber || b.lotId }))}
+              />
+            </FormField>
+            <FormField label="Bin Location" required>
+              <Select
+                value={locationId}
+                onChange={(e) => setLocationId(e.target.value)}
+                options={locations.map((l) => ({ value: l.id, label: `Zone ${l.zone} - Bin ${l.bin}` }))}
+              />
+            </FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Quantity Delta (+/-)" required>
+              <Input type="number" value={quantityDelta} onChange={(e) => setQuantityDelta(e.target.value)} required />
+            </FormField>
+            <FormField label="Reason Code" required>
+              <Select
+                value={reasonCode}
+                onChange={(e) => setReasonCode(e.target.value)}
+                options={[
+                  { value: 'MANUAL_CORRECTION', label: 'Manual Correction' },
+                  { value: 'AUDIT_CORRECTION', label: 'Audit Count Mismatch' },
+                  { value: 'DAMAGE', label: 'Damaged Goods (-)' },
+                  { value: 'LOST', label: 'Lost Inventory (-)' },
+                ]}
+              />
+            </FormField>
+          </div>
+          <FormField label="Audit Notes / Explanation">
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Physical inventory count variance" />
           </FormField>
         </form>
       </Modal>
-    </div>
+    </section>
   );
 };
 

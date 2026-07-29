@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Users, UserPlus, Search, ShieldCheck, UserCheck, UserX } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { UserPlus, UserCheck, UserX, Trash2 } from 'lucide-react';
 import { ROLES, ROLE_LABELS, ROLE_COLORS } from '@/permissions/roles';
 import { useNotification } from '@/contexts/NotificationContext';
 import { PERMISSIONS } from '@/permissions/permissions';
 import PermissionGuard from '@/guards/PermissionGuard';
-
 import PageHeader from '@/components/navigation/PageHeader';
 import DataTable from '@/components/data-display/DataTable';
 import Button from '@/components/ui/Button';
@@ -13,50 +12,99 @@ import Modal from '@/components/ui/Modal';
 import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
+import LoadingState from '@/components/feedback/LoadingState';
+import { userService } from '@/services/userService';
+import { companyService } from '@/services/companyService';
 
 export const UsersPage = () => {
-  const { notifySuccess } = useNotification();
-  const [usersList, setUsersList] = useState(() => JSON.parse(localStorage.getItem('wms_users') || 'null') || [
-    { id: 'usr_001', name: 'Alex Morgan', email: 'alex@stitchnexus.com', role: ROLES.SUPER_ADMIN, department: 'Management', status: 'Active' },
-    { id: 'usr_002', name: 'Jordan Lee', email: 'jordan@stitchnexus.com', role: ROLES.WAREHOUSE_MANAGER, department: 'Warehouse Ops', status: 'Active' },
-    { id: 'usr_003', name: 'Casey Rivera', email: 'casey@stitchnexus.com', role: ROLES.INVENTORY_CLERK, department: 'Stock Inventory', status: 'Active' },
-    { id: 'usr_004', name: 'Sam Wilson', email: 'sam@acmecorp.com', role: ROLES.CLIENT, department: 'Client Accounts', status: 'Active' },
-  ]);
+  const { notifySuccess, notifyError } = useNotification();
 
+  const [usersList, setUsersList] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('nexus123');
   const [role, setRole] = useState(ROLES.INVENTORY_CLERK);
-  const [department, setDepartment] = useState('Warehouse Ops');
+  const [companyId, setCompanyId] = useState('');
   const [search, setSearch] = useState('');
 
-  useEffect(() => localStorage.setItem('wms_users', JSON.stringify(usersList)), [usersList]);
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [usersData, companiesData] = await Promise.all([
+        userService.getUsers(),
+        companyService.getCompanies(),
+      ]);
+      setUsersList(Array.isArray(usersData) ? usersData : []);
+      setCompanies(Array.isArray(companiesData) ? companiesData : []);
+      if (companiesData && companiesData.length > 0) setCompanyId(companiesData[0].id);
+    } catch {
+      notifyError('Failed to load users from database');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const filteredUsers = useMemo(() => usersList.filter((item) =>
-    `${item.name} ${item.email} ${item.department} ${ROLE_LABELS[item.role]}`.toLowerCase().includes(search.toLowerCase())
-  ), [search, usersList]);
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-  const handleAddUser = (e) => {
+  const handleInviteUser = async (e) => {
     e.preventDefault();
-    const newUser = {
-      id: `usr_${Date.now()}`,
-      name,
-      email,
-      role,
-      department,
-      status: 'Active',
-    };
-    setUsersList([...usersList, newUser]);
-    notifySuccess(`User ${name} invited with role ${ROLE_LABELS[role]}.`);
-    setIsModalOpen(false);
-    setName('');
-    setEmail('');
+    if (!name || !email) {
+      notifyError('Name and Email are required');
+      return;
+    }
+
+    try {
+      await userService.inviteUser({
+        name,
+        email,
+        password,
+        role,
+        companyId: role === ROLES.SUPER_ADMIN ? null : companyId,
+      });
+      notifySuccess(`User ${name} created with role ${ROLE_LABELS[role]}.`);
+      setIsModalOpen(false);
+      setName('');
+      setEmail('');
+      fetchData();
+    } catch (err) {
+      notifyError(err.message || 'Failed to create user');
+    }
   };
 
-  const toggleUserStatus = (id) => {
-    setUsersList((current) => current.map((item) => item.id === id ? { ...item, status: item.status === 'Active' ? 'Suspended' : 'Active' } : item));
-    notifySuccess('Account status updated successfully.');
+  const toggleUserStatus = async (user) => {
+    const newStatus = user.status === 'Active' ? 'Suspended' : 'Active';
+    try {
+      await userService.updateUser(user.id, { status: newStatus });
+      notifySuccess(`Account status updated to ${newStatus}.`);
+      fetchData();
+    } catch (err) {
+      notifyError(err.message || 'Failed to update user status');
+    }
   };
+
+  const handleDeleteUser = async (user) => {
+    if (!window.confirm(`Are you sure you want to delete user "${user.name}"?`)) return;
+    try {
+      await userService.deleteUser(user.id);
+      notifySuccess(`User ${user.name} deleted.`);
+      fetchData();
+    } catch (err) {
+      notifyError(err.message || 'Failed to delete user');
+    }
+  };
+
+  const filteredUsers = usersList.filter((item) =>
+    `${item.name} ${item.email} ${item.company?.name || ''} ${ROLE_LABELS[item.role] || ''}`
+      .toLowerCase()
+      .includes(search.toLowerCase())
+  );
 
   const columns = [
     {
@@ -65,7 +113,7 @@ export const UsersPage = () => {
       cell: (row) => (
         <div className="flex items-center gap-3">
           <div className="h-8 w-8 rounded-full bg-primary-600 text-white font-semibold flex items-center justify-center text-xs">
-            {row.name.charAt(0)}
+            {(row.name || 'U').charAt(0)}
           </div>
           <div>
             <span className="font-semibold text-surface-900 dark:text-surface-100 block">{row.name}</span>
@@ -74,98 +122,107 @@ export const UsersPage = () => {
         </div>
       ),
     },
-    { header: 'Department', accessor: 'department' },
+    {
+      header: 'Company / Tenant',
+      accessor: 'company',
+      cell: (row) => row.company?.name || 'Global Platform Admin',
+    },
     {
       header: 'Assigned RBAC Role',
       accessor: 'role',
-      cell: (row) => <Badge variant={ROLE_COLORS[row.role]}>{ROLE_LABELS[row.role]}</Badge>,
+      cell: (row) => <Badge variant={ROLE_COLORS[row.role]}>{ROLE_LABELS[row.role] || row.role}</Badge>,
     },
     {
       header: 'Account Status',
       accessor: 'status',
-      cell: (row) => <Badge variant={row.status === 'Active' ? 'success' : 'warning'} dot>{row.status}</Badge>,
+      cell: (row) => <Badge variant={row.status === 'Active' ? 'success' : 'warning'} dot>{row.status || 'Active'}</Badge>,
     },
     {
-      header: 'Action', accessor: 'action',
+      header: 'Actions',
+      accessor: 'action',
       cell: (row) => (
         <PermissionGuard permission={PERMISSIONS.USERS_EDIT}>
-          <Button size="sm" variant="ghost" leftIcon={row.status === 'Active' ? UserX : UserCheck} onClick={() => toggleUserStatus(row.id)}>
-            {row.status === 'Active' ? 'Suspend' : 'Activate'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="ghost" leftIcon={row.status === 'Active' ? UserX : UserCheck} onClick={() => toggleUserStatus(row)}>
+              {row.status === 'Active' ? 'Suspend' : 'Activate'}
+            </Button>
+            <button onClick={() => handleDeleteUser(row)} className="p-1.5 text-slate-400 hover:text-red-600">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
         </PermissionGuard>
       ),
     },
   ];
 
+  if (loading) return <LoadingState message="Loading Users & RBAC Roles from database..." />;
+
   return (
-    <div className="space-y-6">
+    <section className="space-y-6 flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden">
       <PageHeader
-        title="User Access & Provisioning"
-        description="Manage internal staff users, assign RBAC roles, and control account permissions"
-        breadcrumbs={[{ label: 'Administration' }, { label: 'User Management' }]}
+        title="Role-Based User Management"
+        description="Provision accounts, assign multi-tenant company access, and manage RBAC security roles"
+        breadcrumbs={[{ label: 'Administration' }, { label: 'Users' }]}
         actions={
           <PermissionGuard permission={PERMISSIONS.USERS_CREATE}>
             <Button variant="primary" leftIcon={UserPlus} onClick={() => setIsModalOpen(true)}>
-              Invite New User
+              Provision User Account
             </Button>
           </PermissionGuard>
         }
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="card flex items-center gap-3 p-4"><Users className="h-10 w-10 rounded-xl bg-primary-50 p-2 text-primary-600" /><div><p className="text-xs text-surface-500">Total accounts</p><p className="text-xl font-bold">{usersList.length}</p></div></div>
-        <div className="card flex items-center gap-3 p-4"><UserCheck className="h-10 w-10 rounded-xl bg-success-50 p-2 text-success-600" /><div><p className="text-xs text-surface-500">Active users</p><p className="text-xl font-bold">{usersList.filter((item) => item.status === 'Active').length}</p></div></div>
-        <div className="card flex items-center gap-3 p-4"><ShieldCheck className="h-10 w-10 rounded-xl bg-info-50 p-2 text-info-600" /><div><p className="text-xs text-surface-500">Security roles</p><p className="text-xl font-bold">{Object.keys(ROLE_LABELS).length}</p></div></div>
+      <div className="flex-1">
+        <DataTable columns={columns} data={filteredUsers} />
       </div>
 
-      <div className="card p-4">
-        <div className="relative max-w-xl"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" /><Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search users, email, role or department..." className="pl-9" /></div>
-      </div>
-
-      <DataTable columns={columns} data={filteredUsers} emptyTitle="No matching users" emptyDescription="Try another name, email, role, or department." />
-
+      {/* Provision User Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Invite New System User"
+        title="Provision Enterprise User Account"
         size="md"
         footer={
           <>
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleAddUser}>
-              Send Invite & Assign Role
-            </Button>
+            <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleInviteUser}>Save & Create User</Button>
           </>
         }
       >
-        <form onSubmit={handleAddUser} className="space-y-4">
+        <form onSubmit={handleInviteUser} className="space-y-4">
           <FormField label="Full Name" required>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Taylor Reed" required />
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sarah Jenkins" required />
           </FormField>
-
-          <FormField label="Work Email Address" required>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="taylor@stitchnexus.com" required />
+          <FormField label="Email Address" required>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="sarah@company.com" required />
           </FormField>
-
-          <FormField label="Assigned RBAC Role" required>
+          <FormField label="Initial Password">
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="nexus123" />
+          </FormField>
+          <FormField label="Assign RBAC Role" required>
             <Select
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              options={Object.keys(ROLE_LABELS).map((key) => ({
-                value: key,
-                label: ROLE_LABELS[key],
-              }))}
+              options={[
+                { value: ROLES.SUPER_ADMIN, label: 'Super Admin' },
+                { value: ROLES.WAREHOUSE_MANAGER, label: 'Warehouse Manager' },
+                { value: ROLES.INVENTORY_CLERK, label: 'Inventory Clerk' },
+                { value: ROLES.CLIENT, label: 'Client User' },
+              ]}
             />
           </FormField>
-
-          <FormField label="Department" required>
-            <Input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="e.g. Warehouse Operations" required />
-          </FormField>
+          {role !== ROLES.SUPER_ADMIN && (
+            <FormField label="Assign Client Company">
+              <Select
+                value={companyId}
+                onChange={(e) => setCompanyId(e.target.value)}
+                options={companies.map((c) => ({ value: c.id, label: c.name }))}
+              />
+            </FormField>
+          )}
         </form>
       </Modal>
-    </div>
+    </section>
   );
 };
 

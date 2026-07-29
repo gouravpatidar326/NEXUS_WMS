@@ -1,52 +1,42 @@
 import { api } from './api';
 
 export const productService = {
-  async getProducts({ search = '', category = '', status = '', page = 1, pageSize = 10 } = {}) {
-    const products = await api.get('/products');
-    
-    // Front-end local filtering/pagination since backend GET /api/warehouse/products returns all
-    let filtered = [...products];
+  async getProducts(params = {}) {
+    const query = new URLSearchParams();
+    if (params.search) query.append('search', params.search);
+    if (params.categoryId) query.append('categoryId', params.categoryId);
+    if (params.status) query.append('status', params.status);
+    if (params.page) query.append('page', params.page);
+    if (params.limit) query.append('limit', params.limit || params.pageSize || 10);
 
-    if (search) {
-      const q = search.toLowerCase();
-      filtered = filtered.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.sku.toLowerCase().includes(q)
-      );
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    const res = await api.get(`/v1/products${queryString}`);
+    if (res && res.data) {
+      return {
+        items: res.data,
+        totalItems: res.pagination?.totalItems || res.data.length,
+        totalPages: res.pagination?.totalPages || 1,
+        currentPage: res.pagination?.currentPage || 1,
+        pageSize: res.pagination?.limit || 10,
+      };
     }
-
-    if (category) {
-      filtered = filtered.filter((p) => p.category === category);
-    }
-
-    if (status) {
-      filtered = filtered.filter((p) => p.status === status);
-    }
-
-    const totalItems = filtered.length;
-    const totalPages = Math.ceil(totalItems / pageSize);
-    const start = (page - 1) * pageSize;
-    const items = filtered.slice(start, start + pageSize);
-
-    return { items, totalItems, totalPages, currentPage: page, pageSize };
+    return { items: Array.isArray(res) ? res : [], totalItems: 0, totalPages: 1, currentPage: 1, pageSize: 10 };
   },
 
   async getProductById(id) {
-    const products = await api.get('/products');
-    return products.find(p => p.id === id);
+    const res = await api.get(`/v1/products/${id}`);
+    return res.data || res;
   },
 
   async createProduct(productData) {
-    return await api.post('/warehouse/products', productData);
+    return await api.post('/v1/products', productData);
   },
 
   async updateProduct(id, updates) {
-    // Phase 2 backend doesn't have PUT /products/:id, returning updates mock
-    return { id, ...updates };
+    return await api.put(`/v1/products/${id}`, updates);
   },
 
   async deleteProduct(id) {
-    return true;
+    return await api.delete(`/v1/products/${id}`);
   },
 };

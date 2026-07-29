@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState, useEffect } from 'react';
 import { useNotification } from '@/contexts/NotificationContext';
 import { transferOrdersService } from '@/services/transferOrdersService';
+import { locationService } from '@/services/locationService';
 import { productService } from '@/services/productService';
+import { batchService } from '@/services/batchService';
 
 import PageHeader from '@/components/navigation/PageHeader';
 import DataTable from '@/components/data-display/DataTable';
@@ -12,311 +13,223 @@ import Modal from '@/components/ui/Modal';
 import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
+import LoadingState from '@/components/feedback/LoadingState';
 import { Plus, ArrowRightLeft, RefreshCw } from 'lucide-react';
 
 export const TransferOrdersPage = () => {
-  const { user } = useAuth();
   const { notifySuccess, notifyError } = useNotification();
 
-  // Data state — all from real backend
-  const [transferOrders, setTransferOrders] = useState([]);
+  const [transfers, setTransfers] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [products, setProducts] = useState([]);
-  const [companies, setCompanies] = useState([]);
+  const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal state
+  // Form State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [sourceLocationId, setSourceLocationId] = useState('');
+  const [destLocationId, setDestLocationId] = useState('');
+  const [productId, setProductId] = useState('');
+  const [lotId, setLotId] = useState('');
+  const [quantity, setQuantity] = useState('10');
 
-  // Form state
-  const [selectedProductId, setSelectedProductId] = useState('');
-  const [selectedCompanyId, setSelectedCompanyId] = useState('');
-  const [quantity, setQuantity] = useState(1);
-
-  // Derived: selected product's available stock for hint
-  const selectedProduct = products.find((p) => p.id === selectedProductId);
-  const destinationCompanies = companies.filter((c) => c.id !== user?.companyId);
-
-  // Fetch all transfer orders from DB
-  const fetchTransferOrders = useCallback(async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const data = await transferOrdersService.getTransferOrders();
-      setTransferOrders(data);
-    } catch (err) {
-      notifyError('Failed to load transfer orders');
+      const [transRes, locList, prodRes, batchList] = await Promise.all([
+        transferOrdersService.getTransferOrders(),
+        locationService.getLocations(),
+        productService.getProducts({ limit: 100 }),
+        batchService.getBatches(),
+      ]);
+
+      const items = Array.isArray(transRes) ? transRes : transRes.items || [];
+      setTransfers(items);
+      setLocations(locList || []);
+      setProducts(prodRes.items || []);
+      setBatches(batchList || []);
+
+      if (locList && locList.length > 0) {
+        setSourceLocationId(locList[0].id);
+        if (locList.length > 1) setDestLocationId(locList[1].id);
+        else setDestLocationId(locList[0].id);
+      }
+      if (prodRes.items && prodRes.items.length > 0) setProductId(prodRes.items[0].id);
+      if (batchList && batchList.length > 0) setLotId(batchList[0].id);
+    } catch {
+      notifyError('Failed to load inventory transfers');
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  // Fetch products and companies for the form dropdowns
-  const fetchFormData = useCallback(async () => {
-    try {
-      const [productsRes, companiesData] = await Promise.all([
-        productService.getProducts({ pageSize: 100 }),
-        transferOrdersService.getCompanies(),
-      ]);
-      setProducts(productsRes.items || []);
-      setCompanies(companiesData || []);
-
-      // Pre-select first values
-      if (productsRes.items?.length > 0) setSelectedProductId(productsRes.items[0].id);
-      const dests = (companiesData || []).filter((c) => c.id !== user?.companyId);
-      if (dests.length > 0) setSelectedCompanyId(dests[0].id);
-    } catch (err) {
-      notifyError('Failed to load form data');
-    }
-  }, [user?.companyId]);
+  };
 
   useEffect(() => {
-    fetchTransferOrders();
-  }, [fetchTransferOrders]);
+    fetchData();
+  }, []);
 
-  const handleOpenModal = async () => {
-    await fetchFormData();
+  const handleOpenModal = () => {
     setIsModalOpen(true);
   };
 
-  const handleCreateTO = async (e) => {
+  const handleCreateTransfer = async (e) => {
     e.preventDefault();
-    if (!selectedProductId || !selectedCompanyId || quantity <= 0) {
-      notifyError('Please fill in all required fields with valid values.');
+    if (!sourceLocationId || !destLocationId || !productId || !lotId || !quantity) {
+      notifyError('Source location, Destination location, Product, Lot, and Quantity are required');
       return;
     }
 
-    if (selectedProduct && quantity > selectedProduct.availableStock) {
-      notifyError(
-        `Cannot transfer ${quantity} units. Only ${selectedProduct.availableStock} units available.`
-      );
+    if (sourceLocationId === destLocationId) {
+      notifyError('Source and Destination locations must be different');
+      return;
+    }
+
+    const qty = parseInt(quantity, 10);
+    if (isNaN(qty) || qty <= 0) {
+      notifyError('Quantity must be a positive number');
       return;
     }
 
     setSubmitting(true);
     try {
-      const newTO = await transferOrdersService.createTransferOrder({
-        destinationCompanyId: selectedCompanyId,
-        productId: selectedProductId,
-        quantity: Number(quantity),
+      await transferOrdersService.createTransferOrder({
+        sourceLocationId,
+        destLocationId,
+        items: [
+          {
+            productId,
+            lotId,
+            quantity: qty,
+          },
+        ],
       });
 
-      // Prepend newly created order to the list
-      setTransferOrders((prev) => [newTO, ...prev]);
-      notifySuccess(`Transfer Order created! ${quantity} units of "${selectedProduct?.name}" dispatched.`);
+      notifySuccess('Stock transfer executed successfully.');
       setIsModalOpen(false);
-      setQuantity(1);
+      fetchData();
     } catch (err) {
-      notifyError(err.message || 'Failed to create transfer order');
+      notifyError(err.message || 'Transfer failed');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const getStatusVariant = (status) => {
-    switch (status?.toUpperCase()) {
-      case 'COMPLETED': return 'success';
-      case 'PENDING':   return 'warning';
-      case 'CANCELLED': return 'danger';
-      default:          return 'info';
-    }
-  };
-
   const columns = [
     {
-      header: 'TO Reference',
-      accessor: 'id',
+      header: 'Transfer Number',
+      accessor: 'transferNumber',
       cell: (row) => (
-        <span className="font-mono text-xs font-bold text-primary-600 dark:text-primary-400">
-          TO-{row.id.slice(-8).toUpperCase()}
+        <span className="font-mono font-bold text-primary flex items-center gap-1">
+          <ArrowRightLeft className="w-3.5 h-3.5" />
+          {row.transferNumber || `TRF-${row.id?.substring(0, 6)}`}
         </span>
       ),
     },
     {
-      header: 'Source Company',
-      accessor: 'sourceCompany',
-      cell: (row) => (
-        <div className="text-xs">
-          <span className="font-bold text-surface-800 dark:text-surface-100 block">
-            {row.sourceCompany?.name || '—'}
-          </span>
-          <span className="text-surface-400 font-mono">Source</span>
-        </div>
-      ),
+      header: 'Source Bin Location',
+      accessor: 'sourceLocation',
+      cell: (row) => row.sourceLocation?.code || `Bin ${row.sourceLocation?.bin || row.sourceLocationId}`,
     },
     {
-      header: 'Destination Company',
-      accessor: 'destinationCompany',
-      cell: (row) => (
-        <div className="text-xs">
-          <span className="font-bold text-surface-800 dark:text-surface-100 block">
-            {row.destinationCompany?.name || '—'}
-          </span>
-          <span className="text-surface-400 font-mono">Destination</span>
-        </div>
-      ),
+      header: 'Destination Bin Location',
+      accessor: 'destLocation',
+      cell: (row) => row.destLocation?.code || `Bin ${row.destLocation?.bin || row.destLocationId}`,
     },
     {
-      header: 'Product',
-      accessor: 'product',
-      cell: (row) => (
-        <div className="text-xs">
-          <span className="font-semibold text-surface-900 dark:text-surface-100 block">
-            {row.product?.name || '—'}
-          </span>
-          <span className="font-mono text-primary-600 dark:text-primary-400 font-bold">
-            {row.product?.sku || '—'}
-          </span>
-        </div>
-      ),
-    },
-    {
-      header: 'Qty Transferred',
-      accessor: 'quantity',
-      cell: (row) => (
-        <span className="font-mono font-bold text-surface-800 dark:text-surface-100">
-          {row.quantity} Units
-        </span>
-      ),
+      header: 'Items Count',
+      accessor: 'items',
+      cell: (row) => `${(row.items && row.items.length) || 1} Item(s)`,
     },
     {
       header: 'Status',
       accessor: 'status',
-      cell: (row) => (
-        <Badge variant={getStatusVariant(row.status)}>{row.status}</Badge>
-      ),
+      cell: (row) => <Badge variant="success" dot>{row.status || 'COMPLETED'}</Badge>,
     },
     {
       header: 'Date',
       accessor: 'createdAt',
-      cell: (row) => (
-        <span className="text-xs text-surface-400">
-          {new Date(row.createdAt).toLocaleDateString()}
-        </span>
-      ),
+      cell: (row) => (row.createdAt ? new Date(row.createdAt).toLocaleDateString() : 'N/A'),
     },
   ];
 
+  if (loading) return <LoadingState message="Loading Inventory Transfers..." />;
+
   return (
-    <div className="space-y-6 min-h-[calc(100vh-4rem)] flex flex-col">
+    <section className="space-y-6 flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden">
       <PageHeader
-        title="Cross-Company Transfer Orders"
-        description="Inter-company stock transfers with real-time inventory deduction and destination credit"
-        breadcrumbs={[{ label: 'Order Management' }, { label: 'Transfer Orders' }]}
+        title="Inventory Transfers & Movement"
+        description="Execute bin-to-bin and inter-warehouse stock transfers with real-time transactional updates"
+        breadcrumbs={[{ label: 'Operations' }, { label: 'Inventory Transfers' }]}
         actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              leftIcon={RefreshCw}
-              onClick={fetchTransferOrders}
-              isLoading={loading}
-            >
+          <div className="flex gap-3">
+            <Button variant="outline" leftIcon={RefreshCw} onClick={fetchData}>
               Refresh
             </Button>
             <Button variant="primary" leftIcon={Plus} onClick={handleOpenModal}>
-              Initiate Transfer
+              Create Stock Transfer
             </Button>
           </div>
         }
       />
 
       <div className="flex-1">
-        {transferOrders.length === 0 && !loading ? (
-          <div className="card p-12 text-center">
-            <ArrowRightLeft className="h-12 w-12 text-surface-300 dark:text-surface-600 mx-auto mb-4" />
-            <h3 className="text-base font-bold text-surface-700 dark:text-surface-200 mb-1">
-              No Transfer Orders Yet
-            </h3>
-            <p className="text-sm text-surface-400 mb-4">
-              Click "Initiate Transfer" to create your first inter-company stock transfer.
-            </p>
-            <Button variant="primary" leftIcon={Plus} onClick={handleOpenModal} size="sm">
-              Initiate Transfer
-            </Button>
-          </div>
-        ) : (
-          <DataTable columns={columns} data={transferOrders} isLoading={loading} />
-        )}
+        <DataTable columns={columns} data={transfers} />
       </div>
 
-      {/* Create Transfer Order Modal */}
+      {/* Create Transfer Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Initiate Inter-Company Transfer"
-        subtitle="Transfer stock from your company's inventory to another company. Stock is deducted immediately."
+        title="Execute Bin-to-Bin Stock Transfer"
         size="md"
         footer={
           <>
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleCreateTO}
-              isLoading={submitting}
-            >
-              Create & Execute Transfer
+            <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleCreateTransfer} disabled={submitting}>
+              {submitting ? 'Executing Transfer...' : 'Execute Stock Transfer'}
             </Button>
           </>
         }
       >
-        <form onSubmit={handleCreateTO} className="space-y-4">
-          {/* Product Dropdown */}
-          <FormField
-            label="Product to Transfer"
-            required
-            hint={
-              selectedProduct
-                ? `Available Stock: ${selectedProduct.availableStock} units`
-                : 'Select a product to see available stock'
-            }
-          >
-            <Select
-              value={selectedProductId}
-              onChange={(e) => setSelectedProductId(e.target.value)}
-              options={products.map((p) => ({
-                value: p.id,
-                label: `${p.sku} — ${p.name} (${p.availableStock} available)`,
-              }))}
-            />
-          </FormField>
-
-          {/* Destination Company Dropdown */}
-          <FormField label="Destination Company" required>
-            {destinationCompanies.length === 0 ? (
-              <p className="text-sm text-warning-600 font-medium p-2 bg-warning-50 dark:bg-warning-900/20 rounded-lg">
-                ⚠️ No other companies found in the database. Create another company first.
-              </p>
-            ) : (
+        <form onSubmit={handleCreateTransfer} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Source Storage Bin" required>
               <Select
-                value={selectedCompanyId}
-                onChange={(e) => setSelectedCompanyId(e.target.value)}
-                options={destinationCompanies.map((c) => ({
-                  value: c.id,
-                  label: `${c.name} ${c.industry ? `(${c.industry})` : ''}`,
-                }))}
+                value={sourceLocationId}
+                onChange={(e) => setSourceLocationId(e.target.value)}
+                options={locations.map((l) => ({ value: l.id, label: `Zone ${l.zone} - Bin ${l.bin} (${l.code})` }))}
               />
-            )}
-          </FormField>
-
-          {/* Quantity */}
-          <FormField
-            label="Transfer Quantity"
-            required
-            hint={`Max: ${selectedProduct?.availableStock ?? '—'} units`}
-          >
-            <Input
-              type="number"
-              min="1"
-              max={selectedProduct?.availableStock || undefined}
-              value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
-              required
-            />
+            </FormField>
+            <FormField label="Destination Storage Bin" required>
+              <Select
+                value={destLocationId}
+                onChange={(e) => setDestLocationId(e.target.value)}
+                options={locations.map((l) => ({ value: l.id, label: `Zone ${l.zone} - Bin ${l.bin} (${l.code})` }))}
+              />
+            </FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Product to Transfer" required>
+              <Select
+                value={productId}
+                onChange={(e) => setProductId(e.target.value)}
+                options={products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))}
+              />
+            </FormField>
+            <FormField label="Lot / Batch" required>
+              <Select
+                value={lotId}
+                onChange={(e) => setLotId(e.target.value)}
+                options={batches.map((b) => ({ value: b.id, label: b.lotNumber || b.lotId }))}
+              />
+            </FormField>
+          </div>
+          <FormField label="Quantity to Transfer" required>
+            <Input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} required />
           </FormField>
         </form>
       </Modal>
-    </div>
+    </section>
   );
 };
 

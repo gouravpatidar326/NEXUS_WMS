@@ -11,8 +11,12 @@ const getUsers = async (req, res) => {
         role: true,
         companyId: true,
         status: true,
-        createdAt: true
-      }
+        createdAt: true,
+        company: {
+          select: { name: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
     });
     res.json(users);
   } catch (error) {
@@ -24,8 +28,7 @@ const getUsers = async (req, res) => {
 const inviteUser = async (req, res) => {
   try {
     const { name, email, role, companyId, password } = req.body;
-    
-    // Validate role
+
     const validRoles = ['SUPER_ADMIN', 'WAREHOUSE_MANAGER', 'INVENTORY_CLERK', 'CLIENT'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
@@ -36,8 +39,6 @@ const inviteUser = async (req, res) => {
       return res.status(400).json({ message: 'Email already exists' });
     }
 
-    // In a real flow, an invite would generate a token and email it to the user.
-    // For this implementation, we allow passing a password to provision them immediately for testing.
     const hashedPassword = await bcrypt.hash(password || 'nexus123', 10);
 
     const user = await prisma.user.create({
@@ -46,23 +47,78 @@ const inviteUser = async (req, res) => {
         email,
         password: hashedPassword,
         role,
-        companyId: companyId || null
-      }
+        companyId: companyId || null,
+        status: 'Active',
+      },
     });
 
     await prisma.auditLog.create({
       data: {
         event: 'USER_INVITED',
         userId: req.user.id,
-        ipAddress: req.ip
-      }
+        ipAddress: req.ip,
+      },
     });
 
-    res.status(201).json({ id: user.id, message: 'User invited successfully' });
+    res.status(201).json({ id: user.id, message: 'User invited successfully', user });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: error.message || 'Internal server error' });
   }
 };
 
-module.exports = { getUsers, inviteUser };
+const updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, role, companyId, status } = req.body;
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: {
+        ...(name ? { name } : {}),
+        ...(role ? { role } : {}),
+        ...(status ? { status } : {}),
+        ...(companyId !== undefined ? { companyId } : {}),
+        updatedAt: new Date(),
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        event: 'USER_UPDATED',
+        userId: req.user.id,
+        ipAddress: req.ip,
+      },
+    });
+
+    res.json(user);
+  } catch (error) {
+    console.error(error);
+    res.status(400).json({ message: error.message || 'Failed to update user' });
+  }
+};
+
+const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.user.delete({
+      where: { id },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        event: 'USER_DELETED',
+        userId: req.user.id,
+        ipAddress: req.ip,
+      },
+    });
+
+    res.json({ message: 'User deleted successfully', id });
+  } catch (error) {
+    console.error(error);
+    res.status(400).json({ message: error.message || 'Failed to delete user' });
+  }
+};
+
+module.exports = { getUsers, inviteUser, updateUser, deleteUser };

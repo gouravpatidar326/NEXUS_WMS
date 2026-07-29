@@ -4,10 +4,7 @@ import { useNotification } from '@/contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
 import { ROLES } from '@/permissions/roles';
 import { dashboardService } from '@/services/dashboardService';
-<<<<<<< HEAD
-=======
 import LoadingState from '@/components/feedback/LoadingState';
->>>>>>> bfea083027191f1ba39e44601454fe317a16f51a
 
 export const DashboardPage = () => {
   const { user } = useAuth();
@@ -239,20 +236,6 @@ const SuperAdminDashboard = ({ user }) => {
 const WarehouseManagerDashboard = ({ user }) => {
   const navigate = useNavigate();
   const { notifySuccess, notifyError } = useNotification();
-<<<<<<< HEAD
-  const [summary, setSummary] = useState(null);
-
-  useEffect(() => {
-    const fetchSummary = async () => {
-      try {
-        const data = await dashboardService.getManagerSummary();
-        setSummary(data);
-      } catch (error) {
-        notifyError('Failed to fetch dashboard summary');
-      }
-    };
-    fetchSummary();
-=======
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -268,7 +251,6 @@ const WarehouseManagerDashboard = ({ user }) => {
       }
     };
     fetchData();
->>>>>>> bfea083027191f1ba39e44601454fe317a16f51a
   }, [notifyError]);
 
   const handleClearance = (lotId) => {
@@ -299,20 +281,6 @@ const WarehouseManagerDashboard = ({ user }) => {
           </div>
         </div>
         <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
-<<<<<<< HEAD
-          <p className="text-xs text-on-surface-variant">Pending Pick Lists</p>
-          <h3 className="text-2xl font-bold text-primary">{summary ? summary.pendingPickLists : '...'}</h3>
-          <p className="text-[11px] text-on-surface-variant font-bold mt-2">Active picking tasks</p>
-        </div>
-        <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
-          <p className="text-xs text-on-surface-variant">Pending Sales Orders</p>
-          <h3 className="text-2xl font-bold text-primary">{summary ? summary.pendingSalesOrders : '...'}</h3>
-          <p className="text-[11px] text-primary font-bold mt-2">Needs review</p>
-        </div>
-        <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
-          <p className="text-xs text-on-surface-variant">Near Expiry (&lt;30d)</p>
-          <h3 className="text-2xl font-bold text-red-600">{summary ? summary.nearExpiryBatches?.length || 0 : '...'}</h3>
-=======
           <p className="text-xs text-on-surface-variant">Pending Tasks</p>
           <h3 className="text-2xl font-bold text-primary">{data?.pendingTasks || 0}</h3>
         </div>
@@ -323,7 +291,6 @@ const WarehouseManagerDashboard = ({ user }) => {
         <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
           <p className="text-xs text-on-surface-variant">Near Expiry (&lt;30d)</p>
           <h3 className="text-2xl font-bold text-red-600">{data?.nearExpiryCount || 0}</h3>
->>>>>>> bfea083027191f1ba39e44601454fe317a16f51a
           <p onClick={() => navigate('/expiry-tracking')} className="text-[11px] text-red-600 font-bold underline mt-2 cursor-pointer">
             View critical lots
           </p>
@@ -427,40 +394,16 @@ const WarehouseManagerDashboard = ({ user }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant text-xs">
-<<<<<<< HEAD
-                {summary && summary.nearExpiryBatches && summary.nearExpiryBatches.length > 0 ? (
-                  summary.nearExpiryBatches.map((batch) => (
-                    <tr key={batch.id} className="hover:bg-surface-container-low transition-colors">
-                      <td className="px-4 py-3 font-mono font-bold text-primary">{batch.lotId}</td>
-                      <td className="px-4 py-3 font-semibold text-on-surface">Product {batch.productId.substring(0,8)}</td>
-                      <td className="px-4 py-3 text-red-600 font-bold">{new Date(batch.expiryDate).toISOString().split('T')[0]}</td>
-                      <td className="px-4 py-3">--</td>
-                      <td className="px-4 py-3 font-mono">--</td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => handleClearance(batch.lotId)}
-                          className="px-3 py-1 bg-primary/10 text-primary rounded font-bold hover:bg-primary/20 transition-colors whitespace-nowrap cursor-pointer"
-                        >
-                          Mark for Clearance
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="6" className="px-4 py-6 text-center text-on-surface-variant font-medium">
-                      No expiring lots found.
-=======
                 {data?.expiringLots?.map((lot) => (
                   <tr key={lot.id} className="hover:bg-surface-container-low transition-colors">
-                    <td className="px-4 py-3 font-mono font-bold text-primary">{lot.batchNumber}</td>
+                    <td className="px-4 py-3 font-mono font-bold text-primary">{lot.batchNumber || lot.lotId}</td>
                     <td className="px-4 py-3 font-semibold text-on-surface">{lot.product?.name || 'Unknown'}</td>
                     <td className="px-4 py-3 text-red-600 font-bold">{new Date(lot.expiryDate).toLocaleDateString()}</td>
-                    <td className="px-4 py-3">{lot.quantity} Units</td>
+                    <td className="px-4 py-3">{lot.quantity || '--'} Units</td>
                     <td className="px-4 py-3 font-mono">N/A</td>
                     <td className="px-4 py-3 text-right">
                       <button
-                        onClick={() => handleClearance(lot.batchNumber)}
+                        onClick={() => handleClearance(lot.batchNumber || lot.lotId)}
                         className="px-3 py-1 bg-primary/10 text-primary rounded font-bold hover:bg-primary/20 transition-colors whitespace-nowrap cursor-pointer"
                       >
                         Mark for Clearance
@@ -472,7 +415,6 @@ const WarehouseManagerDashboard = ({ user }) => {
                   <tr>
                     <td colSpan="6" className="px-4 py-6 text-center text-sm text-on-surface-variant">
                       No lots expiring soon.
->>>>>>> bfea083027191f1ba39e44601454fe317a16f51a
                     </td>
                   </tr>
                 )}

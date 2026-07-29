@@ -9,7 +9,10 @@ const warehouseRoutes = require('./modules/warehouse');
 const clientRoutes = require('./modules/client');
 const dashboardRoutes = require('./modules/dashboard');
 
-// Module routes will be mounted here
+const v1Routes = require('./routes/v1');
+
+// Module routes mounted here
+router.use('/v1', v1Routes);
 router.use('/', superAdminRoutes);
 router.use('/', warehouseRoutes);
 router.use('/client', clientRoutes);

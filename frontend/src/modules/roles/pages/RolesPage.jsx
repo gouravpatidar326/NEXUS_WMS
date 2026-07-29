@@ -1,127 +1,213 @@
-import { useState } from 'react';
-import { Check, Lock, Pencil, Save } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Check, Lock, Pencil, Save, Shield } from 'lucide-react';
 import PageHeader from '@/components/navigation/PageHeader';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
-import { ROLES, ROLE_LABELS, ROLE_COLORS } from '@/permissions/roles';
-import { ROLE_PERMISSIONS } from '@/permissions/rolePermissions';
+import LoadingState from '@/components/feedback/LoadingState';
+import { roleService } from '@/services/roleService';
 import { PERMISSIONS } from '@/permissions/permissions';
+import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 
 export const RolesPage = () => {
-  const [selectedRole, setSelectedRole] = useState(ROLES.SUPER_ADMIN);
-  const { notifySuccess } = useNotification();
+  const { syncPermissionsFromApi } = useAuth();
+  const { notifySuccess, notifyError } = useNotification();
+
+  const [roles, setRoles] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [selectedRoleKey, setSelectedRoleKey] = useState('SUPER_ADMIN');
   const [isEditing, setIsEditing] = useState(false);
-  const [permissionState, setPermissionState] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('wms_role_permissions') || 'null');
-      if (saved) Object.keys(saved).forEach((role) => { ROLE_PERMISSIONS[role] = saved[role]; });
-    } catch { /* use defaults */ }
-    return Object.fromEntries(Object.entries(ROLE_PERMISSIONS).map(([role, grants]) => [role, [...grants]]));
-  });
+  const [activePermissions, setActivePermissions] = useState([]);
 
   const permissionCategories = [
-    { title: 'Products & Inventory', perms: [PERMISSIONS.PRODUCTS_VIEW, PERMISSIONS.PRODUCTS_CREATE, PERMISSIONS.PRODUCTS_EDIT, PERMISSIONS.PRODUCTS_DELETE, PERMISSIONS.INVENTORY_VIEW, PERMISSIONS.INVENTORY_ADJUST] },
-    { title: 'Order Operations', perms: [PERMISSIONS.PO_VIEW, PERMISSIONS.PO_CREATE, PERMISSIONS.PO_APPROVE, PERMISSIONS.TO_VIEW, PERMISSIONS.TO_EXECUTE, PERMISSIONS.SO_VIEW, PERMISSIONS.SO_PICK] },
-    { title: 'System Administration', perms: [PERMISSIONS.USERS_VIEW, PERMISSIONS.USERS_CREATE, PERMISSIONS.ROLES_VIEW, PERMISSIONS.ROLES_MANAGE, PERMISSIONS.AUDIT_VIEW, PERMISSIONS.SETTINGS_MANAGE] },
+    {
+      title: 'Products & Inventory',
+      perms: [
+        PERMISSIONS.PRODUCTS_VIEW,
+        PERMISSIONS.PRODUCTS_CREATE,
+        PERMISSIONS.PRODUCTS_EDIT,
+        PERMISSIONS.PRODUCTS_DELETE,
+        PERMISSIONS.INVENTORY_VIEW,
+        PERMISSIONS.INVENTORY_ADJUST,
+        PERMISSIONS.BATCH_VIEW,
+        PERMISSIONS.EXPIRY_VIEW,
+      ],
+    },
+    {
+      title: 'Order Operations & Logistics',
+      perms: [
+        PERMISSIONS.PO_VIEW,
+        PERMISSIONS.PO_CREATE,
+        PERMISSIONS.PO_APPROVE,
+        PERMISSIONS.TO_VIEW,
+        PERMISSIONS.TO_EXECUTE,
+        PERMISSIONS.SO_VIEW,
+        PERMISSIONS.SO_PICK,
+      ],
+    },
+    {
+      title: 'Physical Warehouse Operations',
+      perms: [
+        PERMISSIONS.WAREHOUSE_VIEW,
+        PERMISSIONS.BARCODE_VIEW,
+        PERMISSIONS.SHIPPING_VIEW,
+        PERMISSIONS.CLIENT_PORTAL_VIEW,
+        PERMISSIONS.REPORTS_VIEW,
+      ],
+    },
+    {
+      title: 'System Administration & RBAC',
+      perms: [
+        PERMISSIONS.USERS_VIEW,
+        PERMISSIONS.USERS_CREATE,
+        PERMISSIONS.ROLES_VIEW,
+        PERMISSIONS.ROLES_MANAGE,
+        PERMISSIONS.AUDIT_VIEW,
+        PERMISSIONS.SETTINGS_MANAGE,
+      ],
+    },
   ];
 
-  const activeGrants = permissionState[selectedRole] || [];
-  const togglePermission = (permission) => {
-    if (!isEditing || selectedRole === ROLES.SUPER_ADMIN) return;
-    setPermissionState((current) => ({
-      ...current,
-      [selectedRole]: current[selectedRole].includes(permission)
-        ? current[selectedRole].filter((item) => item !== permission)
-        : [...current[selectedRole], permission],
-    }));
+  const fetchRolesData = async () => {
+    try {
+      setLoading(true);
+      const data = await roleService.getRoles();
+      const rolesList = Array.isArray(data) ? data : [];
+      setRoles(rolesList);
+
+      const activeRole = rolesList.find((r) => r.key === selectedRoleKey) || rolesList[0];
+      if (activeRole) {
+        setSelectedRoleKey(activeRole.key);
+        setActivePermissions(activeRole.permissions || []);
+      }
+    } catch {
+      notifyError('Failed to fetch role permissions matrix');
+    } finally {
+      setLoading(false);
+    }
   };
-  const savePermissions = () => {
-    Object.keys(permissionState).forEach((role) => { ROLE_PERMISSIONS[role] = [...permissionState[role]]; });
-    localStorage.setItem('wms_role_permissions', JSON.stringify(permissionState));
+
+  useEffect(() => {
+    fetchRolesData();
+  }, []);
+
+  const handleSelectRole = (roleItem) => {
+    setSelectedRoleKey(roleItem.key);
+    setActivePermissions(roleItem.permissions || []);
     setIsEditing(false);
-    notifySuccess(`${ROLE_LABELS[selectedRole]} permissions saved and applied.`);
   };
+
+  const togglePermission = (permKey) => {
+    if (!isEditing || selectedRoleKey === 'SUPER_ADMIN') return;
+    setActivePermissions((current) =>
+      current.includes(permKey) ? current.filter((p) => p !== permKey) : [...current, permKey]
+    );
+  };
+
+  const savePermissions = async () => {
+    try {
+      await roleService.updateRolePermissions(selectedRoleKey, activePermissions);
+      if (syncPermissionsFromApi) await syncPermissionsFromApi();
+      notifySuccess(`Permissions for ${selectedRoleKey} saved to database.`);
+      setIsEditing(false);
+      fetchRolesData();
+    } catch (err) {
+      notifyError(err.message || 'Failed to save permissions');
+    }
+  };
+
+  if (loading) return <LoadingState message="Loading RBAC Roles & Permission Matrix from backend..." />;
+
+  const currentRoleObj = roles.find((r) => r.key === selectedRoleKey) || { label: selectedRoleKey, color: 'primary' };
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Roles & Permission Matrix (RBAC)"
-        description="Configure granular permission assignments for each system role"
+        description="Configure granular permission assignments for each system role connected to backend database"
         breadcrumbs={[{ label: 'Administration' }, { label: 'Roles & Permissions' }]}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* Role Selector List */}
-        <div className="card p-3 space-y-2">
-          <h3 className="px-3 text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">
-            Select Role to Inspect
+        <div className="card p-4 space-y-3 bg-white border border-outline-variant rounded-xl shadow-sm">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+            Select System Role
           </h3>
-          {Object.keys(ROLE_LABELS).map((roleKey) => (
+          {roles.map((roleItem) => (
             <button
-              key={roleKey}
-              onClick={() => setSelectedRole(roleKey)}
-              className={`w-full p-3 rounded-xl text-left transition flex items-center justify-between ${
-                selectedRole === roleKey
-                  ? 'bg-primary-50 dark:bg-primary-950/40 border border-primary-300 dark:border-primary-800'
-                  : 'hover:bg-surface-100 dark:hover:bg-surface-800'
+              key={roleItem.key}
+              onClick={() => handleSelectRole(roleItem)}
+              className={`w-full p-3 rounded-xl text-left transition flex items-center justify-between border ${
+                selectedRoleKey === roleItem.key
+                  ? 'bg-blue-50 border-blue-500 text-blue-900 font-bold'
+                  : 'bg-surface-container-low border-transparent hover:bg-slate-100 text-slate-700'
               }`}
             >
               <div>
-                <span className="block text-sm font-bold text-surface-900 dark:text-white">
-                  {ROLE_LABELS[roleKey]}
-                </span>
-                <span className="text-[11px] text-surface-500">
-                  {permissionState[roleKey].length} Active Grants
+                <span className="block text-sm font-bold">{roleItem.label}</span>
+                <span className="text-[11px] text-slate-500">
+                  {roleItem.permissions?.length || 0} Active Grants
                 </span>
               </div>
-              <Badge variant={ROLE_COLORS[roleKey]}>RBAC</Badge>
+              <Badge variant={roleItem.color || 'primary'}>RBAC</Badge>
             </button>
           ))}
         </div>
 
         {/* Matrix Grid */}
-        <div className="card space-y-4 p-4 sm:space-y-6 sm:p-6 md:col-span-3">
-          <div className="flex flex-col gap-3 border-b border-surface-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="card space-y-6 p-6 md:col-span-3 bg-white border border-outline-variant rounded-xl shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-lg font-bold text-surface-900 dark:text-white">
-                Permission Grants for: {ROLE_LABELS[selectedRole]}
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Shield className="w-5 h-5 text-primary" />
+                Permission Grants for: {currentRoleObj.label}
               </h3>
-              <p className="text-xs text-surface-500">
+              <p className="text-xs text-slate-500">
                 Green checkmarks represent granted permissions for this role context.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant={ROLE_COLORS[selectedRole]}>{activeGrants.length} grants</Badge>
-              {selectedRole !== ROLES.SUPER_ADMIN && (isEditing ? <Button size="sm" leftIcon={Save} onClick={savePermissions}>Save changes</Button> : <Button size="sm" variant="outline" leftIcon={Pencil} onClick={() => setIsEditing(true)}>Edit permissions</Button>)}
+            <div className="flex items-center gap-3">
+              <Badge variant={currentRoleObj.color || 'primary'}>{activePermissions.length} Active Grants</Badge>
+              {selectedRoleKey !== 'SUPER_ADMIN' && (
+                isEditing ? (
+                  <Button size="sm" variant="primary" leftIcon={Save} onClick={savePermissions}>
+                    Save Changes
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" leftIcon={Pencil} onClick={() => setIsEditing(true)}>
+                    Edit Permissions
+                  </Button>
+                )
+              )}
             </div>
           </div>
 
           <div className="space-y-6">
-            {permissionCategories.map((cat, idx) => (
-              <div key={idx} className="space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-primary-600 dark:text-primary-400">
-                  {cat.title}
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {cat.perms.map((pKey) => {
-                    const isGranted = activeGrants.includes(pKey);
+            {permissionCategories.map((cat) => (
+              <div key={cat.title} className="space-y-3">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">{cat.title}</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {cat.perms.map((permKey) => {
+                    const isGranted = activePermissions.includes(permKey);
                     return (
                       <button
+                        key={permKey}
                         type="button"
-                        key={pKey}
-                        onClick={() => togglePermission(pKey)}
-                        className={`p-3 rounded-lg border flex items-center justify-between text-xs ${
+                        onClick={() => togglePermission(permKey)}
+                        disabled={!isEditing || selectedRoleKey === 'SUPER_ADMIN'}
+                        className={`p-3 rounded-lg border text-left text-xs font-semibold flex items-center justify-between transition ${
                           isGranted
-                            ? 'bg-success-50/50 dark:bg-success-950/20 border-success-200 dark:border-success-800 text-surface-900 dark:text-surface-100 font-medium'
-                            : 'bg-surface-50 dark:bg-surface-800/30 border-surface-200 dark:border-surface-700 text-surface-400 opacity-60'
-                        } ${isEditing && selectedRole !== ROLES.SUPER_ADMIN ? 'cursor-pointer hover:border-primary-400 hover:shadow-sm' : 'cursor-default'}`}
+                            ? 'bg-green-50 border-green-300 text-green-900'
+                            : 'bg-slate-50 border-slate-200 text-slate-400'
+                        } ${isEditing && selectedRoleKey !== 'SUPER_ADMIN' ? 'cursor-pointer hover:border-green-500' : 'cursor-default'}`}
                       >
-                        <span className="font-mono">{pKey}</span>
+                        <span className="font-mono">{permKey}</span>
                         {isGranted ? (
-                          <Check className="h-4 w-4 text-success-600 shrink-0" />
+                          <Check className="w-4 h-4 text-green-600 shrink-0" />
                         ) : (
-                          <Lock className="h-3.5 w-3.5 text-surface-400 shrink-0" />
+                          <Lock className="w-3.5 h-3.5 text-slate-300 shrink-0" />
                         )}
                       </button>
                     );
