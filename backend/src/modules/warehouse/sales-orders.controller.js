@@ -4,7 +4,7 @@ const NotificationService = require('../../utils/notification.service');
 const getSalesOrders = async (req, res) => {
   try {
     const orders = await prisma.salesOrder.findMany({
-      where: { companyId: req.user.companyId },
+      where: { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) },
       include: {
         items: { include: { product: true } },
         client: { select: { name: true, tier: true } }
@@ -23,7 +23,7 @@ const approveSalesOrder = async (req, res) => {
     const { id } = req.params;
 
     const order = await prisma.salesOrder.findFirst({
-      where: { id, companyId: req.user.companyId },
+      where: { id, ...(req.user.companyId ? { companyId: req.user.companyId } : {}) },
       include: { items: true }
     });
 
@@ -77,7 +77,7 @@ const approveSalesOrder = async (req, res) => {
       await tx.pickList.create({
         data: {
           orderId: order.id,
-          companyId: req.user.companyId,
+          companyId: order.companyId,
           status: 'PENDING',
           items: {
             create: pickListItems
@@ -104,7 +104,7 @@ const approveSalesOrder = async (req, res) => {
     await NotificationService.send({
       title: 'Order Approved',
       message: `Your order (${order.id}) has been approved and is now being picked.`,
-      companyId: req.user.companyId
+      companyId: order.companyId
     });
 
     res.json({ id, status: 'PICKING' });
@@ -127,7 +127,7 @@ const rejectSalesOrder = async (req, res) => {
     }
 
     const order = await prisma.salesOrder.findFirst({
-      where: { id, companyId: req.user.companyId }
+      where: { id, ...(req.user.companyId ? { companyId: req.user.companyId } : {}) }
     });
 
     if (!order) {
@@ -155,7 +155,7 @@ const rejectSalesOrder = async (req, res) => {
     await NotificationService.send({
       title: 'Order Rejected',
       message: `Your order (${order.id}) was rejected. Reason: ${reason}`,
-      companyId: req.user.companyId
+      companyId: order.companyId
     });
 
     res.json({ id, status: 'REJECTED' });
@@ -195,7 +195,7 @@ const createSalesOrder = async (req, res) => {
       data: {
         orderNumber,
         clientId,
-        companyId: req.user.companyId,
+        companyId: req.user.companyId || clientId.companyId || null, // Best effort for super admin
         priority: priority || 'NORMAL',
         shippingAddress,
         poNumber,

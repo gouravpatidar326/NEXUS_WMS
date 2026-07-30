@@ -10,7 +10,7 @@ class BarcodeRepository {
 
   async findByCode(code, companyId) {
     return await prisma.barcode.findFirst({
-      where: { code, companyId },
+      where: { code, ...(companyId ? { companyId } : {}) },
       include: {
         product: true,
         batch: {
