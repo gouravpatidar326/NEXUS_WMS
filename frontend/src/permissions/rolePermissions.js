@@ -3,8 +3,15 @@ import { PERMISSIONS } from './permissions';
 
 const ALL_PERMISSIONS = Object.values(PERMISSIONS);
 
-// Super Admin gets all permissions
-const SUPER_ADMIN_PERMISSIONS = ALL_PERMISSIONS;
+// Super Admin — system oversight, view-only for operational actions like PO creation.
+// Super Admin oversees but does not transact. Warehouse Managers create POs.
+const SUPER_ADMIN_PERMISSIONS = ALL_PERMISSIONS.filter(
+  (p) => ![
+    PERMISSIONS.PO_CREATE,
+    PERMISSIONS.PO_EDIT,
+    PERMISSIONS.PO_RECEIVE,
+  ].includes(p)
+);
 
 // Warehouse Manager — full operational access, no system settings or user management
 const WAREHOUSE_MANAGER_PERMISSIONS = [

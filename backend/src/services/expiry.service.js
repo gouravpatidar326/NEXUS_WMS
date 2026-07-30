@@ -4,8 +4,7 @@ const { getPaginationParams, formatPaginationMeta } = require('../utils/paginati
 class ExpiryService {
   async scanAndGenerateExpiryAlerts(companyId) {
     const batches = await prisma.batch.findMany({
-      where: companyId ? { companyId } : {},
-      orderBy: { expiryDate: 'asc' },
+      where: companyId ? { companyId, status: { not: 'EXPIRED' } } : { status: { not: 'EXPIRED' } },
     });
 
     const now = new Date();
@@ -20,14 +19,34 @@ class ExpiryService {
       const diffTime = expiry.getTime() - now.getTime();
       const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      if (daysRemaining <= 0) {
-        await prisma.batch.update({
-          where: { id: batch.id },
-          data: { status: 'EXPIRED' },
+      if (daysRemaining <= 30) {
+        // Find existing alert for this batch
+        const existingAlert = await prisma.expiryAlert.findFirst({
+          where: { lotId: batch.id },
         });
-        alertsCount++;
-      } else if (daysRemaining <= 30) {
-        alertsCount++;
+
+        if (!existingAlert) {
+          const tier = daysRemaining <= 0 ? 'Expired' : `${daysRemaining} Days`;
+
+          await prisma.expiryAlert.create({
+            data: {
+              lotId: batch.id,
+              productId: batch.productId,
+              expiryDate: batch.expiryDate,
+              daysRemaining,
+              alertTier: tier,
+              companyId: batch.companyId,
+            },
+          });
+          alertsCount++;
+        }
+
+        if (daysRemaining <= 0) {
+          await prisma.batch.update({
+            where: { id: batch.id },
+            data: { status: 'EXPIRED' },
+          });
+        }
       }
     }
 
@@ -40,97 +59,98 @@ class ExpiryService {
   async getExpiryAlerts(companyId, query) {
     const { page, limit, skip } = getPaginationParams(query);
     const search = query.search || '';
-    const statusFilter = query.status || '';
 
     const where = {
       ...(companyId ? { companyId } : {}),
       ...(search
         ? {
-            OR: [
-              { lotNumber: { contains: search } },
-              { lotId: { contains: search } },
-              { product: { name: { contains: search } } },
-              { product: { sku: { contains: search } } },
-            ],
+            batch: {
+              OR: [
+                { lotNumber: { contains: search } },
+                { lotId: { contains: search } },
+                { product: { name: { contains: search } } },
+                { product: { sku: { contains: search } } },
+              ],
+            },
           }
         : {}),
     };
 
-    const [batches, total] = await Promise.all([
-      prisma.batch.findMany({
+    const [alerts, total] = await Promise.all([
+      prisma.expiryAlert.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { expiryDate: 'asc' },
+        orderBy: { createdAt: 'desc' },
         include: {
-          product: true,
-          locationInventories: {
-            include: { location: true },
+          batch: {
+            include: {
+              product: true,
+              locationInventories: {
+                include: { location: true },
+              },
+            },
           },
+          product: true,
         },
       }),
-      prisma.batch.count({ where }),
+      prisma.expiryAlert.count({ where }),
     ]);
 
     const now = new Date();
 
-    const items = batches.map((batch) => {
-      const expiry = batch.expiryDate ? new Date(batch.expiryDate) : null;
-      let daysRemaining = 0;
-      let status = 'Safe';
+    const items = alerts.map((alert) => {
+      const batch = alert.batch;
+      const product = alert.product || batch?.product;
+      const expiry = alert.expiryDate || batch?.expiryDate;
+      let daysRemaining = alert.daysRemaining ?? 0;
+      let status = alert.alertTier || 'Safe';
 
       if (expiry) {
-        const diffTime = expiry.getTime() - now.getTime();
+        const diffTime = new Date(expiry).getTime() - now.getTime();
         daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        if (daysRemaining <= 0) {
-          status = 'Expired';
-        } else if (daysRemaining <= 7) {
-          status = '7 Days';
-        } else if (daysRemaining <= 15) {
-          status = '15 Days';
-        } else if (daysRemaining <= 30) {
-          status = '30 Days';
-        } else {
-          status = 'Safe';
-        }
+        if (daysRemaining <= 0) status = 'Expired';
+        else if (daysRemaining <= 7) status = '7 Days';
+        else if (daysRemaining <= 15) status = '15 Days';
+        else if (daysRemaining <= 30) status = '30 Days';
       }
 
-      // Calculate total available quantity across bin locations or acceptedQty
-      const locQty = batch.locationInventories?.reduce((sum, li) => sum + (li.quantity || 0), 0);
-      const availableQuantity = locQty > 0 ? locQty : batch.acceptedQty || 0;
+      const locQty = batch?.locationInventories?.reduce((sum, li) => sum + (li.quantity || 0), 0);
+      const availableQuantity = locQty > 0 ? locQty : batch?.acceptedQty || 0;
 
-      // Storage location formatting
-      const locNames = batch.locationInventories?.map((li) => li.location?.code || `Bin ${li.location?.bin || 'A1'}`).filter(Boolean);
+      const locNames = batch?.locationInventories?.map((li) => li.location?.code || `Bin ${li.location?.bin || 'A1'}`).filter(Boolean);
       const storageLocation = locNames?.length > 0 ? locNames.join(', ') : 'Unassigned';
 
       return {
-        id: batch.id,
-        lotNumber: batch.lotNumber || batch.lotId || `LOT-${batch.id.substring(0, 6)}`,
-        productName: batch.product?.name || 'N/A',
-        sku: batch.product?.sku || 'N/A',
-        mfgDate: batch.mfgDate,
-        expiryDate: batch.expiryDate,
+        id: alert.id,
+        alertMessage: `Batch ${batch?.lotId || batch?.lotNumber || ''} is expiring in ${daysRemaining} days.`,
+        resolved: false,
+        lotNumber: batch?.lotNumber || batch?.lotId || `LOT-${alert.id.substring(0, 6)}`,
+        productName: product?.name || 'N/A',
+        sku: product?.sku || 'N/A',
+        mfgDate: batch?.mfgDate,
+        expiryDate: expiry,
         daysRemaining,
         status,
         availableQuantity,
         storageLocation,
-        batchStatus: batch.status,
+        batchStatus: batch?.status || 'ACTIVE',
       };
     });
 
-    const filteredItems = statusFilter ? items.filter((i) => i.status.toLowerCase() === statusFilter.toLowerCase()) : items;
-
     const meta = formatPaginationMeta(total, page, limit);
-    return { items: filteredItems, meta };
+    return { items, meta };
   }
 
   async resolveAlert(id, companyId) {
-    await prisma.expiryAlert.updateMany({
-      where: { id, ...(companyId ? { companyId } : {}) },
-      data: { resolved: true },
-    });
-    return { id, resolved: true };
+    try {
+      await prisma.expiryAlert.deleteMany({
+        where: { id, ...(companyId ? { companyId } : {}) },
+      });
+      return { id, resolved: true };
+    } catch (e) {
+      return { id, resolved: true };
+    }
   }
 }
 

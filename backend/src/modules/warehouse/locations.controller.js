@@ -16,7 +16,7 @@ const getLocations = async (req, res) => {
 const createLocation = async (req, res) => {
   try {
     const { companyId } = req.user;
-    const { zone, aisle, rack, shelf, maxCapacity } = req.body;
+    const { warehouse, zone, aisle, rack, shelf, bin, capacityType, maxCapacity } = req.body;
 
     if (!zone || !aisle || !rack || !shelf || maxCapacity === undefined) {
       return res.status(400).json({ message: 'Missing required fields' });
@@ -25,10 +25,13 @@ const createLocation = async (req, res) => {
     const location = await prisma.$transaction(async (tx) => {
       const newLoc = await tx.location.create({
         data: {
+          warehouse: warehouse || 'Main Warehouse',
           zone,
           aisle,
           rack,
           shelf,
+          bin,
+          capacityType: capacityType || 'Items',
           maxCapacity: parseInt(maxCapacity, 10),
           companyId
         }
@@ -52,7 +55,50 @@ const createLocation = async (req, res) => {
   }
 };
 
+const updateLocation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { warehouse, zone, aisle, rack, shelf, bin, capacityType, maxCapacity } = req.body;
+
+    const location = await prisma.location.update({
+      where: { id, companyId: req.user.companyId },
+      data: {
+        warehouse,
+        zone,
+        aisle,
+        rack,
+        shelf,
+        bin,
+        capacityType,
+        maxCapacity: parseInt(maxCapacity, 10)
+      }
+    });
+
+    res.json(location);
+  } catch (error) {
+    console.error('Error updating location:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+const deleteLocation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await prisma.location.delete({
+      where: { id, companyId: req.user.companyId }
+    });
+
+    res.json({ message: 'Location deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting location:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 module.exports = {
   getLocations,
-  createLocation
+  createLocation,
+  updateLocation,
+  deleteLocation
 };

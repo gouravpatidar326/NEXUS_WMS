@@ -16,4 +16,20 @@ export const warehouseService = {
   async completePick(id, payload) {
     return await api.post(`/pick-lists/${id}/pick`, payload);
   },
+
+  async getWarehouses() {
+    return await api.get('/warehouses');
+  },
+
+  async createWarehouse(data) {
+    return await api.post('/warehouses', data);
+  },
+
+  async updateWarehouse(id, data) {
+    return await api.put(`/warehouses/${id}`, data);
+  },
+
+  async deleteWarehouse(id) {
+    return await api.delete(`/warehouses/${id}`);
+  },
 };

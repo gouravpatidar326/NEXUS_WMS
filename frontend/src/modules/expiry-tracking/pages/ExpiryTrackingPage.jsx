@@ -66,9 +66,24 @@ export const ExpiryTrackingPage = () => {
       (item.sku || '').toLowerCase().includes(search.toLowerCase()) ||
       (item.lotNumber || '').toLowerCase().includes(search.toLowerCase());
 
-    const matchesStatus = !statusFilter || (item.status || '').toLowerCase() === statusFilter.toLowerCase();
+    let matchesStatus = true;
+    if (statusFilter === 'Resolved') {
+      matchesStatus = item.resolved === true;
+    } else if (statusFilter) {
+      matchesStatus = !item.resolved && (item.status || '').toLowerCase() === statusFilter.toLowerCase();
+    }
     return matchesSearch && matchesStatus;
   });
+
+  const handleResolveAlert = async (id) => {
+    try {
+      await api.patch(`/v1/expiry/alerts/${id}/resolve`);
+      notifySuccess('Expiry alert resolved successfully');
+      fetchAlerts();
+    } catch (err) {
+      notifyError('Failed to resolve alert');
+    }
+  };
 
   const columns = [
     {
@@ -134,14 +149,43 @@ export const ExpiryTrackingPage = () => {
       },
     },
     {
+      header: 'Alert Message',
+      accessor: 'alertMessage',
+      cell: (row) => (
+        <span className="text-xs text-slate-700 max-w-[200px] truncate block" title={row.alertMessage}>
+          {row.alertMessage || 'N/A'}
+        </span>
+      ),
+    },
+    {
       header: 'Available Qty',
       accessor: 'availableQuantity',
-      cell: (row) => <span className="font-bold text-slate-800">{row.availableQuantity ?? row.acceptedQty ?? 0} Units</span>,
+      cell: (row) => <span className="font-bold text-slate-800">{row.availableQuantity ?? 0} Units</span>,
     },
     {
       header: 'Storage Location',
       accessor: 'storageLocation',
       cell: (row) => <span className="font-mono text-xs text-slate-600">{row.storageLocation || 'Unassigned'}</span>,
+    },
+    {
+      header: 'Resolution',
+      accessor: 'resolved',
+      cell: (row) => (
+        <div className="flex items-center gap-2">
+          {row.resolved ? (
+            <span className="px-2 py-1 bg-green-100 text-green-800 text-[10px] font-bold rounded flex items-center gap-1">
+              <span className="material-symbols-outlined text-[14px]">done_all</span> Resolved
+            </span>
+          ) : (
+            <button
+              onClick={() => handleResolveAlert(row.id)}
+              className="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 text-[10px] font-bold rounded transition-colors"
+            >
+              Resolve Alert
+            </button>
+          )}
+        </div>
+      ),
     },
   ];
 
@@ -182,12 +226,12 @@ export const ExpiryTrackingPage = () => {
           onChange={(e) => setStatusFilter(e.target.value)}
           className="px-3 py-1.5 text-xs border border-outline-variant rounded-lg focus:outline-none focus:border-primary"
         >
-          <option value="">All Expiry Statuses</option>
-          <option value="Safe">Safe</option>
-          <option value="30 Days">30 Days</option>
-          <option value="15 Days">15 Days</option>
-          <option value="7 Days">7 Days</option>
+          <option value="">All Pending Alerts</option>
+          <option value="30 Days">30 Days Remaining</option>
+          <option value="15 Days">15 Days Remaining</option>
+          <option value="7 Days">7 Days Remaining</option>
           <option value="Expired">Expired</option>
+          <option value="Resolved">Resolved Alerts</option>
         </select>
       </div>
 

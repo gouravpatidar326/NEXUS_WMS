@@ -89,8 +89,8 @@ export const InventoryListPage = () => {
 
   const handleAdjustSubmit = async (e) => {
     e.preventDefault();
-    if (!productId || !lotId || !locationId || !quantityDelta) {
-      notifyError('Product, Lot, Location, and Quantity Delta are required');
+    if (!productId || !locationId || !quantityDelta) {
+      notifyError('Product, Location, and Quantity Delta are required');
       return;
     }
 
@@ -143,18 +143,50 @@ export const InventoryListPage = () => {
       ),
     },
     {
-      header: 'Lot / Batch Number',
-      accessor: 'batch',
+      header: 'Tracking Info',
+      accessor: 'tracking',
       cell: (row) => (
-        <span className="font-mono text-xs font-bold text-slate-700">
-          {row.batch?.lotNumber || row.batch?.lotId || row.lotId}
-        </span>
+        <div className="flex flex-col gap-0.5">
+          {row.serialNumber && (
+            <span className="text-[11px] font-mono font-semibold text-slate-800">
+              SN: {row.serialNumber}
+            </span>
+          )}
+          {row.batchNumber && (
+            <span className="text-[10px] font-mono text-slate-600">
+              Batch: {row.batchNumber}
+            </span>
+          )}
+          {(row.batch?.lotNumber || row.batch?.lotId || row.lotId) && !row.batchNumber && (
+            <span className="text-[10px] font-mono text-slate-600">
+              Lot: {row.batch?.lotNumber || row.batch?.lotId || row.lotId}
+            </span>
+          )}
+          {!row.serialNumber && !row.batchNumber && !row.lotId && (
+            <span className="text-[10px] italic text-slate-400">General</span>
+          )}
+        </div>
       ),
     },
     {
-      header: 'Bin Stock Quantity',
+      header: 'Stock Status',
       accessor: 'quantity',
-      cell: (row) => <span className="font-bold text-base text-primary">{row.quantity} Units</span>,
+      cell: (row) => (
+        <div className="flex flex-col text-sm">
+          <div className="flex justify-between w-32 border-b border-slate-100 pb-0.5 mb-0.5">
+            <span className="text-slate-500">Available:</span>
+            <span className="font-bold text-green-600">{row.available}</span>
+          </div>
+          <div className="flex justify-between w-32 border-b border-slate-100 pb-0.5 mb-0.5">
+            <span className="text-slate-500">Reserved:</span>
+            <span className="font-bold text-amber-600">{row.reserved}</span>
+          </div>
+          <div className="flex justify-between w-32">
+            <span className="text-slate-500 text-xs">Total:</span>
+            <span className="font-bold text-slate-800 text-xs">{row.quantity}</span>
+          </div>
+        </div>
+      ),
     },
     {
       header: 'Last Updated',
@@ -316,7 +348,12 @@ export const InventoryListPage = () => {
             <Select
               value={locationId}
               onChange={(e) => setLocationId(e.target.value)}
-              options={locations.map((l) => ({ value: l.id, label: `Zone ${l.zone} - Bin ${l.bin} (${l.code})` }))}
+              placeholder="Select Storage Bin..."
+              options={locations.map((l) => ({ 
+                value: l.id, 
+                label: l.code ? `${l.code} (Zone ${l.zone} - Bin ${l.bin})` : `Zone ${l.zone} - Bin ${l.bin}` 
+              }))}
+              required
             />
           </FormField>
 
@@ -325,14 +362,20 @@ export const InventoryListPage = () => {
               <Select
                 value={productId}
                 onChange={(e) => setProductId(e.target.value)}
+                placeholder="Select Product..."
                 options={products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))}
+                required
               />
             </FormField>
-            <FormField label="Batch / Lot ID" required>
+            <FormField label="Batch / Lot ID">
               <Select
                 value={lotId}
                 onChange={(e) => setLotId(e.target.value)}
-                options={batches.map((b) => ({ value: b.id, label: `Lot ${b.lotId}` }))}
+                placeholder="General / No Batch Tracking"
+                options={batches.map((b) => ({ 
+                  value: b.id, 
+                  label: b.batchNumber ? `Batch: ${b.batchNumber}` : `Lot: ${b.lotNumber || b.lotId}` 
+                }))}
               />
             </FormField>
           </div>

@@ -3,6 +3,7 @@ import { ROLES } from '@/permissions/roles';
 export const SUPER_ADMIN_ITEMS = [
   { id: 'dashboard', title: 'Dashboard', path: '/dashboard', iconName: 'dashboard' },
   { id: 'companies', title: 'Companies', path: '/companies', iconName: 'corporate_fare' },
+  { id: 'facilities', title: 'Facilities (Warehouses)', path: '/facilities', iconName: 'factory' },
   { id: 'warehouses', title: 'Warehouse Operations', path: '/warehouse-ops', iconName: 'warehouse' },
   { id: 'products', title: 'Products Catalog', path: '/products', iconName: 'inventory_2' },
   { id: 'inventory', title: 'Inventory Stock', path: '/inventory', iconName: 'inventory' },
@@ -27,6 +28,7 @@ export const WAREHOUSE_MANAGER_ITEMS = [
   { id: 'inventory', title: 'Inventory', path: '/inventory', iconName: 'inventory' },
   { id: 'lots', title: 'Lots & Batches', path: '/batch-tracking', iconName: 'qr_code_2' },
   { id: 'expiry', title: 'Expiry Tracking', path: '/expiry-tracking', iconName: 'calendar_clock' },
+  { id: 'facilities', title: 'Facilities', path: '/facilities', iconName: 'factory' },
   { id: 'locations', title: 'Locations', path: '/warehouse-ops', iconName: 'location_on' },
   { id: 'sales-orders', title: 'Sales Orders', path: '/sales-orders', iconName: 'shopping_cart' },
   { id: 'picking', title: 'Picking', path: '/picking', iconName: 'conveyor_belt' },

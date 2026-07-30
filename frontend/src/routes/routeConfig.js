@@ -21,6 +21,7 @@ export const ShippingPage = lazy(() => import('@/modules/shipping/pages/Shipping
 export const ClientPortalPage = lazy(() => import('@/modules/client-portal/pages/ClientPortalPage'));
 export const ReportsPage = lazy(() => import('@/modules/reports/pages/ReportsPage'));
 export const UsersPage = lazy(() => import('@/modules/users/pages/UsersPage'));
+export const FacilitiesPage = lazy(() => import('@/modules/facilities/pages/FacilitiesPage'));
 export const CompaniesPage = lazy(() => import('@/modules/users/pages/CompaniesPage'));
 export const ClientsPage = lazy(() => import('@/modules/users/pages/ClientsPage'));
 export const RolesPage = lazy(() => import('@/modules/roles/pages/RolesPage'));
@@ -43,6 +44,7 @@ export const PROTECTED_ROUTES = [
   { path: 'client-portal', Component: ClientPortalPage, permission: PERMISSIONS.CLIENT_PORTAL_VIEW },
   { path: 'reports', Component: ReportsPage, permission: PERMISSIONS.REPORTS_VIEW },
   { path: 'companies', Component: CompaniesPage, permission: PERMISSIONS.USERS_VIEW },
+  { path: 'facilities', Component: FacilitiesPage, permission: PERMISSIONS.WAREHOUSE_VIEW },
   { path: 'users', Component: UsersPage, permission: PERMISSIONS.USERS_VIEW },
   { path: 'clients', Component: ClientsPage, permission: PERMISSIONS.USERS_VIEW },
   { path: 'roles', Component: RolesPage, permission: PERMISSIONS.ROLES_VIEW },

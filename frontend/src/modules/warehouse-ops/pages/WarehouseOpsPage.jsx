@@ -14,6 +14,7 @@ import LoadingState from '@/components/feedback/LoadingState';
 import { locationService } from '@/services/locationService';
 import { receivingService } from '@/services/receivingService';
 import { productService } from '@/services/productService';
+import { warehouseService } from '@/services/warehouseService';
 
 export const WarehouseOpsPage = () => {
   const { notifySuccess, notifyError } = useNotification();
@@ -23,17 +24,21 @@ export const WarehouseOpsPage = () => {
   const [locations, setLocations] = useState([]);
   const [receivings, setReceivings] = useState([]);
   const [products, setProducts] = useState([]);
+  const [facilities, setFacilities] = useState([]);
+  const [activeFacility, setActiveFacility] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Storage Location Modal State
   const [isLocModalOpen, setIsLocModalOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState(null);
-  const [zone, setZone] = useState('A');
-  const [aisle, setAisle] = useState('01');
-  const [rack, setRack] = useState('1');
-  const [shelf, setShelf] = useState('1');
-  const [bin, setBin] = useState('A1');
-  const [maxCapacity, setMaxCapacity] = useState('1000');
+  const [warehouse, setWarehouse] = useState('');
+  const [zone, setZone] = useState('');
+  const [aisle, setAisle] = useState('');
+  const [rack, setRack] = useState('');
+  const [shelf, setShelf] = useState('');
+  const [bin, setBin] = useState('');
+  const [capacityType, setCapacityType] = useState('Items');
+  const [maxCapacity, setMaxCapacity] = useState('');
   const [deleteLocState, setDeleteLocState] = useState({ isOpen: false, locationId: null, locationCode: '' });
 
   // Receiving Modals State
@@ -61,14 +66,18 @@ export const WarehouseOpsPage = () => {
   const fetchAllData = async () => {
     try {
       setLoading(true);
-      const [locs, recs, prodsRes] = await Promise.all([
+      const [locs, recs, prodsRes, facs] = await Promise.all([
         locationService.getLocations(),
         receivingService.getReceivings(),
         productService.getProducts({ limit: 100 }),
+        warehouseService.getWarehouses(),
       ]);
       setLocations(locs || []);
       setReceivings(recs || []);
       setProducts(prodsRes.items || []);
+      setFacilities(facs || []);
+      if (facs && facs.length > 0) setActiveFacility(facs[0]);
+      
       if (locs && locs.length > 0) setPutawayLocId(locs[0].id);
       if (prodsRes.items && prodsRes.items.length > 0) setRecProductId(prodsRes.items[0].id);
     } catch {
@@ -82,16 +91,31 @@ export const WarehouseOpsPage = () => {
     fetchAllData();
   }, []);
 
+  const handleOpenLocModal = () => {
+    setEditingLocation(null);
+    setWarehouse(activeFacility ? activeFacility.name : '');
+    setZone('');
+    setAisle('');
+    setRack('');
+    setShelf('');
+    setBin('');
+    setCapacityType('Items');
+    setMaxCapacity('');
+    setIsLocModalOpen(true);
+  };
+
   // Location Handlers
   const handleSaveLocation = async (e) => {
     e.preventDefault();
     try {
       const payload = {
+        warehouse,
         zone,
         aisle,
         rack,
         shelf,
         bin,
+        capacityType,
         maxCapacity: parseInt(maxCapacity, 10),
       };
 
@@ -137,6 +161,7 @@ export const WarehouseOpsPage = () => {
       await receivingService.createReceiving({
         supplier,
         poNumber,
+        warehouse: activeFacility?.name || '',
         items: [
           {
             productId: recProductId,
@@ -243,11 +268,11 @@ export const WarehouseOpsPage = () => {
       ),
     },
     {
-      header: '5-Tier Hierarchy',
+      header: '6-Tier Hierarchy',
       accessor: 'zone',
       cell: (row) => (
         <span className="font-mono text-xs">
-          Zone {row.zone} &rarr; Aisle {row.aisle} &rarr; Rack {row.rack} &rarr; Shelf {row.shelf} &rarr; Bin {row.bin}
+          {row.warehouse || 'Main Warehouse'} &rarr; Zone {row.zone} &rarr; Aisle {row.aisle} &rarr; Rack {row.rack} &rarr; Shelf {row.shelf} &rarr; Bin {row.bin}
         </span>
       ),
     },
@@ -347,6 +372,20 @@ export const WarehouseOpsPage = () => {
     },
   ];
 
+  const filteredLocations = activeFacility 
+    ? locations.filter(loc => loc.warehouse === activeFacility.name) 
+    : locations;
+
+  const totalFacilityCapacity = activeFacility?.capacity ? parseInt(activeFacility.capacity.replace(/,/g, ''), 10) * 1000 : 0;
+  const provisionedCapacity = filteredLocations.reduce((sum, loc) => sum + (loc.maxCapacity || 0), 0);
+  const occupiedCapacity = filteredLocations.reduce((sum, loc) => sum + (loc.occupied || 0), 0);
+  const freeCapacity = totalFacilityCapacity - occupiedCapacity;
+  const fillPercentage = totalFacilityCapacity > 0 ? Math.min(100, Math.round((occupiedCapacity / totalFacilityCapacity) * 100)) : 0;
+
+  const filteredReceivings = activeFacility 
+    ? receivings.filter(rec => rec.warehouse === activeFacility.name || !rec.warehouse)
+    : receivings;
+
   if (loading) return <LoadingState message="Loading Storage Locations & Receiving Orders..." />;
 
   return (
@@ -356,16 +395,63 @@ export const WarehouseOpsPage = () => {
         description="Receiving, Quality Inspection, Lot/Barcode Generation, and Storage Location Management"
         breadcrumbs={[{ label: 'Operations' }, { label: 'Warehouse Ops' }]}
         actions={
-          <div className="flex gap-3">
+          <div className="flex gap-3 items-center">
+            {facilities.length > 0 && (
+              <Select 
+                value={activeFacility?.name || ''} 
+                onChange={(e) => {
+                  const fac = facilities.find(f => f.name === e.target.value);
+                  if (fac) setActiveFacility(fac);
+                }}
+                options={facilities.map(f => ({ value: f.name, label: f.name }))} 
+                className="w-48 bg-white"
+              />
+            )}
             <Button variant="outline" leftIcon={PackageCheck} onClick={() => setIsCreateRecModalOpen(true)}>
               New Inbound Receiving
             </Button>
-            <Button variant="primary" leftIcon={Plus} onClick={() => setIsLocModalOpen(true)}>
+            <Button variant="primary" leftIcon={Plus} onClick={handleOpenLocModal} disabled={!activeFacility}>
               Provision Storage Bin
             </Button>
           </div>
         }
       />
+
+      {activeFacility && (
+        <div className="bg-white rounded-lg border border-slate-200 p-4 flex items-center justify-between shadow-sm">
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Facility Overview</span>
+            <span className="text-lg font-bold text-slate-800">{activeFacility.name} <span className="text-sm font-normal text-slate-500">({activeFacility.facilityType || 'General'})</span></span>
+          </div>
+          <div className="flex items-center gap-8">
+            <div className="flex flex-col items-end">
+              <span className="text-xs text-slate-500">Total Capacity</span>
+              <span className="font-bold text-slate-800">{(totalFacilityCapacity / 1000).toLocaleString()} Tonnes</span>
+            </div>
+            <div className="flex flex-col items-end">
+              <span className="text-xs text-slate-500">Provisioned Bins Space</span>
+              <span className="font-bold text-slate-700">{provisionedCapacity.toLocaleString()} Kg</span>
+            </div>
+            <div className="flex flex-col items-end">
+              <span className="text-xs text-slate-500">Material Occupied</span>
+              <span className="font-bold text-blue-600">{occupiedCapacity.toLocaleString()} Kg</span>
+            </div>
+            <div className="flex flex-col items-end">
+              <span className="text-xs text-slate-500">Free Space</span>
+              <span className="font-bold text-green-600">{Math.max(0, freeCapacity).toLocaleString()} Kg</span>
+            </div>
+            <div className="w-32 flex flex-col gap-1 ml-4 border-l border-slate-200 pl-4">
+              <div className="flex justify-between text-xs">
+                <span className="font-medium text-slate-600">Utilization</span>
+                <span className="font-bold text-slate-800">{fillPercentage}%</span>
+              </div>
+              <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div className={`h-full ${fillPercentage > 90 ? 'bg-red-500' : fillPercentage > 75 ? 'bg-orange-500' : 'bg-green-500'}`} style={{ width: `${fillPercentage}%` }}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs Header */}
       <div className="flex border-b border-slate-200">
@@ -373,22 +459,22 @@ export const WarehouseOpsPage = () => {
           onClick={() => setActiveTab('locations')}
           className={`px-4 py-2 font-bold text-sm border-b-2 transition-colors ${activeTab === 'locations' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
         >
-          Storage Locations ({locations.length})
+          Storage Locations ({filteredLocations.length})
         </button>
         <button
           onClick={() => setActiveTab('receiving')}
           className={`px-4 py-2 font-bold text-sm border-b-2 transition-colors ${activeTab === 'receiving' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
         >
-          Inbound Receiving & Inspection ({receivings.length})
+          Inbound Receiving & Inspection ({filteredReceivings.length})
         </button>
       </div>
 
       {/* Tab Content */}
       <div className="flex-1">
         {activeTab === 'locations' ? (
-          <DataTable columns={locationColumns} data={locations} />
+          <DataTable columns={locationColumns} data={filteredLocations} />
         ) : (
-          <DataTable columns={receivingColumns} data={receivings} />
+          <DataTable columns={receivingColumns} data={filteredReceivings} />
         )}
       </div>
 
@@ -396,16 +482,18 @@ export const WarehouseOpsPage = () => {
       <Modal
         isOpen={isLocModalOpen}
         onClose={() => setIsLocModalOpen(false)}
-        title="Provision 5-Tier Storage Bin Location"
-        size="md"
+        title={editingLocation ? "Edit Storage Location" : `Provision Bin in ${activeFacility?.name || 'Facility'}`}
         footer={
           <>
             <Button variant="outline" onClick={() => setIsLocModalOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleSaveLocation}>Save Storage Location</Button>
+            <Button variant="primary" onClick={handleSaveLocation}>Save Location</Button>
           </>
         }
       >
         <form onSubmit={handleSaveLocation} className="space-y-4">
+          <FormField label="Warehouse Facility" required>
+            <Input value={warehouse} readOnly className="bg-slate-50 text-slate-500" />
+          </FormField>
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Zone" required>
               <Input value={zone} onChange={(e) => setZone(e.target.value)} placeholder="A" required />
@@ -425,9 +513,24 @@ export const WarehouseOpsPage = () => {
               <Input value={bin} onChange={(e) => setBin(e.target.value)} placeholder="A1" required />
             </FormField>
           </div>
-          <FormField label="Max Capacity (Units)">
-            <Input type="number" value={maxCapacity} onChange={(e) => setMaxCapacity(e.target.value)} />
-          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Capacity Type" required>
+              <Select 
+                value={capacityType} 
+                onChange={(e) => setCapacityType(e.target.value)}
+                options={[
+                  {value: 'Items', label: 'Items'},
+                  {value: 'Kg', label: 'Kg'},
+                  {value: 'Pallets', label: 'Pallets'},
+                  {value: 'CBM', label: 'CBM (Cubic Meter)'}
+                ]}
+                required
+              />
+            </FormField>
+            <FormField label="Capacity Value" required>
+              <Input type="number" value={maxCapacity} onChange={(e) => setMaxCapacity(e.target.value)} placeholder="e.g. 1000" required />
+            </FormField>
+          </div>
         </form>
       </Modal>
 
@@ -435,7 +538,7 @@ export const WarehouseOpsPage = () => {
       <Modal
         isOpen={isCreateRecModalOpen}
         onClose={() => setIsCreateRecModalOpen(false)}
-        title="Create Inbound Receiving Order"
+        title={`New Inbound Receiving for ${activeFacility?.name || 'Facility'}`}
         size="md"
         footer={
           <>
@@ -445,8 +548,11 @@ export const WarehouseOpsPage = () => {
         }
       >
         <form onSubmit={handleCreateReceiving} className="space-y-4">
-          <FormField label="Supplier Name" required>
-            <Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="Apex Global Logistics" required />
+          <FormField label="Warehouse Facility">
+            <Input value={activeFacility?.name || ''} readOnly className="bg-slate-50 text-slate-500" />
+          </FormField>
+          <FormField label="Supplier" required>
+            <Input value={supplier} onChange={e => setSupplier(e.target.value)} placeholder="Supplier Name" required />
           </FormField>
           <FormField label="PO Reference Number">
             <Input value={poNumber} onChange={(e) => setPoNumber(e.target.value)} placeholder="PO-2026-881" />

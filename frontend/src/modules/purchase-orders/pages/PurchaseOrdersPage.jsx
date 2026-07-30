@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { ShoppingCart, Plus, CheckCircle2, PackageCheck, Clock3, CircleDollarSign, Loader2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { ShoppingCart, Plus, CheckCircle2, PackageCheck, Clock3, CircleDollarSign, Loader2, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { PERMISSIONS } from '@/permissions/permissions';
@@ -33,9 +33,17 @@ export const PurchaseOrdersPage = () => {
   // New PO state
   const [supplier, setSupplier] = useState('');
   const [expectedDate, setExpectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [totalAmount, setTotalAmount] = useState(0);
-  const [selectedProductId, setSelectedProductId] = useState('');
-  const [quantity, setQuantity] = useState(10);
+  const [lineItems, setLineItems] = useState([
+    { productId: '', quantity: 10, unitCost: 0 }
+  ]);
+
+  const calculatedTotal = useMemo(() => {
+    return lineItems.reduce((sum, item) => {
+      const q = Number(item.quantity) || 0;
+      const c = Number(item.unitCost) || 0;
+      return sum + (q * c);
+    }, 0);
+  }, [lineItems]);
 
   // Goods Receiving Dock state
   const [recLotId, setRecLotId] = useState('');
@@ -74,10 +82,45 @@ export const PurchaseOrdersPage = () => {
     setRecQty(po.items?.[0]?.quantity || 100);
   };
 
+  const handleAddLineItem = () => {
+    setLineItems([...lineItems, { productId: '', quantity: 1, unitCost: 0 }]);
+  };
+
+  const handleRemoveLineItem = (index) => {
+    if (lineItems.length <= 1) {
+      notifyError('Purchase Order must contain at least one product line item.');
+      return;
+    }
+    setLineItems(lineItems.filter((_, i) => i !== index));
+  };
+
+  const handleLineItemChange = (index, field, value) => {
+    const updated = [...lineItems];
+    updated[index][field] = value;
+
+    if (field === 'productId') {
+      const selectedProd = products.find((p) => p.id === value);
+      if (selectedProd && selectedProd.unitCost !== undefined) {
+        updated[index].unitCost = selectedProd.unitCost || 0;
+      }
+    }
+
+    setLineItems(updated);
+  };
+
   const handleCreatePurchaseOrder = async (e) => {
     e.preventDefault();
-    if (!supplier.trim() || !expectedDate || Number(totalAmount) <= 0 || Number(quantity) <= 0 || !selectedProductId) {
-      notifyError('Complete all purchase order fields with valid values.');
+    if (!supplier.trim() || !expectedDate) {
+      notifyError('Supplier Name and Expected Delivery Date are required.');
+      return;
+    }
+
+    const invalidItems = lineItems.some(
+      (item) => !item.productId || Number(item.quantity) <= 0 || Number(item.unitCost) < 0
+    );
+
+    if (invalidItems) {
+      notifyError('All line items must have a selected product, valid quantity (>0), and unit cost.');
       return;
     }
     
@@ -86,18 +129,17 @@ export const PurchaseOrdersPage = () => {
       await purchaseOrderService.createPurchaseOrder({
         supplier: supplier.trim(),
         expectedDelivery: expectedDate,
-        totalCost: Number(totalAmount),
-        items: [{
-          productId: selectedProductId,
-          quantity: Number(quantity),
-          unitCost: Number(totalAmount) / Number(quantity)
-        }]
+        totalCost: calculatedTotal,
+        items: lineItems.map((item) => ({
+          productId: item.productId,
+          quantity: Number(item.quantity),
+          unitCost: Number(item.unitCost)
+        }))
       });
       notifySuccess(`Purchase Order created successfully.`);
       setIsModalOpen(false);
       setSupplier('');
-      setSelectedProductId('');
-      setTotalAmount(0);
+      setLineItems([{ productId: '', quantity: 10, unitCost: 0 }]);
       fetchData(); // Refresh list
     } catch (error) {
       notifyError('Failed to create purchase order');
@@ -201,9 +243,11 @@ export const PurchaseOrdersPage = () => {
         description="Procurement workflow, vendor goods receiving dock, automated Lot generation, and inventory posting"
         breadcrumbs={[{ label: 'Order Management' }, { label: 'Purchase Orders' }]}
         actions={
-          <PermissionGuard permission={PERMISSIONS.PO_CREATE}>
-            <Button leftIcon={Plus} onClick={() => setIsModalOpen(true)}>Create Purchase Order</Button>
-          </PermissionGuard>
+          user?.role?.toUpperCase() !== 'SUPER_ADMIN' && (
+            <PermissionGuard permission={PERMISSIONS.PO_CREATE}>
+              <Button leftIcon={Plus} onClick={() => setIsModalOpen(true)}>Create Purchase Order</Button>
+            </PermissionGuard>
+          )
         }
       />
 
@@ -222,32 +266,153 @@ export const PurchaseOrdersPage = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Create Purchase Order"
-        size="md"
-        footer={<><Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button><Button onClick={handleCreatePurchaseOrder} disabled={isSubmitting}>{isSubmitting ? 'Submitting...' : 'Submit for Approval'}</Button></>}
+        title="Create Purchase Order (Vendor Procurement)"
+        size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreatePurchaseOrder} disabled={isSubmitting}>
+              {isSubmitting ? 'Submitting...' : 'Submit Purchase Order'}
+            </Button>
+          </>
+        }
       >
-        <form onSubmit={handleCreatePurchaseOrder} className="space-y-4">
-          <FormField label="Supplier" required><Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="Supplier company name" required /></FormField>
-          
-          <FormField label="Item / Product" required>
-            <select 
-              value={selectedProductId}
-              onChange={(e) => setSelectedProductId(e.target.value)}
-              className="flex h-10 w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm text-surface-900 shadow-sm transition-colors placeholder:text-surface-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-surface-50 disabled:text-surface-500"
-              required
-            >
-              <option value="">-- Select a Product --</option>
-              {products.map(p => (
-                <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
-              ))}
-            </select>
-          </FormField>
-
+        <form onSubmit={handleCreatePurchaseOrder} className="space-y-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Quantity" required><Input type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} required /></FormField>
-            <FormField label="Order Total ($)" required><Input type="number" min="1" value={totalAmount} onChange={(e) => setTotalAmount(e.target.value)} required /></FormField>
+            <FormField label="Supplier / Vendor Name" required>
+              <Input
+                value={supplier}
+                onChange={(e) => setSupplier(e.target.value)}
+                placeholder="e.g. Acme Chemical Suppliers Corp"
+                required
+              />
+            </FormField>
+            <FormField label="Expected Arrival Date" required>
+              <Input
+                type="date"
+                value={expectedDate}
+                onChange={(e) => setExpectedDate(e.target.value)}
+                required
+              />
+            </FormField>
           </div>
-          <FormField label="Expected Delivery" required><Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} required /></FormField>
+
+          {/* Line Items Table */}
+          <div className="border border-outline-variant rounded-xl p-4 bg-slate-50/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                Purchase Order Line Items ({lineItems.length})
+              </h4>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                leftIcon={Plus}
+                onClick={handleAddLineItem}
+              >
+                Add Line Item
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {lineItems.map((item, idx) => {
+                const subtotal = (Number(item.quantity) || 0) * (Number(item.unitCost) || 0);
+                return (
+                  <div
+                    key={idx}
+                    className="grid grid-cols-12 gap-3 items-end bg-white p-3 rounded-lg border border-outline-variant shadow-xs"
+                  >
+                    <div className="col-span-5">
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Select Product *
+                      </label>
+                      <select
+                        value={item.productId}
+                        onChange={(e) => handleLineItemChange(idx, 'productId', e.target.value)}
+                        className="w-full h-9 rounded-md border border-outline-variant px-2.5 text-xs bg-white focus:border-primary focus:outline-none"
+                        required
+                      >
+                        <option value="">-- Choose Product --</option>
+                        {products
+                          .filter((p) => p.name && !p.name.includes('dsadsa')) // Clean dropdown
+                          .map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({p.sku})
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Qty *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) => handleLineItemChange(idx, 'quantity', e.target.value)}
+                        className="w-full h-9 rounded-md border border-outline-variant px-2 text-xs focus:border-primary focus:outline-none"
+                        required
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Unit Price ($)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.unitCost}
+                        onChange={(e) => handleLineItemChange(idx, 'unitCost', e.target.value)}
+                        className="w-full h-9 rounded-md border border-outline-variant px-2 text-xs focus:border-primary focus:outline-none"
+                        required
+                      />
+                    </div>
+
+                    <div className="col-span-2 text-right">
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                        Subtotal
+                      </label>
+                      <span className="font-mono font-bold text-xs text-slate-800 block py-1.5">
+                        ${subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    <div className="col-span-1 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveLineItem(idx)}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                        title="Remove line item"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Grand Total Bar */}
+          <div className="p-4 bg-primary/10 border border-primary/20 rounded-xl flex items-center justify-between">
+            <div>
+              <span className="text-xs font-bold text-primary uppercase tracking-wider block">
+                Calculated Grand Total PO Value
+              </span>
+              <span className="text-xs text-slate-600">
+                Sum of {lineItems.length} line item(s)
+              </span>
+            </div>
+            <span className="text-2xl font-extrabold font-mono text-primary">
+              ${calculatedTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </span>
+          </div>
         </form>
       </Modal>
 

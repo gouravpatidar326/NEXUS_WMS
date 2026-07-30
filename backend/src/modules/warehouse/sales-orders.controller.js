@@ -37,23 +37,34 @@ const approveSalesOrder = async (req, res) => {
 
     // Wrap in transaction to ensure stock is reserved safely
     await prisma.$transaction(async (tx) => {
-      // 1. Verify stock for all items first
+      // 1. Check stock and collect warnings — do NOT hard-block approval
+      const stockWarnings = [];
       for (const item of order.items) {
         const product = await tx.product.findUnique({ where: { id: item.productId } });
-        if (product.availableStock < item.quantity) {
-          throw new Error(`Insufficient stock for product ${product.sku}`);
+        if ((product.availableStock || 0) < item.quantity) {
+          stockWarnings.push({
+            productId: item.productId,
+            sku: product.sku,
+            available: product.availableStock || 0,
+            requested: item.quantity
+          });
         }
       }
 
-      // 2. Deduct available, increment committed
+      // 2. Deduct available, increment committed — only if stock is available
       for (const item of order.items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            availableStock: { decrement: item.quantity },
-            committedStock: { increment: item.quantity }
-          }
-        });
+        const product = await tx.product.findUnique({ where: { id: item.productId } });
+        const availQty = product.availableStock || 0;
+        const deductQty = Math.min(availQty, item.quantity); // Deduct only what is available
+        if (deductQty > 0) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              availableStock: { decrement: deductQty },
+              committedStock: { increment: deductQty }
+            }
+          });
+        }
       }
 
       // 3. Create a PickList

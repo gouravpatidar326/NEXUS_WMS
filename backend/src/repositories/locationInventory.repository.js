@@ -39,6 +39,7 @@ class LocationInventoryRepository {
       },
       update: {
         quantity: newQty,
+        available: { increment: quantityDelta },
         updatedAt: new Date(),
       },
       create: {
@@ -46,6 +47,7 @@ class LocationInventoryRepository {
         productId,
         lotId,
         quantity: Math.max(0, quantityDelta),
+        available: Math.max(0, quantityDelta),
         companyId,
       },
     });

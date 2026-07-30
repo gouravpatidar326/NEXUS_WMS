@@ -11,8 +11,8 @@ class AdjustmentService {
   async createAdjustment(companyId, userId, payload) {
     const { productId, lotId, locationId, quantityDelta, reasonCode, notes } = payload;
 
-    if (!productId || !lotId || !locationId || quantityDelta === undefined || !reasonCode) {
-      throw new Error('Product, Lot, Location, Quantity Delta, and Reason Code are required');
+    if (!productId || !locationId || quantityDelta === undefined || !reasonCode) {
+      throw new Error('Product, Location, Quantity Delta, and Reason Code are required');
     }
 
     if (!VALID_REASONS.includes(reasonCode.toUpperCase())) {
@@ -31,7 +31,7 @@ class AdjustmentService {
       await locationInventoryRepository.upsertQuantity(tx, {
         locationId,
         productId,
-        lotId,
+        lotId: lotId || null,
         companyId,
         quantityDelta: delta,
       });
@@ -48,7 +48,7 @@ class AdjustmentService {
         data: {
           adjustmentNumber,
           productId,
-          lotId,
+          lotId: lotId || null,
           locationId,
           quantityDelta: delta,
           reasonCode: reasonCode.toUpperCase(),
@@ -62,7 +62,7 @@ class AdjustmentService {
       // 4. Record Immutable Inventory Transaction (ADJUSTMENT)
       await inventoryTransactionRepository.create(tx, {
         productId,
-        lotId,
+        lotId: lotId || null,
         companyId,
         locationId,
         quantityDelta: delta,

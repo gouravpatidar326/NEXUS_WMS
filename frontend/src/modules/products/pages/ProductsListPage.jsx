@@ -39,9 +39,20 @@ export const ProductsListPage = () => {
   const [sku, setSku] = useState('');
   const [barcode, setBarcode] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [brand, setBrand] = useState('');
+  const [uom, setUom] = useState('Piece');
+  const [storageType, setStorageType] = useState('General Storage');
+  const [trackingMethod, setTrackingMethod] = useState('None');
   const [unitCost, setUnitCost] = useState('0.00');
   const [wholesalePrice, setWholesalePrice] = useState('0.00');
   const [description, setDescription] = useState('');
+  
+  // Specs
+  const [weight, setWeight] = useState('');
+  const [length, setLength] = useState('');
+  const [width, setWidth] = useState('');
+  const [height, setHeight] = useState('');
+  const [volume, setVolume] = useState('');
 
   // Category Form State
   const [catName, setCatName] = useState('');
@@ -110,9 +121,18 @@ export const ProductsListPage = () => {
     setSku('');
     setBarcode('');
     setCategoryId(categories[0]?.id || '');
+    setBrand('');
+    setUom('Piece');
+    setStorageType('General Storage');
+    setTrackingMethod('None');
     setUnitCost('0.00');
     setWholesalePrice('0.00');
     setDescription('');
+    setWeight('');
+    setLength('');
+    setWidth('');
+    setHeight('');
+    setVolume('');
     setIsProductModalOpen(true);
   };
 
@@ -122,9 +142,21 @@ export const ProductsListPage = () => {
     setSku(prod.sku || '');
     setBarcode(prod.barcode || '');
     setCategoryId(prod.categoryId || (categories[0]?.id || ''));
+    setBrand(prod.brand || '');
+    setUom(prod.uom || 'Piece');
+    setStorageType(prod.storageType || 'General Storage');
+    setTrackingMethod(prod.trackingMethod || 'None');
     setUnitCost(prod.unitCost !== undefined ? String(prod.unitCost) : '0.00');
     setWholesalePrice(prod.wholesalePrice !== undefined ? String(prod.wholesalePrice) : '0.00');
     setDescription(prod.description || '');
+    
+    // Specs
+    setWeight(prod.specification?.weight !== undefined && prod.specification?.weight !== null ? String(prod.specification.weight) : '');
+    setLength(prod.specification?.length !== undefined && prod.specification?.length !== null ? String(prod.specification.length) : '');
+    setWidth(prod.specification?.width !== undefined && prod.specification?.width !== null ? String(prod.specification.width) : '');
+    setHeight(prod.specification?.height !== undefined && prod.specification?.height !== null ? String(prod.specification.height) : '');
+    setVolume(prod.specification?.volume !== undefined && prod.specification?.volume !== null ? String(prod.specification.volume) : '');
+
     setIsProductModalOpen(true);
   };
 
@@ -141,9 +173,20 @@ export const ProductsListPage = () => {
         sku,
         barcode,
         categoryId: categoryId || null,
+        brand,
+        uom,
+        storageType,
+        trackingMethod,
         unitCost: parseFloat(unitCost || '0'),
         wholesalePrice: parseFloat(wholesalePrice || '0'),
         description,
+        specification: {
+          weight: weight ? parseFloat(weight) : null,
+          length: length ? parseFloat(length) : null,
+          width: width ? parseFloat(width) : null,
+          height: height ? parseFloat(height) : null,
+          volume: volume ? parseFloat(volume) : null,
+        }
       };
 
       if (editingProduct) {
@@ -378,44 +421,118 @@ export const ProductsListPage = () => {
         footer={
           <>
             <Button variant="outline" onClick={() => setIsProductModalOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleSaveProduct}>Save Product</Button>
+            <Button type="submit" form="product-form" variant="primary">Save Product</Button>
           </>
         }
       >
-        <form onSubmit={handleSaveProduct} className="space-y-3 sm:space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <FormField label="Product Name" required>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Semaglutide 5mg Vial" required />
-            </FormField>
-            <FormField label="SKU Code" required>
-              <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="e.g. SKU-SEM-005" required />
-            </FormField>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <FormField label="Barcode (ShipStation Linked)">
-              <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="e.g. 890123456789" />
-            </FormField>
-            <FormField label="Category">
-              <Select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                options={categories.map((c) => ({ value: c.id, label: c.name }))}
-              />
-            </FormField>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            {showUnitCost && (
-              <FormField label="Unit Cost ($)">
-                <Input type="number" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
+        <form id="product-form" onSubmit={handleSaveProduct} className="space-y-6">
+          
+          {/* Basic Information */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-slate-800 border-b pb-2">Basic Information</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField label="Product Name" required>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter Product Name" required />
               </FormField>
-            )}
-            <FormField label="Wholesale Price ($)">
-              <Input type="number" step="0.01" value={wholesalePrice} onChange={(e) => setWholesalePrice(e.target.value)} />
+              <FormField label="SKU Code" required>
+                <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="Enter SKU Code" required />
+              </FormField>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <FormField label="Barcode / UPC">
+                <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="Enter Barcode" />
+              </FormField>
+              <FormField label="Category" required>
+                <Select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  options={categories.map((c) => ({ value: c.id, label: c.name }))}
+                  required
+                />
+              </FormField>
+              <FormField label="Brand">
+                <Input value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Enter Brand" />
+              </FormField>
+            </div>
+            <FormField label="Product Description">
+              <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Enter Product Description" />
             </FormField>
           </div>
-          <FormField label="Product Description">
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Enter details or storage notes..." />
-          </FormField>
+
+          {/* Specifications (Optional) */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-slate-800 border-b pb-2">Specifications (Optional)</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+              <FormField label="Weight (Kg)">
+                <Input type="number" step="0.01" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="0.00" />
+              </FormField>
+              <FormField label="Length (cm)">
+                <Input type="number" step="0.01" value={length} onChange={(e) => setLength(e.target.value)} placeholder="0.00" />
+              </FormField>
+              <FormField label="Width (cm)">
+                <Input type="number" step="0.01" value={width} onChange={(e) => setWidth(e.target.value)} placeholder="0.00" />
+              </FormField>
+              <FormField label="Height (cm)">
+                <Input type="number" step="0.01" value={height} onChange={(e) => setHeight(e.target.value)} placeholder="0.00" />
+              </FormField>
+              <FormField label="Volume">
+                <Input type="number" step="0.01" value={volume} onChange={(e) => setVolume(e.target.value)} placeholder="0.00" disabled />
+              </FormField>
+            </div>
+          </div>
+
+          {/* Storage & Inventory Rules */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-slate-800 border-b pb-2">Storage & Inventory Rules</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <FormField label="Unit of Measure (UOM)" required>
+                <Select
+                  value={uom}
+                  onChange={(e) => setUom(e.target.value)}
+                  options={[
+                    'Piece', 'Box', 'Carton', 'Pallet', 'Kg', 'Gram', 'Litre', 'Meter', 'Roll', 'Pack', 'Bottle', 'Bag', 'Drum'
+                  ].map(v => ({ value: v, label: v }))}
+                  required
+                />
+              </FormField>
+              <FormField label="Storage Type" required>
+                <Select
+                  value={storageType}
+                  onChange={(e) => setStorageType(e.target.value)}
+                  options={[
+                    'General Storage', 'Cold Storage', 'Hazardous', 'Fragile', 'High Value', 'Outdoor Storage', 'Rack Storage', 'Floor Storage'
+                  ].map(v => ({ value: v, label: v }))}
+                  required
+                />
+              </FormField>
+              <FormField label="Tracking Method" required>
+                <Select
+                  value={trackingMethod}
+                  onChange={(e) => setTrackingMethod(e.target.value)}
+                  options={[
+                    'None', 'Serial Number', 'Batch', 'Lot', 'Batch + Expiry'
+                  ].map(v => ({ value: v, label: v }))}
+                  required
+                />
+              </FormField>
+            </div>
+          </div>
+
+          {/* Financials */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-slate-800 border-b pb-2">Financials</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {showUnitCost && (
+                <FormField label="Unit Cost ($)" required>
+                  <Input type="number" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} required />
+                </FormField>
+              )}
+              <FormField label="Wholesale Price ($)" required>
+                <Input type="number" step="0.01" value={wholesalePrice} onChange={(e) => setWholesalePrice(e.target.value)} required />
+              </FormField>
+            </div>
+          </div>
+
         </form>
       </Modal>
 
@@ -428,19 +545,19 @@ export const ProductsListPage = () => {
         footer={
           <>
             <Button variant="outline" onClick={() => setIsCategoryModalOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleCreateCategory}>Save Category</Button>
+            <Button type="submit" form="category-form" variant="primary">Save Category</Button>
           </>
         }
       >
-        <form onSubmit={handleCreateCategory} className="space-y-3 sm:space-y-4">
+        <form id="category-form" onSubmit={handleCreateCategory} className="space-y-4">
           <FormField label="Category Name" required>
-            <Input value={catName} onChange={(e) => setCatName(e.target.value)} placeholder="e.g. Peptides" required />
+            <Input value={catName} onChange={(e) => setCatName(e.target.value)} placeholder="Enter Category Name" required />
           </FormField>
-          <FormField label="Category Code">
-            <Input value={catCode} onChange={(e) => setCatCode(e.target.value)} placeholder="e.g. PEP" />
+          <FormField label="Category Code" required>
+            <Input value={catCode} onChange={(e) => setCatCode(e.target.value)} placeholder="Enter Category Code" required />
           </FormField>
           <FormField label="Description">
-            <Input value={catDescription} onChange={(e) => setCatDescription(e.target.value)} placeholder="Description..." />
+            <Input value={catDescription} onChange={(e) => setCatDescription(e.target.value)} placeholder="Enter Description" />
           </FormField>
         </form>
       </Modal>

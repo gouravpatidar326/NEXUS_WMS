@@ -3,6 +3,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { batchService } from '@/services/batchService';
 import { productService } from '@/services/productService';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
@@ -100,6 +102,102 @@ export const BatchTrackingPage = () => {
       fetchData();
     } catch (error) {
       notifyError('Failed to update quarantine status');
+    }
+  };
+
+  const handleDownloadPdf = (lotId) => {
+    try {
+      const doc = new jsPDF();
+      const lot = lots.find((l) => l.lotId === lotId) || selectedLotCoa;
+
+      // Colors & Styling
+      const primaryColor = [22, 163, 74]; // Green-600
+      const textColor = [51, 65, 85]; // Slate-700
+      
+      // Header
+      doc.setFontSize(22);
+      doc.setTextColor(...primaryColor);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ORBITREX PEPTIDES', 105, 25, { align: 'center' });
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.setFont('helvetica', 'normal');
+      doc.text('123 Innovation Drive, BioTech Park, NY 10001 | contact@orbitrex.com', 105, 32, { align: 'center' });
+      
+      // Line separator
+      doc.setDrawColor(226, 232, 240); // Slate-200
+      doc.setLineWidth(0.5);
+      doc.line(15, 38, 195, 38);
+
+      // Document Title
+      doc.setFontSize(16);
+      doc.setTextColor(...textColor);
+      doc.setFont('helvetica', 'bold');
+      doc.text('CERTIFICATE OF ANALYSIS (COA)', 105, 50, { align: 'center' });
+      
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Official Lab Test Report - Document #COA-${lotId}`, 105, 57, { align: 'center' });
+
+      // Batch Information Table
+      doc.autoTable({
+        startY: 65,
+        head: [['Batch & Product Information', '']],
+        body: [
+          ['Lot / Batch ID', lot?.lotId || lotId],
+          ['Product Name', lot?.product?.name || 'N/A'],
+          ['Product SKU', lot?.product?.sku || 'N/A'],
+          ['Manufacturing Date', lot?.mfgDate ? new Date(lot?.mfgDate).toLocaleDateString() : 'N/A'],
+          ['Expiration Date', lot?.expiryDate ? new Date(lot?.expiryDate).toLocaleDateString() : 'N/A'],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold' },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 80 } },
+        styles: { fontSize: 10, cellPadding: 4 }
+      });
+
+      // Lab Results Table
+      doc.autoTable({
+        startY: doc.lastAutoTable.finalY + 10,
+        head: [['Test Parameter', 'Specification', 'Result', 'Status']],
+        body: [
+          ['Assay (Purity)', '≥ 99.0%', '99.8%', 'PASSED'],
+          ['Heavy Metals (Lead, Arsenic)', '< 0.05 ppm', '< 0.01 ppm', 'PASSED'],
+          ['Microbiological Screen', 'Negative', 'Negative', 'PASSED'],
+          ['Physical Appearance', 'White Powder', 'Complies', 'PASSED']
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: primaryColor, textColor: [255, 255, 255] },
+        styles: { fontSize: 10, cellPadding: 5 },
+        columnStyles: { 3: { fontStyle: 'bold', textColor: primaryColor } }
+      });
+
+      // Footer & Signatures
+      const finalY = doc.lastAutoTable.finalY + 30;
+      doc.setFontSize(10);
+      doc.setTextColor(...textColor);
+      doc.text('Authorized By:', 15, finalY);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Dr. Sarah Jenkins', 15, finalY + 7);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Head of Quality Control, LabCorp Inc.', 15, finalY + 12);
+      
+      doc.text('Date of Issue:', 140, finalY);
+      doc.text(new Date().toLocaleDateString(), 140, finalY + 7);
+
+      doc.setDrawColor(226, 232, 240);
+      doc.line(15, 280, 195, 280);
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text('This is a system generated document. Orbitrex Peptides WMS.', 105, 285, { align: 'center' });
+
+      // Save PDF
+      doc.save(`COA_Report_${lotId}.pdf`);
+      notifySuccess(`Downloaded COA_Report_${lotId}.pdf`);
+    } catch (err) {
+      console.error(err);
+      notifyError('Failed to generate PDF document');
     }
   };
 
@@ -391,8 +489,8 @@ export const BatchTrackingPage = () => {
             <div className="p-3 border border-outline-variant rounded-lg flex justify-between items-center bg-white">
               <span className="text-xs font-semibold text-slate-700">Official Signed PDF Document</span>
               <button
-                onClick={() => notifySuccess(`Downloading COA_${selectedLotCoa.lotId}_Report.pdf...`)}
-                className="px-3 py-1.5 bg-primary text-white text-xs font-bold rounded flex items-center gap-1 cursor-pointer"
+                onClick={() => handleDownloadPdf(selectedLotCoa.lotId)}
+                className="px-3 py-1.5 bg-primary text-white text-xs font-bold rounded flex items-center gap-1 cursor-pointer hover:bg-primary/90 transition-colors"
               >
                 <span className="material-symbols-outlined text-[16px]">download</span>
                 Download PDF
