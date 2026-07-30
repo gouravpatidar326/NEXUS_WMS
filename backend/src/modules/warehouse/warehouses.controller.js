@@ -3,8 +3,9 @@ const prisma = require('../../utils/prisma');
 const getWarehouses = async (req, res) => {
   try {
     const { companyId } = req.user;
+    const where = companyId ? { companyId } : {};
     const warehouses = await prisma.warehouse.findMany({
-      where: { companyId },
+      where,
       orderBy: { createdAt: 'desc' }
     });
     res.json(warehouses);
@@ -16,11 +17,20 @@ const getWarehouses = async (req, res) => {
 
 const createWarehouse = async (req, res) => {
   try {
-    const { companyId } = req.user;
+    let { companyId } = req.user;
     const { name, code, address, city, state, country, zipCode, managerName, contactPhone, capacityType, capacityValue, facilityType, supportedItems } = req.body;
 
     if (!name) {
       return res.status(400).json({ message: 'Facility Name is required' });
+    }
+
+    if (!companyId) {
+      const defaultCompany = await prisma.company.findFirst();
+      if (defaultCompany) {
+        companyId = defaultCompany.id;
+      } else {
+        return res.status(400).json({ message: 'No company found in database to associate warehouse with' });
+      }
     }
 
     const warehouse = await prisma.$transaction(async (tx) => {

@@ -4,7 +4,7 @@ import { useNotification } from '@/contexts/NotificationContext';
 import { batchService } from '@/services/batchService';
 import { productService } from '@/services/productService';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
@@ -141,7 +141,7 @@ export const BatchTrackingPage = () => {
       doc.text(`Official Lab Test Report - Document #COA-${lotId}`, 105, 57, { align: 'center' });
 
       // Batch Information Table
-      doc.autoTable({
+      autoTable(doc, {
         startY: 65,
         head: [['Batch & Product Information', '']],
         body: [
@@ -158,7 +158,7 @@ export const BatchTrackingPage = () => {
       });
 
       // Lab Results Table
-      doc.autoTable({
+      autoTable(doc, {
         startY: doc.lastAutoTable.finalY + 10,
         head: [['Test Parameter', 'Specification', 'Result', 'Status']],
         body: [

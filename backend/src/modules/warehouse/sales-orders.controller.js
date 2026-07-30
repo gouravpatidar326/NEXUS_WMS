@@ -3,8 +3,10 @@ const NotificationService = require('../../utils/notification.service');
 
 const getSalesOrders = async (req, res) => {
   try {
+    const { companyId } = req.user;
+    const where = companyId ? { companyId } : {};
     const orders = await prisma.salesOrder.findMany({
-      where: { companyId: req.user.companyId },
+      where,
       include: {
         items: { include: { product: true } },
         client: { select: { name: true, tier: true } }
@@ -21,9 +23,15 @@ const getSalesOrders = async (req, res) => {
 const approveSalesOrder = async (req, res) => {
   try {
     const { id } = req.params;
+    const { companyId } = req.user;
+
+    const where = { id };
+    if (companyId) {
+      where.companyId = companyId;
+    }
 
     const order = await prisma.salesOrder.findFirst({
-      where: { id, companyId: req.user.companyId },
+      where,
       include: { items: true }
     });
 
@@ -104,7 +112,7 @@ const approveSalesOrder = async (req, res) => {
     await NotificationService.send({
       title: 'Order Approved',
       message: `Your order (${order.id}) has been approved and is now being picked.`,
-      companyId: req.user.companyId
+      companyId: order.companyId
     });
 
     res.json({ id, status: 'PICKING' });
@@ -126,8 +134,14 @@ const rejectSalesOrder = async (req, res) => {
       return res.status(400).json({ message: 'Rejection reason is required' });
     }
 
+    const { companyId } = req.user;
+    const where = { id };
+    if (companyId) {
+      where.companyId = companyId;
+    }
+
     const order = await prisma.salesOrder.findFirst({
-      where: { id, companyId: req.user.companyId }
+      where
     });
 
     if (!order) {
@@ -155,7 +169,7 @@ const rejectSalesOrder = async (req, res) => {
     await NotificationService.send({
       title: 'Order Rejected',
       message: `Your order (${order.id}) was rejected. Reason: ${reason}`,
-      companyId: req.user.companyId
+      companyId: order.companyId
     });
 
     res.json({ id, status: 'REJECTED' });
