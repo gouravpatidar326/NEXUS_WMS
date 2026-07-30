@@ -5,11 +5,7 @@ const getWarehouses = async (req, res) => {
     const { companyId } = req.user;
     const where = companyId ? { companyId } : {};
     const warehouses = await prisma.warehouse.findMany({
-<<<<<<< HEAD
       where,
-=======
-      where: { ...(companyId ? { companyId } : {}) },
->>>>>>> 76436a94e2abfa295c585eaa0ec513255b4ba0e6
       orderBy: { createdAt: 'desc' }
     });
     res.json(warehouses);
