@@ -7,6 +7,12 @@ import LoadingState from '@/components/feedback/LoadingState';
 import { useNotification } from '@/contexts/NotificationContext';
 import { useWmsStore } from '@/contexts/WmsStoreContext';
 import { reportService } from '@/services/reportService';
+import { productService } from '@/services/productService';
+import { purchaseOrderService } from '@/services/purchaseOrderService';
+import { salesOrderService } from '@/services/salesOrderService';
+import { batchService } from '@/services/batchService';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   ResponsiveContainer,
   PieChart,
@@ -28,17 +34,29 @@ export const ReportsPage = () => {
 
   const [valuationData, setValuationData] = useState([]);
   const [velocityData, setVelocityData] = useState([]);
+  const [reportProducts, setReportProducts] = useState([]);
+  const [reportLots, setReportLots] = useState([]);
+  const [reportPos, setReportPos] = useState([]);
+  const [reportSos, setReportSos] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchReportsData = async () => {
     setLoading(true);
     try {
-      const [valRes, velRes] = await Promise.all([
+      const [valRes, velRes, prodRes, lotsRes, poRes, soRes] = await Promise.all([
         reportService.getStockValuation(),
         reportService.getInventoryVelocity(),
+        productService.getProducts({ pageSize: 500 }),
+        batchService.getBatches(),
+        purchaseOrderService.fetchPurchaseOrders(),
+        salesOrderService.fetchSalesOrders()
       ]);
       setValuationData(Array.isArray(valRes) ? valRes : []);
       setVelocityData(Array.isArray(velRes) ? velRes : []);
+      setReportProducts(prodRes?.items || prodRes || []);
+      setReportLots(lotsRes?.items || lotsRes || []);
+      setReportPos(poRes?.items || poRes || []);
+      setReportSos(soRes?.items || soRes || []);
     } catch (err) {
       console.error('Error loading report analytics:', err);
       notifyError('Failed to load supply chain analytics');
@@ -63,8 +81,31 @@ export const ReportsPage = () => {
 
   const handleExport = (type) => {
     if (type === 'PDF') {
-      window.print();
-      notifySuccess('Print-ready analytics report opened. Choose Save as PDF to download.');
+      const doc = new jsPDF();
+      doc.text('Nexus WMS - Inventory Analytics Report', 14, 15);
+      
+      const sourceProducts = reportProducts.length > 0 ? reportProducts : products;
+      
+      const tableData = sourceProducts.map((p) => [
+        p.sku,
+        p.name,
+        p.category?.name || p.category || 'General',
+        p.availableStock || p.totalStock || 0,
+        p.availableStock || 0,
+        p.unitCost || 0,
+        (Number(p.availableStock || 0) * Number(p.unitCost || 0)).toFixed(2),
+      ]);
+
+      autoTable(doc, {
+        startY: 25,
+        head: [['SKU', 'Product Name', 'Category', 'Total Stock', 'Available Stock', 'Unit Cost ($)', 'Asset Value ($)']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [99, 102, 241] } // Primary color
+      });
+
+      doc.save('nexus-wms-inventory-report.pdf');
+      notifySuccess('PDF report downloaded successfully.');
       return;
     }
     downloadCsv('nexus-wms-inventory-report.csv', [
@@ -143,10 +184,10 @@ export const ReportsPage = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: 'Catalog SKUs', value: products.length, icon: Package, tone: 'bg-primary-50 text-primary-600' },
-          { label: 'Total Lot Batches', value: lots.length, icon: TrendingUp, tone: 'bg-success-50 text-success-600' },
-          { label: 'Sales Orders', value: salesOrders.length, icon: Truck, tone: 'bg-info-50 text-info-600' },
-          { label: 'Purchase Orders', value: purchaseOrders.length, icon: AlertTriangle, tone: 'bg-warning-50 text-warning-600' },
+          { label: 'Catalog SKUs', value: reportProducts.length, icon: Package, tone: 'bg-primary-50 text-primary-600' },
+          { label: 'Total Lot Batches', value: reportLots.length, icon: TrendingUp, tone: 'bg-success-50 text-success-600' },
+          { label: 'Sales Orders', value: reportSos.length, icon: Truck, tone: 'bg-info-50 text-info-600' },
+          { label: 'Purchase Orders', value: reportPos.length, icon: AlertTriangle, tone: 'bg-warning-50 text-warning-600' },
         ].map(({ label, value, icon: Icon, tone }) => (
           <div key={label} className="card flex items-center gap-3 p-4 sm:p-5 border border-outline-variant bg-white rounded-xl shadow-sm">
             <Icon className={`h-10 w-10 shrink-0 rounded-xl p-2 ${tone}`} />
@@ -179,7 +220,6 @@ export const ReportsPage = () => {
                   innerRadius={48}
                   outerRadius={86}
                   paddingAngle={3}
-                  label={({ name, value }) => `${name}: ${value}`}
                 >
                   {pieChartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

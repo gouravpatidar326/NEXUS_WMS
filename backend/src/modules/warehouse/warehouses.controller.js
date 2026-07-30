@@ -5,7 +5,11 @@ const getWarehouses = async (req, res) => {
     const { companyId } = req.user;
     const where = companyId ? { companyId } : {};
     const warehouses = await prisma.warehouse.findMany({
+<<<<<<< HEAD
       where,
+=======
+      where: { ...(companyId ? { companyId } : {}) },
+>>>>>>> 76436a94e2abfa295c585eaa0ec513255b4ba0e6
       orderBy: { createdAt: 'desc' }
     });
     res.json(warehouses);
@@ -77,7 +81,7 @@ const updateWarehouse = async (req, res) => {
     const { name, code, facilityType, capacityType, capacityValue, supportedItems, managerName, contactPhone, address, city, state, country, zipCode } = req.body;
 
     const warehouse = await prisma.warehouse.update({
-      where: { id, companyId: req.user.companyId },
+      where: { id, ...(req.user.companyId ? { companyId: req.user.companyId } : {}) },
       data: {
         name,
         code,
@@ -107,7 +111,7 @@ const deleteWarehouse = async (req, res) => {
     const { id } = req.params;
     
     await prisma.warehouse.delete({
-      where: { id, companyId: req.user.companyId }
+      where: { id, ...(req.user.companyId ? { companyId: req.user.companyId } : {}) }
     });
 
     res.json({ message: 'Facility deleted successfully' });
