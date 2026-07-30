@@ -22,7 +22,10 @@ export const CompaniesPage = () => {
   const [editingCompany, setEditingCompany] = useState(null);
   const [name, setName] = useState('');
   const [industry, setIndustry] = useState('Consumer Electronics');
-  const [code, setCode] = useState('');
+  const [clientCode, setClientCode] = useState('');
+  const [status, setStatus] = useState('ACTIVE');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
 
   // Delete Modal States
   const [deletingCompany, setDeletingCompany] = useState(null);
@@ -48,7 +51,10 @@ export const CompaniesPage = () => {
     setEditingCompany(null);
     setName('');
     setIndustry('Consumer Electronics');
-    setCode('');
+    setClientCode('');
+    setStatus('ACTIVE');
+    setEmail('');
+    setPhone('');
     setIsModalOpen(true);
   };
 
@@ -56,28 +62,34 @@ export const CompaniesPage = () => {
     setEditingCompany(company);
     setName(company.name || '');
     setIndustry(company.industry || 'Consumer Electronics');
-    setCode(company.code || '');
+    setClientCode(company.clientCode || '');
+    setStatus(company.status || 'ACTIVE');
+    setEmail(company.email || '');
+    setPhone(company.phone || '');
     setIsModalOpen(true);
   };
 
   const handleSaveCompany = async (e) => {
     e.preventDefault();
-    if (!name) {
-      notifyError('Company name is required');
+    if (!name || !clientCode || !email || !phone || !industry || !status) {
+      notifyError('All fields (Name, Code, Email, Phone, Industry, Status) are required.');
       return;
     }
 
     try {
+      const payload = { name, industry, clientCode, status, email, phone };
       if (editingCompany) {
-        await companyService.updateCompany(editingCompany.id, { name, industry });
+        await companyService.updateCompany(editingCompany.id, payload);
         notifySuccess(`Company ${name} updated successfully.`);
       } else {
-        await companyService.createCompany({ name, industry });
+        await companyService.createCompany(payload);
         notifySuccess(`Company ${name} onboarded successfully.`);
       }
       setIsModalOpen(false);
       setName('');
-      setCode('');
+      setClientCode('');
+      setEmail('');
+      setPhone('');
       setEditingCompany(null);
       fetchCompanies();
     } catch (err) {
@@ -114,12 +126,23 @@ export const CompaniesPage = () => {
           </div>
           <div>
             <span className="font-semibold text-surface-900 dark:text-surface-100 block">{row.name}</span>
-            <span className="text-xs font-mono text-surface-400">{row.id?.substring(0, 8)}</span>
+            <span className="text-xs font-mono text-surface-400">{row.clientCode || row.id?.substring(0, 8)}</span>
           </div>
         </div>
       ),
     },
     { header: 'Industry', accessor: 'industry', cell: (row) => row.industry || 'N/A' },
+    {
+      header: 'Contact Info',
+      accessor: 'email',
+      cell: (row) => (
+        <div className="text-sm">
+          {row.email && <div className="text-surface-700 dark:text-surface-300">{row.email}</div>}
+          {row.phone && <div className="text-surface-500 dark:text-surface-400 text-xs">{row.phone}</div>}
+          {!row.email && !row.phone && <span className="text-surface-400">N/A</span>}
+        </div>
+      ),
+    },
     {
       header: 'Created At',
       accessor: 'createdAt',
@@ -128,7 +151,11 @@ export const CompaniesPage = () => {
     {
       header: 'Status',
       accessor: 'status',
-      cell: () => <Badge variant="success" dot>Active</Badge>,
+      cell: (row) => (
+        <Badge variant={row.status === 'ACTIVE' ? 'success' : 'danger'} dot>
+          {row.status || 'ACTIVE'}
+        </Badge>
+      ),
     },
     {
       header: 'Actions',
@@ -195,9 +222,19 @@ export const CompaniesPage = () => {
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Apex International Ltd" required />
           </FormField>
 
-          <FormField label="Internal Client Code">
-            <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. NEX-AI-009" />
+          <FormField label="Internal Client Code" required>
+            <Input value={clientCode} onChange={(e) => setClientCode(e.target.value)} placeholder="e.g. NEX-AI-009" required />
           </FormField>
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Contact Email" required>
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="contact@company.com" required />
+            </FormField>
+            
+            <FormField label="Contact Phone" required>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 (555) 000-0000" required />
+            </FormField>
+          </div>
 
           <FormField label="Industry Sector" required>
             <Select
@@ -210,6 +247,17 @@ export const CompaniesPage = () => {
                 { value: 'Chemicals & Materials', label: 'Chemicals & Materials' },
                 { value: 'Pharmaceuticals', label: 'Pharmaceuticals' },
                 { value: 'Logistics', label: 'Logistics' },
+              ]}
+            />
+          </FormField>
+
+          <FormField label="Account Status" required>
+            <Select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              options={[
+                { value: 'ACTIVE', label: 'Active' },
+                { value: 'INACTIVE', label: 'Inactive' },
               ]}
             />
           </FormField>

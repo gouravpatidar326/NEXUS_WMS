@@ -24,8 +24,12 @@ export const ClientsPage = () => {
   const [editingClient, setEditingClient] = useState(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [status, setStatus] = useState('ACTIVE');
   const [tier, setTier] = useState('STANDARD');
   const [creditLimit, setCreditLimit] = useState('100000');
+  const [errors, setErrors] = useState({});
 
   const fetchClients = async () => {
     try {
@@ -47,8 +51,12 @@ export const ClientsPage = () => {
     setEditingClient(null);
     setName('');
     setEmail('');
+    setPhone('');
+    setAddress('');
+    setStatus('ACTIVE');
     setTier('STANDARD');
     setCreditLimit('100000');
+    setErrors({});
     setIsModalOpen(true);
   };
 
@@ -56,22 +64,40 @@ export const ClientsPage = () => {
     setEditingClient(cli);
     setName(cli.name || '');
     setEmail(cli.email || '');
+    setPhone(cli.phone || '');
+    setAddress(cli.address || '');
+    setStatus(cli.status || 'ACTIVE');
     setTier(cli.tier || 'STANDARD');
     setCreditLimit(String(cli.creditLimit || '100000'));
+    setErrors({});
     setIsModalOpen(true);
   };
 
   const handleSaveClient = async (e) => {
     e.preventDefault();
-    if (!name) {
-      notifyError('Client contact name is required');
+    
+    const newErrors = {};
+    if (!name) newErrors.name = 'Contact name is required';
+    if (!email) newErrors.email = 'Email address is required';
+    if (!phone) newErrors.phone = 'Phone number is required';
+    if (!address) newErrors.address = 'Billing address is required';
+    if (!status) newErrors.status = 'Status is required';
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      notifyError('Please fill in all required fields highlighted in red.');
       return;
     }
+
+    setErrors({});
 
     try {
       const payload = {
         name,
         email,
+        phone,
+        address,
+        status,
         tier,
         creditLimit: parseFloat(creditLimit || '0'),
       };
@@ -131,7 +157,7 @@ export const ClientsPage = () => {
     {
       header: 'Status',
       accessor: 'status',
-      cell: () => <Badge variant="success" dot>Active</Badge>,
+      cell: (row) => <Badge variant={row.status === 'ACTIVE' ? 'success' : 'warning'} dot>{row.status || 'ACTIVE'}</Badge>,
     },
     {
       header: 'Actions',
@@ -184,12 +210,35 @@ export const ClientsPage = () => {
         }
       >
         <form onSubmit={handleSaveClient} className="space-y-4">
-          <FormField label="Client Contact Name" required>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sam Wilson" required />
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Client Contact Name" required error={errors.name}>
+              <Input value={name} onChange={(e) => { setName(e.target.value); setErrors({...errors, name: ''}); }} placeholder="e.g. Sam Wilson" error={errors.name} />
+            </FormField>
+            <FormField label="Email Address" required error={errors.email}>
+              <Input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setErrors({...errors, email: ''}); }} placeholder="sam@acmecorp.com" error={errors.email} />
+            </FormField>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Phone Number" required error={errors.phone}>
+              <Input value={phone} onChange={(e) => { setPhone(e.target.value); setErrors({...errors, phone: ''}); }} placeholder="e.g. +1 555-0198" error={errors.phone} />
+            </FormField>
+            <FormField label="Account Status" required error={errors.status}>
+              <Select
+                value={status}
+                onChange={(e) => { setStatus(e.target.value); setErrors({...errors, status: ''}); }}
+                options={[
+                  { value: 'ACTIVE', label: 'Active' },
+                  { value: 'INACTIVE', label: 'Inactive / Suspended' },
+                ]}
+              />
+            </FormField>
+          </div>
+
+          <FormField label="Billing Address" required error={errors.address}>
+            <Input value={address} onChange={(e) => { setAddress(e.target.value); setErrors({...errors, address: ''}); }} placeholder="123 Corporate Blvd, Suite 100" error={errors.address} />
           </FormField>
-          <FormField label="Email Address">
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="sam@acmecorp.com" />
-          </FormField>
+
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Account Tier" required>
               <Select
@@ -200,10 +249,11 @@ export const ClientsPage = () => {
                   { value: 'VIP', label: 'VIP Preferred' },
                   { value: 'ENTERPRISE_TIER_1', label: 'Enterprise Tier 1' },
                 ]}
+                required
               />
             </FormField>
-            <FormField label="Approved Credit Limit ($)">
-              <Input type="number" value={creditLimit} onChange={(e) => setCreditLimit(e.target.value)} />
+            <FormField label="Approved Credit Limit ($)" required>
+              <Input type="number" value={creditLimit} onChange={(e) => setCreditLimit(e.target.value)} required />
             </FormField>
           </div>
         </form>

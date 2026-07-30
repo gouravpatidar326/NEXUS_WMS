@@ -9,6 +9,8 @@ const getUsers = async (req, res) => {
         id: true,
         name: true,
         email: true,
+        phone: true,
+        jobTitle: true,
         role: true,
         companyId: true,
         status: true,
@@ -26,9 +28,9 @@ const getUsers = async (req, res) => {
   }
 };
 
-const inviteUser = async (req, res) => {
+  const inviteUser = async (req, res) => {
   try {
-    const { name, email, role, companyId, password } = req.body;
+    const { name, email, role, companyId, password, phone, jobTitle } = req.body;
 
     const validRoles = ['SUPER_ADMIN', 'WAREHOUSE_MANAGER', 'INVENTORY_CLERK', 'CLIENT'];
     if (!validRoles.includes(role)) {
@@ -46,6 +48,8 @@ const inviteUser = async (req, res) => {
       data: {
         name,
         email,
+        phone,
+        jobTitle,
         password: hashedPassword,
         role,
         companyId: companyId || null,
@@ -65,7 +69,7 @@ const inviteUser = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, role, companyId, status } = req.body;
+    const { name, role, companyId, status, phone, jobTitle } = req.body;
 
     const existingUser = await prisma.user.findUnique({ where: { id } });
     if (!existingUser) {
@@ -78,6 +82,8 @@ const updateUser = async (req, res) => {
         ...(name ? { name } : {}),
         ...(role ? { role } : {}),
         ...(status ? { status } : {}),
+        ...(phone !== undefined ? { phone } : {}),
+        ...(jobTitle !== undefined ? { jobTitle } : {}),
         ...(companyId !== undefined ? { companyId } : {}),
         updatedAt: new Date(),
       },

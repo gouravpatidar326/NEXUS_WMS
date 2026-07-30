@@ -8,7 +8,7 @@ class InventoryRepository {
       where: {
         productId_companyId: {
           productId,
-          companyId,
+          ...(companyId ? { companyId } : {}),
         },
       },
     });
@@ -28,7 +28,7 @@ class InventoryRepository {
       where: {
         productId_companyId: {
           productId,
-          companyId,
+          ...(companyId ? { companyId } : {}),
         },
       },
       update: {
@@ -39,7 +39,7 @@ class InventoryRepository {
       },
       create: {
         productId,
-        companyId,
+        ...(companyId ? { companyId } : {}),
         totalStock: newTotal,
         reservedStock: newReserved,
         availableStock: newAvailable,
@@ -52,7 +52,7 @@ class InventoryRepository {
       where: {
         productId_companyId: {
           productId,
-          companyId,
+          ...(companyId ? { companyId } : {}),
         },
       },
       include: { product: true },

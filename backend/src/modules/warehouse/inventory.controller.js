@@ -3,7 +3,7 @@ const prisma = require('../../utils/prisma');
 const getInventory = async (req, res) => {
   try {
     const ledger = await prisma.inventoryLedger.findMany({
-      where: { companyId: req.user.companyId },
+      where: { ...(req.user.companyId ? { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) } : {}) },
       include: { product: true },
       orderBy: { timestamp: 'desc' }
     });
@@ -28,7 +28,7 @@ const adjustStock = async (req, res) => {
       await tx.inventoryLedger.create({
         data: {
           productId,
-          companyId: req.user.companyId,
+          ...(req.user.companyId ? { companyId: req.user.companyId } : {}),
           location,
           quantityDelta,
           movementType: reason || 'ADJUSTMENT'

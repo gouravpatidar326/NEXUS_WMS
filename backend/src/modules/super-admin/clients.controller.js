@@ -15,15 +15,19 @@ const getClients = async (req, res) => {
 
 const provisionClient = async (req, res) => {
   try {
-    const { name, creditLimit, tier } = req.body;
+    const { name, creditLimit, tier, email, phone, address, status } = req.body;
 
-    if (!name) {
-      return res.status(400).json({ message: 'Client name is required' });
+    if (!name || !email || !phone || !address || !status) {
+      return res.status(400).json({ message: 'Name, Email, Phone, Address, and Status are required' });
     }
 
     const client = await prisma.client.create({
       data: {
         name,
+        email,
+        phone,
+        address,
+        status,
         creditLimit: creditLimit ? parseFloat(creditLimit) : 0.0,
         tier: tier || 'STANDARD',
       },
@@ -41,7 +45,7 @@ const provisionClient = async (req, res) => {
 const updateClient = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, creditLimit, tier } = req.body;
+    const { name, creditLimit, tier, email, phone, address, status } = req.body;
 
     const existingClient = await prisma.client.findUnique({ where: { id } });
     if (!existingClient) {
@@ -52,6 +56,10 @@ const updateClient = async (req, res) => {
       where: { id },
       data: {
         ...(name ? { name } : {}),
+        ...(email ? { email } : {}),
+        ...(phone ? { phone } : {}),
+        ...(address ? { address } : {}),
+        ...(status ? { status } : {}),
         ...(creditLimit !== undefined ? { creditLimit: parseFloat(creditLimit) } : {}),
         ...(tier ? { tier } : {}),
         updatedAt: new Date(),

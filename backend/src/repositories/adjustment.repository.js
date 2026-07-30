@@ -10,7 +10,7 @@ class AdjustmentRepository {
 
   async findAll({ companyId, reasonCode, productId, skip, limit, sortBy, sortOrder }) {
     const where = {
-      companyId,
+      ...(companyId ? { companyId } : {}),
       ...(reasonCode ? { reasonCode } : {}),
       ...(productId ? { productId } : {}),
     };

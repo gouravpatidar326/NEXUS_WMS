@@ -7,7 +7,7 @@ class ProductRepository {
 
   async findById(id, companyId) {
     return await prisma.product.findFirst({
-      where: { id, companyId, deletedAt: null },
+      where: { id, ...(companyId ? { companyId } : {}), deletedAt: null },
       include: {
         categoryRef: true,
         locationInventories: {
@@ -19,13 +19,13 @@ class ProductRepository {
 
   async findBySku(sku, companyId) {
     return await prisma.product.findFirst({
-      where: { sku, companyId, deletedAt: null },
+      where: { sku, ...(companyId ? { companyId } : {}), deletedAt: null },
     });
   }
 
   async findAll({ companyId, categoryId, status, search, skip, limit, sortBy, sortOrder }) {
     const where = {
-      companyId,
+      ...(companyId ? { companyId } : {}),
       deletedAt: null,
       ...(categoryId ? { categoryId } : {}),
       ...(status ? { status } : {}),
@@ -59,7 +59,7 @@ class ProductRepository {
 
   async update(id, companyId, data) {
     return await prisma.product.updateMany({
-      where: { id, companyId, deletedAt: null },
+      where: { id, ...(companyId ? { companyId } : {}), deletedAt: null },
       data,
     });
   }

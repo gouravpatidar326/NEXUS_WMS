@@ -7,7 +7,7 @@ const getSalesOrders = async (req, res) => {
     // For this mockup, we assume the user represents the client for their company.
     // If you had a distinct clientId on the JWT, filter by that.
     const orders = await prisma.salesOrder.findMany({
-      where: { companyId: req.user.companyId },
+      where: { ...(req.user.companyId ? { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) } : {}) },
       include: {
         items: { include: { product: true } }
       },
@@ -36,7 +36,7 @@ const createSalesOrder = async (req, res) => {
     // Validate products exist and calculate total (using wholesale price for clients)
     for (const item of items) {
       const product = await prisma.product.findFirst({
-        where: { id: item.productId, companyId: req.user.companyId }
+        where: { id: item.productId, ...(req.user.companyId ? { companyId: req.user.companyId } : {}) }
       });
       if (!product) {
         return res.status(400).json({ message: `Product ${item.productId} not found in catalog` });
@@ -47,7 +47,7 @@ const createSalesOrder = async (req, res) => {
     const order = await prisma.salesOrder.create({
       data: {
         clientId: effectiveClientId,
-        companyId: req.user.companyId,
+        ...(req.user.companyId ? { companyId: req.user.companyId } : {}),
         status: 'PENDING_REVIEW',
         totalCost,
         items: {
@@ -72,7 +72,7 @@ const createSalesOrder = async (req, res) => {
     await NotificationService.send({
       title: 'New Order Request',
       message: `A new order request (${order.id}) has been placed and is pending review.`,
-      companyId: req.user.companyId
+      ...(req.user.companyId ? { companyId: req.user.companyId } : {})
     });
 
     res.status(201).json(order);

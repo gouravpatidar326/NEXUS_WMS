@@ -3,7 +3,7 @@ const prisma = require('../../utils/prisma');
 const getPurchaseOrders = async (req, res) => {
   try {
     const orders = await prisma.purchaseOrder.findMany({
-      where: { companyId: req.user.companyId },
+      where: { ...(req.user.companyId ? { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) } : {}) },
       include: {
         items: {
           include: { product: true }
@@ -88,7 +88,7 @@ const receiveGoods = async (req, res) => {
     }
 
     const order = await prisma.purchaseOrder.findFirst({
-      where: { id, companyId: req.user.companyId }
+      where: { id, ...(req.user.companyId ? { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) } : {}) }
     });
 
     if (!order) {
@@ -113,7 +113,7 @@ const receiveGoods = async (req, res) => {
           data: {
             lotId: lot.lotId,
             productId: lot.productId,
-            companyId: req.user.companyId,
+            ...(req.user.companyId ? { companyId: req.user.companyId } : {}),
             mfgDate: lot.mfgDate ? new Date(lot.mfgDate) : null,
             expiryDate: lot.expiryDate ? new Date(lot.expiryDate) : null,
             coaLocked: false, // Inbound docs might not need lock if they trust vendor, or keep it true based on business rule
@@ -125,7 +125,7 @@ const receiveGoods = async (req, res) => {
         await tx.inventoryLedger.create({
           data: {
             productId: lot.productId,
-            companyId: req.user.companyId,
+            ...(req.user.companyId ? { companyId: req.user.companyId } : {}),
             location: lot.binLocation,
             quantityDelta: Number(lot.quantity),
             movementType: 'PO_RECEIPT'
