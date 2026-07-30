@@ -109,6 +109,17 @@ export const WarehouseOpsPage = () => {
     }
   };
 
+  const handleEditLocation = (row) => {
+    setEditingLocation(row);
+    setZone(row.zone || '');
+    setAisle(row.aisle || '');
+    setRack(row.rack || '');
+    setShelf(row.shelf || '');
+    setBin(row.bin || '');
+    setMaxCapacity(String(row.maxCapacity || '1000'));
+    setIsLocModalOpen(true);
+  };
+
   const handleDeleteLocation = (row) => {
     setDeleteLocState({ isOpen: true, locationId: row.id, locationCode: row.code || `Bin ${row.bin}` });
   };
@@ -278,8 +289,11 @@ export const WarehouseOpsPage = () => {
       header: 'Actions',
       accessor: 'actions',
       cell: (row) => (
-        <div className="flex gap-2">
-          <button onClick={() => handleDeleteLocation(row)} className="p-1 text-slate-400 hover:text-red-600">
+        <div className="flex gap-2 items-center">
+          <button onClick={() => handleEditLocation(row)} className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-md transition-colors" title="Edit Location">
+            <Edit2 className="w-4 h-4" />
+          </button>
+          <button onClick={() => handleDeleteLocation(row)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Delete Location">
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
@@ -360,7 +374,11 @@ export const WarehouseOpsPage = () => {
             <Button variant="outline" leftIcon={PackageCheck} onClick={() => setIsCreateRecModalOpen(true)}>
               New Inbound Receiving
             </Button>
-            <Button variant="primary" leftIcon={Plus} onClick={() => setIsLocModalOpen(true)}>
+            <Button variant="primary" leftIcon={Plus} onClick={() => {
+              setEditingLocation(null);
+              setZone(''); setAisle(''); setRack(''); setShelf(''); setBin(''); setMaxCapacity('1000');
+              setIsLocModalOpen(true);
+            }}>
               Provision Storage Bin
             </Button>
           </div>

@@ -10,7 +10,11 @@ datasource db {
 model Company {
   id        String   @id @default(uuid())
   name      String
+  clientCode String?
   industry  String?
+  status    String   @default("ACTIVE")
+  email     String?
+  phone     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -23,8 +27,8 @@ model Company {
   inventories        Inventory[]
   receivings         Receiving[]
   inventoryLedgers   InventoryLedger[]
-  transfersOut       TransferOrder[] @relation("SourceCompany")
-  transfersIn        TransferOrder[] @relation("DestCompany")
+  transfersOut       TransferOrder[]     @relation("SourceCompany")
+  transfersIn        TransferOrder[]     @relation("DestCompany")
   inventoryTransfers InventoryTransfer[]
   stockAdjustments   StockAdjustment[]
   expiryAlerts       ExpiryAlert[]
@@ -40,13 +44,15 @@ model User {
   name      String
   email     String   @unique
   password  String
-  role      String   // SUPER_ADMIN, WAREHOUSE_MANAGER, INVENTORY_CLERK, CLIENT
+  role      String // SUPER_ADMIN, WAREHOUSE_MANAGER, INVENTORY_CLERK, CLIENT
   status    String   @default("ACTIVE")
+  phone     String?
+  jobTitle  String?
   companyId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company            Company? @relation(fields: [companyId], references: [id])
+  company            Company?            @relation(fields: [companyId], references: [id])
   auditLogs          AuditLog[]
   notifications      Notification[]
   receivings         Receiving[]         @relation("InspectorUser")
@@ -59,6 +65,10 @@ model Client {
   name        String
   creditLimit Float    @default(0.0)
   tier        String   @default("STANDARD")
+  email       String?
+  phone       String?
+  address     String?
+  status      String   @default("ACTIVE")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -72,7 +82,7 @@ model AuditLog {
   ipAddress String?
   timestamp DateTime @default(now())
 
-  user      User?    @relation(fields: [userId], references: [id])
+  user User? @relation(fields: [userId], references: [id])
 }
 
 model SystemSettings {
@@ -103,7 +113,7 @@ model Product {
   barcode        String?
   name           String
   description    String?
-  category       String?   // Backward compatible string category
+  category       String? // Backward compatible string category
   categoryId     String?
   unitCost       Float     @default(0.0)
   wholesalePrice Float     @default(0.0)
@@ -170,8 +180,8 @@ model ReceivingItem {
 
 model Batch {
   id                String    @id @default(uuid())
-  lotNumber         String?   
-  lotId             String?   
+  lotNumber         String?
+  lotId             String?
   productId         String
   receivingItemId   String?
   companyId         String
@@ -212,7 +222,7 @@ model Barcode {
 
 model Location {
   id          String    @id @default(uuid())
-  code        String?   
+  code        String?
   name        String?
   zone        String
   aisle       String
@@ -276,18 +286,18 @@ model InventoryLedger {
   locationId       String?
   sourceLocationId String?
   destLocationId   String?
-  location         String?  // Legacy string location fallback
-  quantityDelta    Int      // Positive for IN, Negative for OUT
-  movementType     String   // RECEIVE, TRANSFER, RETURN, ADJUSTMENT, PICK, SHIP
+  location         String? // Legacy string location fallback
+  quantityDelta    Int // Positive for IN, Negative for OUT
+  movementType     String // RECEIVE, TRANSFER, RETURN, ADJUSTMENT, PICK, SHIP
   referenceId      String?
   notes            String?
   createdBy        String?
   timestamp        DateTime @default(now())
 
-  product  Product   @relation(fields: [productId], references: [id])
-  batch    Batch?    @relation(fields: [lotId], references: [id])
-  company  Company   @relation(fields: [companyId], references: [id])
-  locRef   Location? @relation(fields: [locationId], references: [id])
+  product Product   @relation(fields: [productId], references: [id])
+  batch   Batch?    @relation(fields: [lotId], references: [id])
+  company Company   @relation(fields: [companyId], references: [id])
+  locRef  Location? @relation(fields: [locationId], references: [id])
 }
 
 model InventoryTransfer {
@@ -328,7 +338,7 @@ model StockAdjustment {
   lotId            String
   locationId       String
   quantityDelta    Int
-  reasonCode       String   // DAMAGE, LOST, MANUAL_CORRECTION, AUDIT_CORRECTION
+  reasonCode       String // DAMAGE, LOST, MANUAL_CORRECTION, AUDIT_CORRECTION
   notes            String?
   createdBy        String?
   companyId        String
@@ -347,7 +357,7 @@ model ExpiryAlert {
   productId     String
   expiryDate    DateTime
   daysRemaining Int
-  alertTier     String   // ALERT_30D, ALERT_15D, ALERT_7D, EXPIRED
+  alertTier     String // ALERT_30D, ALERT_15D, ALERT_7D, EXPIRED
   resolved      Boolean  @default(false)
   companyId     String
   createdAt     DateTime @default(now())
@@ -358,15 +368,15 @@ model ExpiryAlert {
 }
 
 model PurchaseOrder {
-  id               String   @id @default(uuid())
-  poNumber         String   @unique
+  id               String    @id @default(uuid())
+  poNumber         String    @unique
   supplier         String
   expectedDelivery DateTime?
-  totalCost        Float    @default(0.0)
-  status           String   @default("PENDING") // PENDING, APPROVED, RECEIVED
+  totalCost        Float     @default(0.0)
+  status           String    @default("PENDING") // PENDING, APPROVED, RECEIVED
   companyId        String
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   company Company             @relation(fields: [companyId], references: [id])
   items   PurchaseOrderItem[]

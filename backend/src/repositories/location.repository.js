@@ -7,7 +7,7 @@ class LocationRepository {
 
   async findById(id, companyId) {
     return await prisma.location.findFirst({
-      where: { id, companyId, deletedAt: null },
+      where: { id, ...(companyId ? { companyId } : {}), deletedAt: null },
       include: {
         locationInventories: {
           include: { product: true, batch: true },
@@ -18,7 +18,7 @@ class LocationRepository {
 
   async findAll({ companyId, zone, status, search, skip, limit, sortBy, sortOrder }) {
     const where = {
-      companyId,
+      ...(companyId ? { companyId } : {}),
       deletedAt: null,
       ...(zone ? { zone } : {}),
       ...(status ? { status } : {}),
@@ -54,7 +54,7 @@ class LocationRepository {
 
   async update(id, companyId, data) {
     return await prisma.location.updateMany({
-      where: { id, companyId, deletedAt: null },
+      where: { id, ...(companyId ? { companyId } : {}), deletedAt: null },
       data,
     });
   }

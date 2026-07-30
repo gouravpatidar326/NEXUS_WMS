@@ -7,14 +7,14 @@ class CategoryRepository {
 
   async findById(id, companyId) {
     return await prisma.category.findFirst({
-      where: { id, companyId, deletedAt: null },
+      where: { id, ...(companyId ? { companyId } : {}), deletedAt: null },
       include: { _count: { select: { products: true } } },
     });
   }
 
   async findAll({ companyId, skip, limit, sortBy, sortOrder, search }) {
     const where = {
-      companyId,
+      ...(companyId ? { companyId } : {}),
       deletedAt: null,
       ...(search
         ? {
@@ -42,7 +42,7 @@ class CategoryRepository {
 
   async update(id, companyId, data) {
     return await prisma.category.updateMany({
-      where: { id, companyId, deletedAt: null },
+      where: { id, ...(companyId ? { companyId } : {}), deletedAt: null },
       data,
     });
   }

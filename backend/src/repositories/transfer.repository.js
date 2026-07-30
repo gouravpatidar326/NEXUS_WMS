@@ -31,7 +31,7 @@ class TransferRepository {
 
   async findAll({ companyId, status, transferType, skip, limit, sortBy, sortOrder }) {
     const where = {
-      companyId,
+      ...(companyId ? { companyId } : {}),
       ...(status ? { status } : {}),
       ...(transferType ? { transferType } : {}),
     };

@@ -4,7 +4,7 @@ const NotificationService = require('../../utils/notification.service');
 const getSalesOrders = async (req, res) => {
   try {
     const orders = await prisma.salesOrder.findMany({
-      where: { companyId: req.user.companyId },
+      where: { ...(req.user.companyId ? { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) } : {}) },
       include: {
         items: { include: { product: true } },
         client: { select: { name: true, tier: true } }
@@ -23,7 +23,7 @@ const approveSalesOrder = async (req, res) => {
     const { id } = req.params;
 
     const order = await prisma.salesOrder.findFirst({
-      where: { id, companyId: req.user.companyId },
+      where: { id, ...(req.user.companyId ? { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) } : {}) },
       include: { items: true }
     });
 
@@ -37,11 +37,19 @@ const approveSalesOrder = async (req, res) => {
 
     // Wrap in transaction to ensure stock is reserved safely
     await prisma.$transaction(async (tx) => {
-      // 1. Verify stock for all items first
+      // 1. Verify stock for all items first using real-time inventory aggregate
       for (const item of order.items) {
         const product = await tx.product.findUnique({ where: { id: item.productId } });
-        if (product.availableStock < item.quantity) {
-          throw new Error(`Insufficient stock for product ${product.sku}`);
+        
+        // Use real-time sum from LocationInventory (source of truth)
+        const stockAggregate = await tx.locationInventory.aggregate({
+          where: { productId: item.productId },
+          _sum: { quantity: true }
+        });
+        const actualStock = stockAggregate._sum.quantity ?? 0;
+
+        if (actualStock < item.quantity) {
+          throw new Error(`Insufficient stock for product ${product.sku}. Available: ${actualStock}, Required: ${item.quantity}`);
         }
       }
 
@@ -66,7 +74,7 @@ const approveSalesOrder = async (req, res) => {
       await tx.pickList.create({
         data: {
           orderId: order.id,
-          companyId: req.user.companyId,
+          ...(req.user.companyId ? { companyId: req.user.companyId } : {}),
           status: 'PENDING',
           items: {
             create: pickListItems
@@ -93,7 +101,7 @@ const approveSalesOrder = async (req, res) => {
     await NotificationService.send({
       title: 'Order Approved',
       message: `Your order (${order.id}) has been approved and is now being picked.`,
-      companyId: req.user.companyId
+      ...(req.user.companyId ? { companyId: req.user.companyId } : {})
     });
 
     res.json({ id, status: 'PICKING' });
@@ -116,7 +124,7 @@ const rejectSalesOrder = async (req, res) => {
     }
 
     const order = await prisma.salesOrder.findFirst({
-      where: { id, companyId: req.user.companyId }
+      where: { id, ...(req.user.companyId ? { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) } : {}) }
     });
 
     if (!order) {
@@ -144,7 +152,7 @@ const rejectSalesOrder = async (req, res) => {
     await NotificationService.send({
       title: 'Order Rejected',
       message: `Your order (${order.id}) was rejected. Reason: ${reason}`,
-      companyId: req.user.companyId
+      ...(req.user.companyId ? { companyId: req.user.companyId } : {})
     });
 
     res.json({ id, status: 'REJECTED' });
@@ -184,7 +192,7 @@ const createSalesOrder = async (req, res) => {
       data: {
         orderNumber,
         clientId,
-        companyId: req.user.companyId,
+        ...(req.user.companyId ? { companyId: req.user.companyId } : {}),
         priority: priority || 'NORMAL',
         shippingAddress,
         poNumber,

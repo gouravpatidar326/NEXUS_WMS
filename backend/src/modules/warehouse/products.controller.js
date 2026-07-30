@@ -4,7 +4,7 @@ const getProducts = async (req, res) => {
   try {
     const products = await prisma.product.findMany({
       where: { 
-        companyId: req.user.companyId,
+        ...(req.user.companyId ? { companyId: req.user.companyId } : {}),
         status: { not: 'DELETED' }
       }
     });
@@ -37,7 +37,7 @@ const createProduct = async (req, res) => {
         category,
         unitCost: unitCost || 0,
         wholesalePrice: wholesalePrice || 0,
-        companyId: req.user.companyId
+        ...(req.user.companyId ? { companyId: req.user.companyId } : {})
       }
     });
 

@@ -4,11 +4,11 @@ export const userService = {
   getUsers: async () => {
     return await api.get('/users');
   },
-  inviteUser: async (userData) => {
-    return await api.post('/users', userData);
+  inviteUser: async (data) => {
+    return await api.post('/users', data);
   },
-  updateUser: async (id, userData) => {
-    return await api.put(`/users/${id}`, userData);
+  updateUser: async (id, data) => {
+    return await api.put(`/users/${id}`, data);
   },
   deleteUser: async (id) => {
     return await api.delete(`/users/${id}`);

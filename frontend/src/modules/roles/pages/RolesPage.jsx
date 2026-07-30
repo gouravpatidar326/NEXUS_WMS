@@ -105,6 +105,19 @@ export const RolesPage = () => {
     );
   };
 
+  const selectCategory = (categoryPerms) => {
+    if (!isEditing || selectedRoleKey === 'SUPER_ADMIN') return;
+    const missingPerms = categoryPerms.filter(p => !activePermissions.includes(p));
+    if (missingPerms.length > 0) {
+      setActivePermissions(prev => [...prev, ...missingPerms]);
+    }
+  };
+
+  const deselectCategory = (categoryPerms) => {
+    if (!isEditing || selectedRoleKey === 'SUPER_ADMIN') return;
+    setActivePermissions(prev => prev.filter(p => !categoryPerms.includes(p)));
+  };
+
   const savePermissions = async () => {
     try {
       await roleService.updateRolePermissions(selectedRoleKey, activePermissions);
@@ -185,9 +198,33 @@ export const RolesPage = () => {
           </div>
 
           <div className="space-y-6">
-            {permissionCategories.map((cat) => (
-              <div key={cat.title} className="space-y-3">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">{cat.title}</h4>
+            {permissionCategories.map((cat) => {
+              const categoryGrantedCount = cat.perms.filter(p => activePermissions.includes(p)).length;
+              const isAllGranted = categoryGrantedCount === cat.perms.length;
+              
+              return (
+                <div key={cat.title} className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">{cat.title}</h4>
+                    {isEditing && selectedRoleKey !== 'SUPER_ADMIN' && (
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => selectCategory(cat.perms)}
+                          disabled={isAllGranted}
+                          className={`text-[10px] px-2 py-1 rounded-md font-bold uppercase tracking-wide transition ${isAllGranted ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-primary-50 text-primary-600 hover:bg-primary-100'}`}
+                        >
+                          Select All
+                        </button>
+                        <button 
+                          onClick={() => deselectCategory(cat.perms)}
+                          disabled={categoryGrantedCount === 0}
+                          className={`text-[10px] px-2 py-1 rounded-md font-bold uppercase tracking-wide transition ${categoryGrantedCount === 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-rose-50 text-rose-600 hover:bg-rose-100'}`}
+                        >
+                          Deselect All
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {cat.perms.map((permKey) => {
                     const isGranted = activePermissions.includes(permKey);
@@ -212,9 +249,10 @@ export const RolesPage = () => {
                       </button>
                     );
                   })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

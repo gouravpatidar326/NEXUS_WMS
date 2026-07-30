@@ -24,7 +24,7 @@ class BarcodeRepository {
 
   async findAll({ companyId, productId, batchId, skip, limit }) {
     const where = {
-      companyId,
+      ...(companyId ? { companyId } : {}),
       ...(productId ? { productId } : {}),
       ...(batchId ? { batchId } : {}),
     };

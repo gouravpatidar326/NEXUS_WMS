@@ -16,7 +16,7 @@ const getCompanies = async (req, res) => {
 const getPickLists = async (req, res) => {
   try {
     const pickLists = await prisma.pickList.findMany({
-      where: { companyId: req.user.companyId },
+      where: { ...(req.user.companyId ? { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) } : {}) },
       include: {
         items: {
           include: { product: true, batch: true }
@@ -41,7 +41,7 @@ const completePick = async (req, res) => {
     }
 
     const pickList = await prisma.pickList.findFirst({
-      where: { id, companyId: req.user.companyId }
+      where: { id, ...(req.user.companyId ? { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) } : {}) }
     });
 
     if (!pickList) {
@@ -58,19 +58,10 @@ const completePick = async (req, res) => {
 
         if (!assignedBatchId) {
           const batch = await tx.batch.findFirst({
-            where: {
-              productId: pickItem.productId,
-              companyId: req.user.companyId,
-              quarantine: false
-            },
-            orderBy: {
-              expiryDate: 'asc'
-            }
+            where: { productId: pickItem.productId, ...(req.user.companyId ? { companyId: req.user.companyId } : {}), quarantine: false },
+            orderBy: { expiryDate: 'asc' }
           });
-
-          if (batch) {
-            assignedBatchId = batch.id;
-          }
+          if (batch) assignedBatchId = batch.id;
         }
 
         await tx.pickListItem.update({
@@ -81,6 +72,25 @@ const completePick = async (req, res) => {
             ...(assignedBatchId && { batchId: assignedBatchId })
           }
         });
+
+        const pickedQty = item.pickedQuantity;
+
+        // Deduct from LocationInventory (source of truth)
+        const locInv = await tx.locationInventory.findFirst({
+          where: { productId: pickItem.productId }
+        });
+        if (locInv) {
+          await tx.locationInventory.update({
+            where: { id: locInv.id },
+            data: { quantity: { decrement: pickedQty } }
+          });
+        }
+
+        // Sync Product.availableStock cache
+        await tx.product.update({
+          where: { id: pickItem.productId },
+          data: { availableStock: { decrement: pickedQty } }
+        });
       }
 
       await tx.pickList.update({
@@ -90,10 +100,7 @@ const completePick = async (req, res) => {
 
       // Update SalesOrder status to PACKING
       if (pickList.orderId) {
-        // We assume orderId is the SalesOrder ID
-        const salesOrder = await tx.salesOrder.findUnique({
-          where: { id: pickList.orderId }
-        });
+        const salesOrder = await tx.salesOrder.findUnique({ where: { id: pickList.orderId } });
         if (salesOrder) {
           await tx.salesOrder.update({
             where: { id: pickList.orderId },
@@ -104,11 +111,7 @@ const completePick = async (req, res) => {
     });
 
     await prisma.auditLog.create({
-      data: {
-        event: 'PICK_LIST_COMPLETED',
-        userId: req.user.id,
-        ipAddress: req.ip
-      }
+      data: { event: 'PICK_LIST_COMPLETED', userId: req.user.id, ipAddress: req.ip }
     });
 
     res.json({ id, status: 'COMPLETED' });
@@ -128,11 +131,7 @@ const updateLocation = async (req, res) => {
     }
 
     await prisma.auditLog.create({
-      data: {
-        event: 'BARCODE_LOCATION_UPDATED',
-        userId: req.user.id,
-        ipAddress: req.ip
-      }
+      data: { event: 'BARCODE_LOCATION_UPDATED', userId: req.user.id, ipAddress: req.ip }
     });
 
     res.json({ status: 'Location Updated', barcode, location: newLocation });
@@ -145,7 +144,7 @@ const updateLocation = async (req, res) => {
 const getShipments = async (req, res) => {
   try {
     const shipments = await prisma.shipment.findMany({
-      where: { companyId: req.user.companyId },
+      where: { ...(req.user.companyId ? { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) } : {}) },
       orderBy: { createdAt: 'desc' }
     });
     res.json(shipments);
@@ -177,27 +176,18 @@ const generateShippingLabel = async (req, res) => {
           estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           status: 'LABEL_CREATED',
           labelUrl: mockLabelUrl,
-          companyId: req.user.companyId
+          ...(req.user.companyId ? { companyId: req.user.companyId } : {})
         }
       });
 
       await tx.auditLog.create({
-        data: {
-          event: 'SHIPSTATION_LABEL_GENERATED',
-          userId: req.user.id,
-          ipAddress: req.ip
-        }
+        data: { event: 'SHIPSTATION_LABEL_GENERATED', userId: req.user.id, ipAddress: req.ip }
       });
 
       // Update SalesOrder status to SHIPPED
-      const salesOrder = await tx.salesOrder.findUnique({
-        where: { id: orderId }
-      });
+      const salesOrder = await tx.salesOrder.findUnique({ where: { id: orderId } });
       if (salesOrder) {
-        await tx.salesOrder.update({
-          where: { id: orderId },
-          data: { status: 'SHIPPED' }
-        });
+        await tx.salesOrder.update({ where: { id: orderId }, data: { status: 'SHIPPED' } });
       }
 
       return newShipment;
@@ -209,6 +199,7 @@ const generateShippingLabel = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
 const getCarriers = async (req, res) => {
   try {
     let settings = await prisma.systemSettings.findUnique({ where: { key: 'CARRIERS' } });
@@ -231,7 +222,7 @@ const deleteShipment = async (req, res) => {
   try {
     const { id } = req.params;
     const shipment = await prisma.shipment.findFirst({
-      where: { id, companyId: req.user.companyId }
+      where: { id, ...(req.user.companyId ? { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) } : {}) }
     });
 
     if (!shipment) {
@@ -241,11 +232,7 @@ const deleteShipment = async (req, res) => {
     await prisma.shipment.delete({ where: { id } });
 
     await prisma.auditLog.create({
-      data: {
-        event: 'SHIPMENT_DELETED',
-        userId: req.user.id,
-        ipAddress: req.ip
-      }
+      data: { event: 'SHIPMENT_DELETED', userId: req.user.id, ipAddress: req.ip }
     });
 
     res.json({ message: 'Shipment deleted successfully' });

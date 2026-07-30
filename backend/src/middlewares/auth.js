@@ -10,6 +10,12 @@ const verifyToken = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded; // { id, role, companyId, ... }
+    
+    // Super Admins should have global visibility
+    if (req.user.role === 'SUPER_ADMIN') {
+      req.user.companyId = null;
+    }
+    
     next();
   } catch (error) {
     return res.status(401).json({ message: 'Unauthorized: Invalid token' });

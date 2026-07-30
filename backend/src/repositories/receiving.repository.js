@@ -30,7 +30,7 @@ class ReceivingRepository {
 
   async findAll({ companyId, status, search, skip, limit, sortBy, sortOrder }) {
     const where = {
-      companyId,
+      ...(companyId ? { companyId } : {}),
       ...(status ? { status } : {}),
       ...(search
         ? {

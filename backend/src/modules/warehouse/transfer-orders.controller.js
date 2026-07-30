@@ -37,7 +37,7 @@ const createTransferOrder = async (req, res) => {
 
     // Verify product & stock exist in source company
     const sourceProduct = await prisma.product.findFirst({
-      where: { id: productId, companyId: req.user.companyId }
+      where: { id: productId, ...(req.user.companyId ? { companyId: req.user.companyId } : {}) }
     });
 
     if (!sourceProduct) {
@@ -70,7 +70,7 @@ const createTransferOrder = async (req, res) => {
       await tx.inventoryLedger.create({
         data: {
           productId,
-          companyId: req.user.companyId,
+          ...(req.user.companyId ? { companyId: req.user.companyId } : {}),
           location: 'TRANSFER_OUT',
           quantityDelta: -quantity,
           movementType: 'TRANSFER_OUT'

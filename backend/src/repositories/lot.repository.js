@@ -21,7 +21,7 @@ class LotRepository {
 
   async findAll({ companyId, productId, status, search, skip, limit, sortBy, sortOrder }) {
     const where = {
-      companyId,
+      ...(companyId ? { companyId } : {}),
       ...(productId ? { productId } : {}),
       ...(status ? { status } : {}),
       ...(search

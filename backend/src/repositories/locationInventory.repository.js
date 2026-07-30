@@ -46,7 +46,7 @@ class LocationInventoryRepository {
         productId,
         lotId,
         quantity: Math.max(0, quantityDelta),
-        companyId,
+        ...(companyId ? { companyId } : {}),
       },
     });
 
