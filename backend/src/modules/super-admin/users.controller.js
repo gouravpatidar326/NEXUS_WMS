@@ -49,7 +49,7 @@ const inviteUser = async (req, res) => {
         password: hashedPassword,
         role,
         companyId: companyId || null,
-        status: 'Active',
+        status: 'ACTIVE',
       },
     });
 

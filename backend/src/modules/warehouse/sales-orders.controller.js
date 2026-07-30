@@ -156,7 +156,7 @@ const rejectSalesOrder = async (req, res) => {
 
 const createSalesOrder = async (req, res) => {
   try {
-    const { clientId, priority, items } = req.body;
+    const { clientId, priority, items, shippingAddress, poNumber, notes } = req.body;
 
     if (!clientId || !items || items.length === 0) {
       return res.status(400).json({ message: 'Client ID and items are required' });
@@ -186,6 +186,9 @@ const createSalesOrder = async (req, res) => {
         clientId,
         companyId: req.user.companyId,
         priority: priority || 'NORMAL',
+        shippingAddress,
+        poNumber,
+        notes,
         totalCost,
         items: {
           create: orderItemsData

@@ -240,6 +240,7 @@ export const SalesOrdersPage = () => {
               <tr className="bg-surface-container text-xs font-bold text-on-surface-variant uppercase tracking-wider border-b border-outline-variant">
                 <th className="px-6 py-4">Order ID</th>
                 <th className="px-6 py-4">Client</th>
+                <th className="px-6 py-4">Items (Qty)</th>
                 <th className="px-6 py-4">Order Date</th>
                 <th className="px-6 py-4">Priority</th>
                 <th className="px-6 py-4">Status</th>
@@ -249,11 +250,14 @@ export const SalesOrdersPage = () => {
             <tbody className="divide-y divide-outline-variant text-sm">
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="text-center py-8 text-surface-500">No sales orders found</td>
+                  <td colSpan="7" className="text-center py-8 text-surface-500">No sales orders found</td>
                 </tr>
               ) : filteredOrders.map((ord) => (
                 <tr key={ord.id} className="hover:bg-surface-container-low transition-colors group">
-                  <td className="px-6 py-4 font-mono font-bold text-primary">{ord.orderNumber}</td>
+                  <td className="px-6 py-4">
+                    <div className="font-mono font-bold text-primary">{ord.orderNumber}</div>
+                    {ord.poNumber && <div className="text-[10px] text-surface-500 mt-1">PO: {ord.poNumber}</div>}
+                  </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded bg-secondary-container flex items-center justify-center text-xs font-bold text-on-secondary-container">
@@ -261,6 +265,29 @@ export const SalesOrdersPage = () => {
                       </div>
                       <span className="font-semibold text-on-surface">{ord.client?.name || 'Unknown Client'}</span>
                     </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    {ord.items && ord.items.length > 0 ? (
+                      <div className="flex flex-col gap-1">
+                        {ord.items.map(item => (
+                          <span key={item.id} className="text-xs text-on-surface">
+                            {item.product?.name || 'Unknown Product'} <span className="text-on-surface-variant font-bold">(x{item.quantity})</span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-on-surface-variant">No items</span>
+                    )}
+                    {ord.shippingAddress && (
+                      <div className="mt-2 text-[10px] text-surface-600 border-t border-outline-variant pt-1">
+                        <span className="font-bold">Ship To:</span> {ord.shippingAddress}
+                      </div>
+                    )}
+                    {ord.notes && (
+                      <div className="mt-1 text-[10px] text-surface-600">
+                        <span className="font-bold text-amber-700">Note:</span> {ord.notes}
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-on-surface-variant text-xs">{new Date(ord.createdAt).toLocaleDateString()}</td>
                   <td className="px-6 py-4">

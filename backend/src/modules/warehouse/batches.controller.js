@@ -113,4 +113,40 @@ const unlockCoa = async (req, res) => {
   }
 };
 
-module.exports = { getBatches, createBatch, updateBatch, unlockCoa };
+const deleteBatch = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { companyId } = req.user;
+
+    const batch = await prisma.batch.findFirst({
+      where: { id, companyId }
+    });
+
+    if (!batch) {
+      return res.status(404).json({ message: 'Batch not found' });
+    }
+
+    // Clear FK-linked records before deletion
+    await prisma.barcode.deleteMany({ where: { batchId: id } });
+    await prisma.locationInventory.deleteMany({ where: { batchId: id } });
+    await prisma.inventoryLedger.deleteMany({ where: { batchId: id } });
+
+    await prisma.batch.delete({ where: { id } });
+
+    // Audit log (userId must exist — logged-in admin)
+    await prisma.auditLog.create({
+      data: {
+        event: 'BATCH_DELETED',
+        userId: req.user.id,
+        ipAddress: req.ip
+      }
+    });
+
+    res.json({ message: `Batch ${batch.lotId} deleted successfully`, id });
+  } catch (error) {
+    console.error('Error deleting batch:', error);
+    res.status(500).json({ message: error.message || 'Internal server error' });
+  }
+};
+
+module.exports = { getBatches, createBatch, updateBatch, unlockCoa, deleteBatch };

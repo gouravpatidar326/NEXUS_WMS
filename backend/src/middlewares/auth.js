@@ -18,7 +18,9 @@ const verifyToken = (req, res, next) => {
 
 const requireRole = (roles) => {
   return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    const userRole = (req.user?.role || '').toUpperCase();
+    const allowedRoles = roles.map(r => r.toUpperCase());
+    if (!req.user || !allowedRoles.includes(userRole)) {
       return res.status(403).json({ message: 'Forbidden: Insufficient privileges' });
     }
     next();
@@ -29,3 +31,5 @@ module.exports = {
   verifyToken,
   requireRole
 };
+
+

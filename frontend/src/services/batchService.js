@@ -21,5 +21,9 @@ export const batchService = {
 
   async unlockCoa(id, paymentToken) {
     return await api.post(`/batches/${id}/unlock-coa`, { paymentToken });
+  },
+
+  async deleteBatch(id) {
+    return await api.delete(`/batches/${id}`);
   }
 };

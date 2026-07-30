@@ -7,7 +7,8 @@ import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import LoadingState from '@/components/feedback/LoadingState';
-import { QrCode, Lock, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { QrCode, Lock, CheckCircle2, ShieldAlert, Trash2 } from 'lucide-react';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 export const BatchTrackingPage = () => {
   const { user } = useAuth();
@@ -21,13 +22,15 @@ export const BatchTrackingPage = () => {
   // Modals
   const [selectedLotCoa, setSelectedLotCoa] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, id: null, lotId: '' });
 
   // Form State
   const [formData, setFormData] = useState({
     lotId: '',
     productId: '',
     mfgDate: '',
-    expiryDate: ''
+    expiryDate: '',
+    acceptedQty: ''
   });
 
   const fetchData = async () => {
@@ -57,7 +60,7 @@ export const BatchTrackingPage = () => {
       await batchService.createBatch(formData);
       notifySuccess('Batch added successfully!');
       setIsAddModalOpen(false);
-      setFormData({ lotId: '', productId: '', mfgDate: '', expiryDate: '' });
+      setFormData({ lotId: '', productId: '', mfgDate: '', expiryDate: '', acceptedQty: '' });
       fetchData();
     } catch (error) {
       console.error(error);
@@ -72,6 +75,21 @@ export const BatchTrackingPage = () => {
       fetchData();
     } catch (error) {
       notifyError('Failed to unlock COA');
+    }
+  };
+
+  const handleDeleteBatch = (id, lotId) => {
+    setDeleteConfirm({ isOpen: true, id, lotId });
+  };
+
+  const confirmDeleteBatch = async () => {
+    try {
+      await batchService.deleteBatch(deleteConfirm.id);
+      notifySuccess(`Batch ${deleteConfirm.lotId} permanently deleted.`);
+      setDeleteConfirm({ isOpen: false, id: null, lotId: '' });
+      fetchData();
+    } catch (error) {
+      notifyError('Failed to delete batch');
     }
   };
 
@@ -232,12 +250,20 @@ export const BatchTrackingPage = () => {
                           Pay $150 to Unlock COA
                         </button>
                       )}
-                      <button
+                       <button
                         onClick={() => handleToggleQuarantine(lot.id, lot.quarantine)}
                         className={`px-3 py-1 border rounded text-xs font-bold transition-colors cursor-pointer w-full max-w-[160px] ${lot.quarantine ? 'border-green-600 text-green-600 hover:bg-green-50' : 'border-red-600 text-red-600 hover:bg-red-50'}`}
-                      >
+                       >
                         {lot.quarantine ? 'Remove Quarantine' : 'Quarantine'}
-                      </button>
+                       </button>
+                       {user?.role?.toUpperCase() === 'SUPER_ADMIN' && (
+                         <button
+                           onClick={() => handleDeleteBatch(lot.id, lot.lotId)}
+                           className="px-3 py-1 bg-red-600 text-white rounded text-xs font-bold hover:bg-red-700 transition-colors flex items-center gap-1 justify-center w-full max-w-[160px]"
+                         >
+                           <Trash2 className="w-3 h-3" /> Delete Batch
+                         </button>
+                       )}
                     </td>
                   </tr>
                 );
@@ -298,6 +324,18 @@ export const BatchTrackingPage = () => {
                 className="w-full p-2 border border-outline-variant rounded-md focus:outline-none focus:border-primary"
               />
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-on-surface mb-1">Accepted Quantity (Units) *</label>
+            <input
+              required
+              type="number"
+              min="1"
+              value={formData.acceptedQty}
+              onChange={e => setFormData({...formData, acceptedQty: e.target.value})}
+              className="w-full p-2 border border-outline-variant rounded-md focus:outline-none focus:border-primary"
+              placeholder="e.g. 500"
+            />
           </div>
           <div className="flex justify-end gap-3 mt-6">
             <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>Cancel</Button>
@@ -363,6 +401,17 @@ export const BatchTrackingPage = () => {
           </div>
         )}
       </Modal>
+
+      {/* Delete Batch Confirm Modal */}
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, id: null, lotId: '' })}
+        onConfirm={confirmDeleteBatch}
+        title="Permanently Delete Batch?"
+        message={`Are you sure you want to permanently delete Batch "${deleteConfirm.lotId}"? This will remove all linked inventory records, barcodes, and COA data. This action CANNOT be undone.`}
+        confirmLabel="Yes, Delete Permanently"
+        danger
+      />
     </div>
   );
 };

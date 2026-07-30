@@ -434,6 +434,9 @@ model SalesOrder {
   status          String   @default("PENDING_REVIEW") // PENDING_REVIEW, PICKING, REJECTED, COMPLETED
   rejectionReason String?
   totalCost       Float    @default(0.0)
+  shippingAddress String?
+  poNumber        String?
+  notes           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

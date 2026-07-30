@@ -92,20 +92,21 @@ const deleteCompany = async (req, res) => {
       await tx.salesOrder.deleteMany({ where: { companyId: id } });
       await tx.purchaseOrderItem.deleteMany({ where: { purchaseOrder: { companyId: id } } });
       await tx.purchaseOrder.deleteMany({ where: { companyId: id } });
-      await tx.user.deleteMany({ where: { companyId: id } });
-
-      // 2. Delete target company record
-      await tx.company.delete({
-        where: { id },
-      });
-
-      // 3. Log audit event
+      // 2. Log audit event BEFORE deleting users (userId FK must exist)
       await tx.auditLog.create({
         data: {
           event: 'COMPANY_DELETED',
           userId: req.user.id,
           ipAddress: req.ip
         }
+      });
+
+      // 3. Delete users and company record
+      await tx.user.deleteMany({ where: { companyId: id } });
+
+      // 4. Delete target company record
+      await tx.company.delete({
+        where: { id },
       });
     });
 

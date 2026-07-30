@@ -6,7 +6,7 @@ import { ROLES } from '@/permissions/roles';
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('alex@stitchnexus.com');
-  const [password, setPassword] = useState('password123');
+  const [password, setPassword] = useState('123456');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -24,7 +24,7 @@ export const LoginPage = () => {
 
     setEmail(targetEmail);
     try {
-      const result = await login(targetEmail, 'password123');
+      const result = await login(targetEmail, '123456');
       setIsLoading(false);
       if (result?.success) {
         notifySuccess(`Logged in as ${result.user.name}`);

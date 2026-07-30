@@ -11,8 +11,10 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Sync role permissions from real backend API
+  // Sync role permissions from real backend API — only when token exists
   const syncPermissionsFromApi = useCallback(async () => {
+    const token = localStorage.getItem('wms_token');
+    if (!token) return; // Skip if not authenticated
     try {
       const rolesData = await roleService.getRoles();
       if (Array.isArray(rolesData)) {

@@ -11,6 +11,10 @@ import PageHeader from '@/components/navigation/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { productService } from '@/services/productService';
+import { categoryService } from '@/services/categoryService';
+import { salesOrderService } from '@/services/salesOrderService';
+import { clientService } from '@/services/clientService';
+import { ShoppingCart } from 'lucide-react';
 
 export const ProductsListPage = () => {
   const { user } = useAuth();
@@ -47,26 +51,42 @@ export const ProductsListPage = () => {
   // Delete Confirm State
   const [deleteProdState, setDeleteProdState] = useState({ isOpen: false, id: null, name: '' });
 
-  const isClient = user?.role === 'client';
-  const showUnitCost = user?.role === 'super_admin' || user?.role === 'warehouse_manager';
+  // Order State
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [orderProduct, setOrderProduct] = useState(null);
+  const [orderQuantity, setOrderQuantity] = useState(1);
+  const [orderPriority, setOrderPriority] = useState('NORMAL');
+  const [orderShippingAddress, setOrderShippingAddress] = useState('');
+  const [orderPoNumber, setOrderPoNumber] = useState('');
+  const [orderNotes, setOrderNotes] = useState('');
+  const [clients, setClients] = useState([]);
+  const [orderClientId, setOrderClientId] = useState('');
+
+  const isClient = user?.role === 'client' || user?.role?.toUpperCase() === 'CLIENT';
+  const showUnitCost = user?.role?.toUpperCase() === 'SUPER_ADMIN' || user?.role?.toUpperCase() === 'WAREHOUSE_MANAGER';
+  const showWholesalePrice = !isClient;
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [prodRes, catRes] = await Promise.all([
+      const [prodRes, catRes, clientRes] = await Promise.all([
         productService.getProducts({
           search: searchTerm,
           category: selectedCategory,
           status: selectedStatus,
         }),
-        productService.getCategories(),
+        categoryService.getCategories(),
+        clientService.fetchClients().catch(() => ({ data: [] }))
       ]);
 
       const prodList = Array.isArray(prodRes) ? prodRes : prodRes?.items || prodRes?.data || [];
       const catList = Array.isArray(catRes) ? catRes : catRes?.data || [];
+      const clientList = Array.isArray(clientRes) ? clientRes : clientRes?.data || [];
 
       setProducts(prodList);
       setCategories(catList);
+      setClients(clientList);
+      if (clientList.length > 0) setOrderClientId(clientList[0].id);
     } catch (err) {
       console.error('Error loading products data:', err);
       notifyError('Failed to load products master catalog');
@@ -148,7 +168,7 @@ export const ProductsListPage = () => {
     }
 
     try {
-      await productService.createCategory({
+      await categoryService.createCategory({
         name: catName,
         code: catCode,
         description: catDescription,
@@ -177,6 +197,42 @@ export const ProductsListPage = () => {
       fetchData();
     } catch (err) {
       notifyError(err.message || 'Failed to delete product');
+    }
+  };
+
+  const handleOpenOrderModal = (prod) => {
+    setOrderProduct(prod);
+    setOrderQuantity(1);
+    setOrderPriority('NORMAL');
+    setOrderShippingAddress('');
+    setOrderPoNumber('');
+    setOrderNotes('');
+    setIsOrderModalOpen(true);
+  };
+
+  const handleSubmitOrder = async (e) => {
+    e.preventDefault();
+    if (!orderQuantity || orderQuantity <= 0) {
+      notifyError('Please enter a valid quantity.');
+      return;
+    }
+    
+    // Fallback if no clients available
+    const clientIdToUse = orderClientId || 'fallback-client-id';
+
+    try {
+      await salesOrderService.createSalesOrder({
+        clientId: clientIdToUse,
+        priority: orderPriority,
+        shippingAddress: orderShippingAddress,
+        poNumber: orderPoNumber,
+        notes: orderNotes,
+        items: [{ productId: orderProduct.id, quantity: parseInt(orderQuantity) }]
+      });
+      notifySuccess(`Order placed successfully for ${orderQuantity}x ${orderProduct.name}`);
+      setIsOrderModalOpen(false);
+    } catch (err) {
+      notifyError(err.message || 'Failed to place order');
     }
   };
 
@@ -245,7 +301,7 @@ export const ProductsListPage = () => {
                 <th className="p-3">Category</th>
                 <th className="p-3 text-right">Available Stock</th>
                 {showUnitCost && <th className="p-3 text-right">Unit Cost</th>}
-                <th className="p-3 text-right">Wholesale Price</th>
+                {showWholesalePrice && <th className="p-3 text-right">Wholesale Price</th>}
                 <th className="p-3">Status</th>
                 <th className="p-3 text-right">Actions</th>
               </tr>
@@ -274,23 +330,36 @@ export const ProductsListPage = () => {
                         ${Number(prod.unitCost || 0).toFixed(2)}
                       </td>
                     )}
-                    <td className="p-3 font-mono text-right font-bold text-green-700">
-                      ${Number(prod.wholesalePrice || 0).toFixed(2)}
-                    </td>
+                    {showWholesalePrice && (
+                      <td className="p-3 font-mono text-right font-bold text-green-700">
+                        ${Number(prod.wholesalePrice || 0).toFixed(2)}
+                      </td>
+                    )}
                     <td className="p-3">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${prod.status === 'INACTIVE' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                         {prod.status || 'ACTIVE'}
                       </span>
                     </td>
                     <td className="p-3 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button onClick={() => openEditProductModal(prod)} className="p-1.5 text-slate-400 hover:text-blue-600 rounded hover:bg-slate-100">
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => handleDeleteProduct(prod.id, prod.name)} className="p-1.5 text-slate-400 hover:text-red-600 rounded hover:bg-slate-100">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      {isClient ? (
+                        <div className="flex justify-end">
+                          <button 
+                            onClick={() => handleOpenOrderModal(prod)} 
+                            className="px-3 py-1.5 bg-primary text-white rounded text-xs font-bold hover:bg-primary-700 transition flex items-center gap-1 shadow-sm"
+                          >
+                            <ShoppingCart className="w-3 h-3" /> Place Order
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex justify-end gap-2">
+                          <button onClick={() => openEditProductModal(prod)} className="p-1.5 text-slate-400 hover:text-blue-600 rounded hover:bg-slate-100">
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDeleteProduct(prod.id, prod.name)} className="p-1.5 text-slate-400 hover:text-red-600 rounded hover:bg-slate-100">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -386,6 +455,72 @@ export const ProductsListPage = () => {
         confirmText="Yes, Delete Product"
         variant="danger"
       />
+
+      {/* Place Order Modal */}
+      <Modal isOpen={isOrderModalOpen} onClose={() => setIsOrderModalOpen(false)} title="Place Order" size="sm">
+        <form onSubmit={handleSubmitOrder} className="space-y-4">
+          <div>
+            <p className="text-sm text-slate-600 mb-2">
+              You are ordering: <span className="font-bold text-slate-900">{orderProduct?.name}</span> (Stock: {orderProduct?.availableStock} units)
+            </p>
+          </div>
+          <FormField label="Order Quantity">
+            <Input 
+              type="number" 
+              min="1"
+              max={orderProduct?.availableStock || 9999}
+              value={orderQuantity} 
+              onChange={(e) => setOrderQuantity(e.target.value)} 
+              required
+            />
+          </FormField>
+          
+          <FormField label="Priority">
+            <Select value={orderPriority} onChange={(e) => setOrderPriority(e.target.value)} options={[
+              { value: 'NORMAL', label: 'Normal' },
+              { value: 'URGENT', label: 'Urgent' }
+            ]} />
+          </FormField>
+
+          <FormField label="Shipping Address">
+            <Input 
+              value={orderShippingAddress}
+              onChange={(e) => setOrderShippingAddress(e.target.value)}
+              placeholder="e.g. 123 Main St, NY..."
+              required
+            />
+          </FormField>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="PO Number (Optional)">
+              <Input 
+                value={orderPoNumber}
+                onChange={(e) => setOrderPoNumber(e.target.value)}
+                placeholder="e.g. PO-9988"
+              />
+            </FormField>
+            
+            {clients.length > 0 && (
+              <FormField label="Order As Client">
+                <Select value={orderClientId} onChange={(e) => setOrderClientId(e.target.value)} options={clients.map(c => ({ value: c.id, label: c.name }))} />
+              </FormField>
+            )}
+          </div>
+
+          <FormField label="Order Notes (Optional)">
+            <Input 
+              value={orderNotes}
+              onChange={(e) => setOrderNotes(e.target.value)}
+              placeholder="Any special handling instructions?"
+            />
+          </FormField>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="outline" type="button" onClick={() => setIsOrderModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" type="submit">Submit Order</Button>
+          </div>
+        </form>
+      </Modal>
     </section>
   );
 };

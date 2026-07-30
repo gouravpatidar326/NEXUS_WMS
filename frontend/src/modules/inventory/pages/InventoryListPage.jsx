@@ -41,7 +41,7 @@ export const InventoryListPage = () => {
   const [lotId, setLotId] = useState('');
   const [locationId, setLocationId] = useState('');
   const [quantityDelta, setQuantityDelta] = useState('');
-  const [reasonCode, setReasonCode] = useState('PHYSICAL_COUNT');
+  const [reasonCode, setReasonCode] = useState('AUDIT_CORRECTION');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -356,6 +356,8 @@ export const InventoryListPage = () => {
                   { value: 'DAMAGED', label: 'Damaged Goods Quarantine' },
                   { value: 'EXPIRED', label: 'Expired Stock Removal' },
                   { value: 'MANUAL_CORRECTION', label: 'Manual Correction' },
+                  { value: 'AUDIT_CORRECTION', label: 'Audit Correction' },
+                  { value: 'LOST', label: 'Lost / Missing' },
                 ]}
               />
             </FormField>

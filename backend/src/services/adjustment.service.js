@@ -5,7 +5,7 @@ const inventoryTransactionRepository = require('../repositories/inventoryTransac
 const { getPaginationParams, formatPaginationMeta } = require('../utils/pagination');
 const prisma = require('../utils/prisma');
 
-const VALID_REASONS = ['DAMAGE', 'LOST', 'MANUAL_CORRECTION', 'AUDIT_CORRECTION'];
+const VALID_REASONS = ['DAMAGE', 'DAMAGED', 'LOST', 'MANUAL_CORRECTION', 'AUDIT_CORRECTION', 'PHYSICAL_COUNT', 'EXPIRED'];
 
 class AdjustmentService {
   async createAdjustment(companyId, userId, payload) {
