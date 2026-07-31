@@ -17,6 +17,7 @@ import Select from '@/components/ui/Select';
 import LoadingState from '@/components/feedback/LoadingState';
 import { userService } from '@/services/userService';
 import { companyService } from '@/services/companyService';
+import { warehouseService } from '@/services/warehouseService';
 
 export const UsersPage = () => {
   const { notifySuccess, notifyError } = useNotification();
@@ -24,6 +25,7 @@ export const UsersPage = () => {
 
   const [usersList, setUsersList] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleteUserState, setDeleteUserState] = useState({ isOpen: false, user: null });
 
@@ -32,8 +34,10 @@ export const UsersPage = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('nexus123');
+  const [confirmPassword, setConfirmPassword] = useState('nexus123');
   const [role, setRole] = useState(ROLES.INVENTORY_CLERK);
   const [companyId, setCompanyId] = useState('');
+  const [warehouseId, setWarehouseId] = useState('');
   const [phone, setPhone] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [search, setSearch] = useState('');
@@ -42,9 +46,12 @@ export const UsersPage = () => {
   const fetchData = async (isSilent = false) => {
     try {
       if (!isSilent) setLoading(true);
-      
-      const usersData = await userService.getUsers();
+      const [usersData, warehousesData] = await Promise.all([
+        userService.getUsers(),
+        warehouseService.getWarehouses().catch(() => [])
+      ]);
       setUsersList(Array.isArray(usersData) ? usersData : []);
+      setWarehouses(Array.isArray(warehousesData) ? warehousesData : []);
 
       if (currentUser?.role === ROLES.SUPER_ADMIN) {
         try {
@@ -72,6 +79,10 @@ export const UsersPage = () => {
       notifyError('Name, Email, Phone, and Job Title are required');
       return;
     }
+    if (password !== confirmPassword) {
+      notifyError('Passwords do not match');
+      return;
+    }
 
     try {
       await userService.inviteUser({
@@ -81,14 +92,18 @@ export const UsersPage = () => {
         role,
         phone,
         jobTitle,
+        warehouseId,
         companyId: role === ROLES.SUPER_ADMIN ? null : companyId,
       });
       notifySuccess(`User ${name} created with role ${ROLE_LABELS[role]}.`);
       setIsModalOpen(false);
       setName('');
       setEmail('');
+      setPassword('nexus123');
+      setConfirmPassword('nexus123');
       setPhone('');
       setJobTitle('');
+      setWarehouseId('');
       fetchData(true);
     } catch (err) {
       notifyError(err.message || 'Failed to create user');
@@ -337,9 +352,15 @@ export const UsersPage = () => {
             </FormField>
           </div>
           
-          <FormField label="Initial Password">
-            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="nexus123" />
-          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Initial Password" required>
+              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="nexus123" required />
+            </FormField>
+            <FormField label="Confirm Password" required>
+              <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="nexus123" required />
+            </FormField>
+          </div>
+          
           <FormField label="Assign RBAC Role" required>
             <Select
               value={role}
@@ -350,11 +371,9 @@ export const UsersPage = () => {
                       { value: ROLES.SUPER_ADMIN, label: 'Super Admin' },
                       { value: ROLES.WAREHOUSE_MANAGER, label: 'Warehouse Manager' },
                       { value: ROLES.INVENTORY_CLERK, label: 'Inventory Clerk' },
-                      { value: ROLES.CLIENT, label: 'Client User' },
                     ]
                   : [
                       { value: ROLES.INVENTORY_CLERK, label: 'Inventory Clerk' },
-                      { value: ROLES.CLIENT, label: 'Client User' },
                     ]
               }
             />
@@ -364,7 +383,16 @@ export const UsersPage = () => {
               <Select
                 value={companyId}
                 onChange={(e) => setCompanyId(e.target.value)}
-                options={companies.map((c) => ({ value: c.id, label: c.name }))}
+                options={[{value: '', label: 'Select Company'}, ...companies.map((c) => ({ value: c.id, label: c.name }))]}
+              />
+            </FormField>
+          )}
+          {role === ROLES.INVENTORY_CLERK && warehouses.length > 0 && (
+            <FormField label="Assign Warehouse (Optional)">
+              <Select
+                value={warehouseId}
+                onChange={(e) => setWarehouseId(e.target.value)}
+                options={[{value: '', label: 'All Warehouses'}, ...warehouses.map((w) => ({ value: w.id, label: w.name }))]}
               />
             </FormField>
           )}

@@ -37,16 +37,16 @@ const getUsers = async (req, res) => {
   const inviteUser = async (req, res) => {
   try {
     const { name, email, password, phone, jobTitle } = req.body;
-    let { role, companyId } = req.body;
+    let { role, companyId, warehouseId } = req.body;
 
     if (req.user.role === 'WAREHOUSE_MANAGER') {
       companyId = req.user.companyId;
-      const allowedRoles = ['INVENTORY_CLERK', 'CLIENT'];
+      const allowedRoles = ['INVENTORY_CLERK'];
       if (!allowedRoles.includes(role)) {
-        return res.status(403).json({ message: 'Managers can only create Clerks or Clients' });
+        return res.status(403).json({ message: 'Managers can only create Clerks' });
       }
     } else {
-      const validRoles = ['SUPER_ADMIN', 'WAREHOUSE_MANAGER', 'INVENTORY_CLERK', 'CLIENT'];
+      const validRoles = ['SUPER_ADMIN', 'WAREHOUSE_MANAGER', 'INVENTORY_CLERK'];
       if (!validRoles.includes(role)) {
         return res.status(400).json({ message: 'Invalid role' });
       }
@@ -67,6 +67,7 @@ const getUsers = async (req, res) => {
         jobTitle,
         password: hashedPassword,
         role,
+        warehouseId: warehouseId || null,
         companyId: companyId || null,
         status: 'ACTIVE',
       },
@@ -96,7 +97,7 @@ const updateUser = async (req, res) => {
         return res.status(403).json({ message: 'Forbidden' });
       }
       // Force companyId to remain the same for managers
-      if (role && !['INVENTORY_CLERK', 'CLIENT'].includes(role)) {
+      if (role && !['INVENTORY_CLERK'].includes(role)) {
         return res.status(403).json({ message: 'Forbidden role' });
       }
     }

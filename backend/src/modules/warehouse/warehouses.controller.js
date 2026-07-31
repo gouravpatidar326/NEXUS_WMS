@@ -53,13 +53,17 @@ const createWarehouse = async (req, res) => {
         }
       });
 
-      await tx.auditLog.create({
-        data: {
-          event: 'WAREHOUSE_FACILITY_CREATED',
-          userId: req.user.id,
-          ipAddress: req.ip
-        }
-      });
+      // Safely check if user exists before logging to avoid FK constraint errors with stale JWTs
+      const userExists = req.user?.id ? await tx.user.findUnique({ where: { id: req.user.id } }) : null;
+      if (userExists) {
+        await tx.auditLog.create({
+          data: {
+            event: 'WAREHOUSE_FACILITY_CREATED',
+            userId: req.user.id,
+            ipAddress: req.ip
+          }
+        });
+      }
 
       return newWarehouse;
     });
