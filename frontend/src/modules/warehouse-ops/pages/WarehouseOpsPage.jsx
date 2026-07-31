@@ -495,7 +495,7 @@ export const WarehouseOpsPage = () => {
           <FormField label="Warehouse Facility" required>
             <Input value={warehouse} readOnly className="bg-slate-50 text-slate-500" />
           </FormField>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Zone" required>
               <Input value={zone} onChange={(e) => setZone(e.target.value)} placeholder="A" required />
             </FormField>
@@ -503,7 +503,7 @@ export const WarehouseOpsPage = () => {
               <Input value={aisle} onChange={(e) => setAisle(e.target.value)} placeholder="01" required />
             </FormField>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <FormField label="Rack" required>
               <Input value={rack} onChange={(e) => setRack(e.target.value)} placeholder="1" required />
             </FormField>
@@ -514,7 +514,7 @@ export const WarehouseOpsPage = () => {
               <Input value={bin} onChange={(e) => setBin(e.target.value)} placeholder="A1" required />
             </FormField>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Capacity Unit" required>
               <Input 
                 value={activeFacility?.capacityType || 'Items'} 
@@ -582,7 +582,7 @@ export const WarehouseOpsPage = () => {
           <p className="text-xs text-slate-500 font-semibold">
             Inbound Product: <strong className="text-slate-800">{selectedReceiving?.items?.[0]?.product?.name}</strong> (Expected: {selectedReceiving?.items?.[0]?.expectedQty} Units)
           </p>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Accepted Quantity" required>
               <Input type="number" value={acceptedQty} onChange={(e) => setAcceptedQty(e.target.value)} required />
             </FormField>
@@ -620,7 +620,7 @@ export const WarehouseOpsPage = () => {
               options={locations.map((l) => ({ value: l.id, label: `Zone ${l.zone} - Aisle ${l.aisle} - Bin ${l.bin} (${l.code})` }))}
             />
           </FormField>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="MFG Date">
               <Input type="date" value={mfgDate} onChange={(e) => setMfgDate(e.target.value)} />
             </FormField>
