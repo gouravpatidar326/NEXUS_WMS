@@ -100,6 +100,56 @@ const getManagerSummary = async (req, res) => {
   }
 };
 
+const getClerkDashboard = async (req, res) => {
+  try {
+    const companyId = req.user?.companyId;
+    const whereCompany = companyId ? { companyId } : {};
+
+    const totalSkus = await prisma.product.count({ where: whereCompany });
+    
+    const lowStockAlerts = await prisma.product.count({
+      where: {
+        ...whereCompany,
+        availableStock: { lt: 10 }
+      }
+    });
+
+    const stockAlertsList = await prisma.product.findMany({
+      where: {
+        ...whereCompany,
+        availableStock: { lt: 10 }
+      },
+      select: {
+        id: true,
+        sku: true,
+        name: true,
+        availableStock: true
+      },
+      take: 5
+    });
+
+    const pendingPickLists = await prisma.salesOrder.findMany({
+      where: {
+        ...whereCompany,
+        status: { in: ['PENDING_APPROVAL', 'PICKING', 'READY_TO_SHIP'] },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 5,
+    });
+
+    res.json({
+      totalSkus,
+      lowStockAlerts,
+      stockAlertsList,
+      pendingPickLists
+    });
+  } catch (error) {
+    console.error('Error fetching clerk summary:', error);
+    res.status(500).json({ message: error.message || 'Internal server error' });
+  }
+};
+
 module.exports = {
   getManagerSummary,
+  getClerkDashboard
 };

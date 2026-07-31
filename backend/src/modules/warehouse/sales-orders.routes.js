@@ -12,5 +12,6 @@ router.post('/sales-orders', ...baseAuth, salesOrdersController.createSalesOrder
 // Only Managers can approve or reject
 router.post('/sales-orders/:id/approve', verifyToken, requireRole(['SUPER_ADMIN', 'WAREHOUSE_MANAGER']), salesOrdersController.approveSalesOrder);
 router.post('/sales-orders/:id/reject', verifyToken, requireRole(['SUPER_ADMIN', 'WAREHOUSE_MANAGER']), salesOrdersController.rejectSalesOrder);
+router.delete('/sales-orders/:id', verifyToken, requireRole(['SUPER_ADMIN', 'WAREHOUSE_MANAGER']), salesOrdersController.deleteSalesOrder);
 
 module.exports = router;

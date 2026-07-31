@@ -9,16 +9,18 @@ const defaultPermissions = {
     'expiry.view', 'expiry.manage',
     'po.view', 'po.create', 'po.edit', 'po.approve', 'po.receive', 'po.delete',
     'to.view', 'to.create', 'to.edit', 'to.execute', 'to.delete',
-    'so.view', 'so.create', 'so.edit', 'so.pick', 'so.ship', 'so.delete',
-    'warehouse.view', 'warehouse.manage', 'warehouse.zones', 'warehouse.locations',
+    'so.view', 'so.create', 'so.edit', 'so.pick', 'so.ship', 'so.delete', 'so.approve',
+    'warehouse.view', 'warehouse.manage', 'warehouse.zones', 'warehouse.locations', 'facilities.view',
     'barcode.view', 'barcode.generate', 'barcode.print',
-    'shipping.view', 'shipping.create', 'shipping.track', 'shipping.manage',
+    'shipping.view', 'shipping.create', 'shipping.track', 'shipping.manage', 'shipping.execute',
     'client_portal.view', 'client_portal.orders', 'client_portal.tracking', 'client_portal.reports',
+    'clients.view',
     'reports.view', 'reports.export', 'reports.financial',
     'users.view', 'users.create', 'users.edit', 'users.delete', 'users.manage_roles',
     'roles.view', 'roles.manage',
     'audit.view', 'audit.export',
-    'settings.view', 'settings.manage', 'settings.system'
+    'settings.view', 'settings.manage', 'settings.system',
+    'receiving.execute', 'picking.execute'
   ],
   WAREHOUSE_MANAGER: [
     'dashboard.view', 'dashboard.analytics',
@@ -26,14 +28,14 @@ const defaultPermissions = {
     'inventory.view', 'inventory.adjust', 'inventory.movements', 'inventory.export',
     'batch.view', 'batch.create', 'batch.edit',
     'expiry.view', 'expiry.manage',
-    'po.view', 'po.create', 'po.edit', 'po.approve', 'po.receive',
+    'po.view', 'po.create', 'po.edit', 'po.approve',
     'to.view', 'to.create', 'to.edit', 'to.execute',
-    'so.view', 'so.create', 'so.edit', 'so.pick', 'so.ship',
-    'warehouse.view', 'warehouse.manage', 'warehouse.zones', 'warehouse.locations',
+    'so.view', 'so.create', 'so.edit', 'so.approve',
+    'warehouse.view', 'warehouse.manage', 'warehouse.zones', 'warehouse.locations', 'facilities.view',
     'barcode.view', 'barcode.generate', 'barcode.print',
-    'shipping.view', 'shipping.create', 'shipping.track', 'shipping.manage',
+    'shipping.view', 'shipping.track',
     'reports.view', 'reports.export',
-    'users.view', 'audit.view', 'settings.view'
+    'users.view', 'clients.view', 'audit.view', 'settings.view'
   ],
   INVENTORY_CLERK: [
     'dashboard.view',
@@ -41,13 +43,11 @@ const defaultPermissions = {
     'inventory.view', 'inventory.adjust', 'inventory.movements',
     'batch.view', 'batch.create',
     'expiry.view',
-    'po.view', 'po.receive',
+    'po.view', 'po.receive', 'receiving.execute',
     'to.view', 'to.execute',
-    'so.view', 'so.pick',
-    'warehouse.view', 'warehouse.locations',
+    'so.view', 'so.pick', 'picking.execute',
     'barcode.view', 'barcode.generate', 'barcode.print',
-    'shipping.view', 'shipping.track',
-    'reports.view'
+    'shipping.view', 'shipping.track', 'shipping.execute'
   ],
   CLIENT: [
     'dashboard.view',

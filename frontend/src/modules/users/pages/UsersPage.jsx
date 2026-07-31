@@ -43,9 +43,9 @@ export const UsersPage = () => {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
 
-  const fetchData = async (isSilent = false) => {
+  const fetchData = async () => {
     try {
-      if (!isSilent) setLoading(true);
+      setLoading(true);
       const [usersData, warehousesData] = await Promise.all([
         userService.getUsers(),
         warehouseService.getWarehouses().catch(() => [])
@@ -65,7 +65,7 @@ export const UsersPage = () => {
     } catch {
       notifyError('Failed to load users from database');
     } finally {
-      if (!isSilent) setLoading(false);
+      setLoading(false);
     }
   };
 
@@ -104,7 +104,7 @@ export const UsersPage = () => {
       setPhone('');
       setJobTitle('');
       setWarehouseId('');
-      fetchData(true);
+      fetchData();
     } catch (err) {
       notifyError(err.message || 'Failed to create user');
     }
@@ -115,7 +115,7 @@ export const UsersPage = () => {
     try {
       await userService.updateUser(user.id, { status: newStatus });
       notifySuccess(`Account status updated to ${newStatus}.`);
-      fetchData(true);
+      fetchData();
     } catch (err) {
       notifyError(err.message || 'Failed to update user status');
     }
@@ -131,7 +131,7 @@ export const UsersPage = () => {
       await userService.deleteUser(deleteUserState.user.id);
       notifySuccess(`User ${deleteUserState.user.name} deleted.`);
       setDeleteUserState({ isOpen: false, user: null });
-      fetchData(true);
+      fetchData();
     } catch (err) {
       notifyError(err.message || 'Failed to delete user');
     }

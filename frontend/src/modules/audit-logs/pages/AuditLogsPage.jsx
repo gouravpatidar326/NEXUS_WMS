@@ -275,10 +275,10 @@ export const AuditLogsPage = () => {
           }
         >
           <div className="space-y-3 text-xs">
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="sm:col-span-2">
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg grid grid-cols-2 gap-3">
+              <div>
                 <span className="text-slate-500 block">Audit ID:</span>
-                <span className="font-mono font-bold text-slate-800 break-all">{selectedLog.id}</span>
+                <span className="font-mono font-bold text-slate-800">{selectedLog.id}</span>
               </div>
               <div>
                 <span className="text-slate-500 block">Record ID:</span>
@@ -290,12 +290,12 @@ export const AuditLogsPage = () => {
               </div>
               <div>
                 <span className="text-slate-500 block">Action:</span>
-                <span className="font-bold text-primary break-all">{selectedLog.action}</span>
+                <span className="font-bold text-primary">{selectedLog.action}</span>
               </div>
               <div>
                 <span className="text-slate-500 block">User Name & Email:</span>
                 <span className="font-semibold text-slate-800">{selectedLog.userName}</span>
-                <span className="block text-[11px] text-slate-500 break-all">{selectedLog.userEmail}</span>
+                <span className="block text-[11px] text-slate-500">{selectedLog.userEmail}</span>
               </div>
               <div>
                 <span className="text-slate-500 block">Role:</span>

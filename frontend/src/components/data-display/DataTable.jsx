@@ -22,58 +22,32 @@ export const DataTable = ({
     data.length > 0 && data.every((row) => selectedRows.includes(row.id));
 
   return (
-    <div className="bg-transparent md:bg-white md:border md:border-surface-200 md:rounded-2xl md:shadow-sm md:overflow-hidden">
-      <div className="space-y-4 md:hidden">
+    <div className="card overflow-hidden">
+      <div className="divide-y divide-surface-200 md:hidden">
         {isLoading ? (
-          <div className="p-6 bg-white rounded-2xl border border-surface-200 shadow-sm"><LoadingState message="Loading dataset..." /></div>
+          <div className="p-6"><LoadingState message="Loading dataset..." /></div>
         ) : data.length === 0 ? (
-          <div className="p-6 bg-white rounded-2xl border border-surface-200 shadow-sm"><EmptyState title={emptyTitle} description={emptyDescription} /></div>
+          <div className="p-6"><EmptyState title={emptyTitle} description={emptyDescription} /></div>
         ) : data.map((row, idx) => {
           const isSelected = selectedRows.includes(row.id);
           return (
-            <article
-              key={row.id || idx}
-              className={`space-y-4 p-5 rounded-2xl border border-surface-200/80 shadow-sm transition hover:shadow-md ${
-                isSelected ? 'bg-primary-50/60' : 'bg-white'
-              }`}
-            >
+            <article key={row.id || idx} className={`space-y-3 p-4 ${isSelected ? 'bg-primary-50/60' : 'bg-white'}`}>
               {selectable && (
-                <label className="flex items-center gap-2 text-xs font-semibold text-surface-600 border-b border-surface-100 pb-2">
+                <label className="flex items-center gap-2 text-xs font-semibold text-surface-600">
                   <input type="checkbox" checked={isSelected} onChange={(e) => onSelectRow && onSelectRow(row.id, e.target.checked)} className="rounded border-surface-300 text-primary-600" />
-                  Select Record
+                  Select record
                 </label>
               )}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                {columns.map((col, cIdx) => {
-                  const content = col.cell ? col.cell(row) : row[col.accessor] !== undefined ? row[col.accessor] : '—';
-                  const isAction = /action/i.test(col.header || '');
-                  
-                  if (isAction) {
-                    return (
-                      <div key={col.key || col.accessor} className="col-span-2 border-t border-surface-100 pt-3 mt-1">
-                        <div className="text-sm text-surface-800">{content}</div>
-                      </div>
-                    );
-                  }
-
-                  const isFirst = cIdx === 0;
-                  // Determine if column should take full width (e.g. name, description, address, email, reference code, id, or first column)
-                  const isFullWidth = isFirst || /name|desc|address|detail|info|ref|id|code|email|phone|role|tenant|company|carrier|recipient|destination|tracking|item|product|reason|comment|note|message/i.test(col.header || col.accessor || '');
-                  
-                  return (
-                    <div key={col.key || col.accessor} className={`${isFullWidth ? 'col-span-2' : 'col-span-1'} min-w-0`}>
-                      {!isFirst && (
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-surface-400 mb-0.5">
-                          {col.header}
-                        </p>
-                      )}
-                      <div className={isFirst ? "min-w-0 break-words text-base font-bold text-surface-900 [&_*]:max-w-full [&_button]:whitespace-normal" : "min-w-0 break-words text-sm text-surface-800 [&_*]:max-w-full [&_button]:whitespace-normal"}>
-                        {content}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              {columns.map((col) => {
+                const content = col.cell ? col.cell(row) : row[col.accessor] !== undefined ? row[col.accessor] : '—';
+                const isAction = /action/i.test(col.header || '');
+                return (
+                  <div key={col.key || col.accessor} className={`${isAction ? 'border-t border-surface-100 pt-3' : ''} min-w-0`}>
+                    <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-surface-400">{col.header}</p>
+                    <div className="min-w-0 break-words text-sm text-surface-800 [&_*]:max-w-full [&_button]:whitespace-normal">{content}</div>
+                  </div>
+                );
+              })}
             </article>
           );
         })}

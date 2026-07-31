@@ -396,7 +396,7 @@ export const WarehouseOpsPage = () => {
         description="Receiving, Quality Inspection, Lot/Barcode Generation, and Storage Location Management"
         breadcrumbs={[{ label: 'Operations' }, { label: 'Warehouse Ops' }]}
         actions={
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto [&>button]:w-full sm:[&>button]:w-auto [&>select]:w-full sm:[&>select]:w-48">
+          <div className="flex gap-3 items-center">
             {facilities.length > 0 && (
               <Select 
                 value={activeFacility?.name || ''} 
@@ -405,7 +405,7 @@ export const WarehouseOpsPage = () => {
                   if (fac) setActiveFacility(fac);
                 }}
                 options={facilities.map(f => ({ value: f.name, label: f.name }))} 
-                className="w-full sm:w-48 bg-white"
+                className="w-48 bg-white"
               />
             )}
             <Button variant="outline" leftIcon={PackageCheck} onClick={() => setIsCreateRecModalOpen(true)}>
@@ -419,36 +419,36 @@ export const WarehouseOpsPage = () => {
       />
 
       {activeFacility && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-6 shadow-sm">
+        <div className="bg-white rounded-lg border border-slate-200 p-4 flex items-center justify-between shadow-sm">
           <div className="flex flex-col">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Facility Overview</span>
-            <span className="text-lg font-bold text-slate-800 mt-0.5">{activeFacility.name} <span className="text-xs font-normal text-slate-500">({activeFacility.facilityType || 'General'})</span></span>
+            <span className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Facility Overview</span>
+            <span className="text-lg font-bold text-slate-800">{activeFacility.name} <span className="text-sm font-normal text-slate-500">({activeFacility.facilityType || 'General'})</span></span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1 w-full lg:max-w-4xl lg:justify-items-end items-center">
-            <div className="flex flex-col text-left lg:text-right min-w-0">
-              <span className="text-xs text-slate-500 truncate">Total Capacity</span>
-              <span className="font-bold text-slate-800 text-sm mt-0.5">{totalFacilityCapacity.toLocaleString()} {facilityUnit}</span>
+          <div className="flex items-center gap-8">
+            <div className="flex flex-col items-end">
+              <span className="text-xs text-slate-500">Total Capacity</span>
+              <span className="font-bold text-slate-800">{totalFacilityCapacity.toLocaleString()} {facilityUnit}</span>
             </div>
-            <div className="flex flex-col text-left lg:text-right min-w-0">
-              <span className="text-xs text-slate-500 truncate">Provisioned Bins</span>
-              <span className="font-bold text-slate-700 text-sm mt-0.5">{provisionedCapacity.toLocaleString()} {facilityUnit}</span>
+            <div className="flex flex-col items-end">
+              <span className="text-xs text-slate-500">Provisioned Bins Space</span>
+              <span className="font-bold text-slate-700">{provisionedCapacity.toLocaleString()} {facilityUnit}</span>
             </div>
-            <div className="flex flex-col text-left lg:text-right min-w-0">
-              <span className="text-xs text-slate-500 truncate">Material Occupied</span>
-              <span className="font-bold text-blue-600 text-sm mt-0.5">{occupiedCapacity.toLocaleString()} {facilityUnit}</span>
+            <div className="flex flex-col items-end">
+              <span className="text-xs text-slate-500">Material Occupied</span>
+              <span className="font-bold text-blue-600">{occupiedCapacity.toLocaleString()} {facilityUnit}</span>
             </div>
-            <div className="flex flex-col text-left lg:text-right min-w-0">
-              <span className="text-xs text-slate-500 truncate">Free Space</span>
-              <span className="font-bold text-green-600 text-sm mt-0.5">{Math.max(0, freeCapacity).toLocaleString()} {facilityUnit}</span>
+            <div className="flex flex-col items-end">
+              <span className="text-xs text-slate-500">Free Space</span>
+              <span className="font-bold text-green-600">{Math.max(0, freeCapacity).toLocaleString()} {facilityUnit}</span>
             </div>
-          </div>
-          <div className="w-full lg:w-44 flex flex-col gap-1 border-t lg:border-t-0 lg:border-l border-slate-200 pt-4 lg:pt-0 lg:pl-4 shrink-0">
-            <div className="flex justify-between text-xs">
-              <span className="font-semibold text-slate-600">Utilization</span>
-              <span className="font-bold text-slate-800">{fillPercentage}%</span>
-            </div>
-            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden mt-1">
-              <div className={`h-full ${fillPercentage > 90 ? 'bg-red-500' : fillPercentage > 75 ? 'bg-orange-500' : 'bg-green-500'}`} style={{ width: `${fillPercentage}%` }}></div>
+            <div className="w-32 flex flex-col gap-1 ml-4 border-l border-slate-200 pl-4">
+              <div className="flex justify-between text-xs">
+                <span className="font-medium text-slate-600">Utilization</span>
+                <span className="font-bold text-slate-800">{fillPercentage}%</span>
+              </div>
+              <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div className={`h-full ${fillPercentage > 90 ? 'bg-red-500' : fillPercentage > 75 ? 'bg-orange-500' : 'bg-green-500'}`} style={{ width: `${fillPercentage}%` }}></div>
+              </div>
             </div>
           </div>
         </div>
@@ -495,7 +495,7 @@ export const WarehouseOpsPage = () => {
           <FormField label="Warehouse Facility" required>
             <Input value={warehouse} readOnly className="bg-slate-50 text-slate-500" />
           </FormField>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <FormField label="Zone" required>
               <Input value={zone} onChange={(e) => setZone(e.target.value)} placeholder="A" required />
             </FormField>
@@ -503,7 +503,7 @@ export const WarehouseOpsPage = () => {
               <Input value={aisle} onChange={(e) => setAisle(e.target.value)} placeholder="01" required />
             </FormField>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <FormField label="Rack" required>
               <Input value={rack} onChange={(e) => setRack(e.target.value)} placeholder="1" required />
             </FormField>
@@ -514,7 +514,7 @@ export const WarehouseOpsPage = () => {
               <Input value={bin} onChange={(e) => setBin(e.target.value)} placeholder="A1" required />
             </FormField>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <FormField label="Capacity Unit" required>
               <Input 
                 value={activeFacility?.capacityType || 'Items'} 
@@ -582,7 +582,7 @@ export const WarehouseOpsPage = () => {
           <p className="text-xs text-slate-500 font-semibold">
             Inbound Product: <strong className="text-slate-800">{selectedReceiving?.items?.[0]?.product?.name}</strong> (Expected: {selectedReceiving?.items?.[0]?.expectedQty} Units)
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <FormField label="Accepted Quantity" required>
               <Input type="number" value={acceptedQty} onChange={(e) => setAcceptedQty(e.target.value)} required />
             </FormField>
@@ -620,7 +620,7 @@ export const WarehouseOpsPage = () => {
               options={locations.map((l) => ({ value: l.id, label: `Zone ${l.zone} - Aisle ${l.aisle} - Bin ${l.bin} (${l.code})` }))}
             />
           </FormField>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <FormField label="MFG Date">
               <Input type="date" value={mfgDate} onChange={(e) => setMfgDate(e.target.value)} />
             </FormField>

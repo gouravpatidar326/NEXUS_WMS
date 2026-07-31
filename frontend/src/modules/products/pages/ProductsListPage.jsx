@@ -8,8 +8,6 @@ import Modal from '@/components/ui/Modal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import LoadingState from '@/components/feedback/LoadingState';
 import PageHeader from '@/components/navigation/PageHeader';
-import DataTable from '@/components/data-display/DataTable';
-import Badge from '@/components/ui/Badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { productService } from '@/services/productService';
@@ -128,14 +126,8 @@ export const ProductsListPage = () => {
   };
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const searchParam = params.get('search') || '';
-    setSearchTerm(searchParam);
-  }, [window.location.search]);
-
-  useEffect(() => {
     fetchData();
-  }, [selectedCategory, selectedStatus, searchTerm]);
+  }, [selectedCategory, selectedStatus]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -318,82 +310,6 @@ export const ProductsListPage = () => {
     }
   };
 
-  const columns = [
-    {
-      header: 'SKU / Barcode',
-      accessor: 'sku',
-      cell: (row) => (
-        <div className="font-mono">
-          <div className="font-bold text-slate-900">{row.sku}</div>
-          <div className="text-[11px] text-slate-500">{row.barcode || 'NO BARCODE'}</div>
-        </div>
-      )
-    },
-    {
-      header: 'Product Name',
-      accessor: 'name',
-      cell: (row) => <span className="font-semibold text-slate-800">{row.name}</span>
-    },
-    {
-      header: 'Category',
-      accessor: 'category.name',
-      cell: (row) => row.category?.name || 'Uncategorized'
-    },
-    {
-      header: 'Available Stock',
-      accessor: 'availableStock',
-      cell: (row) => (
-        <span className="font-mono font-bold text-slate-900">
-          {row.availableStock || 0} units
-        </span>
-      ),
-    },
-    ...(showUnitCost ? [{
-      header: 'Unit Cost',
-      accessor: 'unitCost',
-      cell: (row) => <span className="font-mono">${Number(row.unitCost || 0).toFixed(2)}</span>,
-    }] : []),
-    ...(showWholesalePrice ? [{
-      header: 'Wholesale Price',
-      accessor: 'wholesalePrice',
-      cell: (row) => <span className="font-mono font-bold text-green-700">${Number(row.wholesalePrice || 0).toFixed(2)}</span>,
-    }] : []),
-    {
-      header: 'Status',
-      accessor: 'status',
-      cell: (row) => (
-        <Badge variant={row.status === 'INACTIVE' ? 'danger' : 'success'} dot>
-          {row.status || 'ACTIVE'}
-        </Badge>
-      )
-    },
-    {
-      header: 'Actions',
-      accessor: 'actions',
-      cell: (row) => (
-        isClient ? (
-          <div className="flex justify-end">
-            <button 
-              onClick={() => handleOpenOrderModal(row)} 
-              className="px-3 py-1.5 bg-[#4f8f32] text-white rounded text-xs font-bold hover:bg-[#3f722a] transition flex items-center gap-1 shadow-sm cursor-pointer"
-            >
-              <ShoppingCart className="w-3.5 h-3.5" /> Place Order
-            </button>
-          </div>
-        ) : (
-          <div className="flex justify-end gap-2">
-            <button onClick={() => openEditProductModal(row)} className="p-1.5 text-slate-400 hover:text-blue-600 rounded hover:bg-slate-100 cursor-pointer">
-              <Edit2 className="w-4 h-4" />
-            </button>
-            <button onClick={() => handleDeleteProduct(row.id, row.name)} className="p-1.5 text-slate-400 hover:text-red-600 rounded hover:bg-slate-100 cursor-pointer">
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-        )
-      ),
-    }
-  ];
-
   if (loading) return <LoadingState message="Loading Master Product Catalog from database..." />;
 
   return (
@@ -447,13 +363,85 @@ export const ProductsListPage = () => {
           />
         </div>
       </div>
+
       {/* Products Table Container */}
-      <DataTable
-        columns={columns}
-        data={products}
-        emptyTitle="No products found"
-        emptyDescription="Create products to add items to catalog."
-      />
+      <div className="card overflow-hidden bg-white">
+        <div className="w-full overflow-x-auto overscroll-x-contain [webkit-overflow-scrolling:touch]">
+          <table className="w-full min-w-[750px] text-left text-xs sm:text-sm">
+            <thead>
+              <tr className="border-b border-outline-variant bg-slate-50 text-[11px] sm:text-xs uppercase font-bold text-slate-600">
+                <th className="p-3">SKU / Barcode</th>
+                <th className="p-3">Product Name</th>
+                <th className="p-3">Category</th>
+                <th className="p-3 text-right">Available Stock</th>
+                {showUnitCost && <th className="p-3 text-right">Unit Cost</th>}
+                {showWholesalePrice && <th className="p-3 text-right">Wholesale Price</th>}
+                <th className="p-3">Status</th>
+                <th className="p-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-outline-variant">
+              {products.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-slate-500">
+                    No products found. Click "Create Product" to add items to master catalog.
+                  </td>
+                </tr>
+              ) : (
+                products.map((prod) => (
+                  <tr key={prod.id} className="hover:bg-slate-50 transition">
+                    <td className="p-3 font-mono">
+                      <div className="font-bold text-slate-900">{prod.sku}</div>
+                      <div className="text-[11px] text-slate-500">{prod.barcode || 'NO BARCODE'}</div>
+                    </td>
+                    <td className="p-3 font-semibold text-slate-800">{prod.name}</td>
+                    <td className="p-3 text-xs text-slate-600">{prod.category?.name || 'Uncategorized'}</td>
+                    <td className="p-3 font-mono font-bold text-slate-900 text-right">
+                      {prod.availableStock || 0} units
+                    </td>
+                    {showUnitCost && (
+                      <td className="p-3 font-mono text-right text-slate-700">
+                        ${Number(prod.unitCost || 0).toFixed(2)}
+                      </td>
+                    )}
+                    {showWholesalePrice && (
+                      <td className="p-3 font-mono text-right font-bold text-green-700">
+                        ${Number(prod.wholesalePrice || 0).toFixed(2)}
+                      </td>
+                    )}
+                    <td className="p-3">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${prod.status === 'INACTIVE' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                        {prod.status || 'ACTIVE'}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right">
+                      {isClient ? (
+                        <div className="flex justify-end">
+                          <button 
+                            onClick={() => handleOpenOrderModal(prod)} 
+                            className="px-3 py-1.5 bg-primary text-white rounded text-xs font-bold hover:bg-primary-700 transition flex items-center gap-1 shadow-sm"
+                          >
+                            <ShoppingCart className="w-3 h-3" /> Place Order
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex justify-end gap-2">
+                          <button onClick={() => openEditProductModal(prod)} className="p-1.5 text-slate-400 hover:text-blue-600 rounded hover:bg-slate-100">
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDeleteProduct(prod.id, prod.name)} className="p-1.5 text-slate-400 hover:text-red-600 rounded hover:bg-slate-100">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Product Form Modal */}
       <Modal
@@ -718,7 +706,7 @@ export const ProductsListPage = () => {
             />
           </FormField>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <FormField label="PO Number (Optional)">
               <Input 
                 value={orderPoNumber}

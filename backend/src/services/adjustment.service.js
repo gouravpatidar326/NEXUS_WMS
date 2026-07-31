@@ -43,6 +43,8 @@ class AdjustmentService {
         totalDelta: delta,
       });
 
+      const userExists = userId ? await tx.user.findUnique({ where: { id: userId } }) : null;
+
       // 3. Record Stock Adjustment Audit Record
       const adjustment = await tx.stockAdjustment.create({
         data: {
@@ -53,7 +55,7 @@ class AdjustmentService {
           quantityDelta: delta,
           reasonCode: reasonCode.toUpperCase(),
           notes: notes || null,
-          createdBy: userId,
+          createdBy: userExists ? userId : null,
           companyId,
         },
         include: { product: true, batch: true, location: true },
@@ -70,6 +72,16 @@ class AdjustmentService {
         referenceId: adjustmentNumber,
         notes: `Stock adjustment [${reasonCode}]: ${delta > 0 ? '+' : ''}${delta} units. ${notes || ''}`,
         createdBy: userId,
+      });
+
+      // 5. Sync Product.availableStock cache dynamically to prevent desync
+      const allLocs = await tx.locationInventory.findMany({
+        where: { productId }
+      });
+      const totalAvailable = allLocs.reduce((sum, l) => sum + l.available, 0);
+      await tx.product.update({
+        where: { id: productId },
+        data: { availableStock: totalAvailable }
       });
 
       return adjustment;

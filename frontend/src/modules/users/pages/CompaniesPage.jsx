@@ -226,7 +226,7 @@ export const CompaniesPage = () => {
             <Input value={clientCode} onChange={(e) => setClientCode(e.target.value)} placeholder="e.g. NEX-AI-009" required />
           </FormField>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <FormField label="Contact Email" required>
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="contact@company.com" required />
             </FormField>

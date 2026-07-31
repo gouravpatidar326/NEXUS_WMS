@@ -11,9 +11,14 @@ import QRScannerPlaceholder from '@/components/forms/QRScannerPlaceholder';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
+import ReadOnlyBanner from '@/components/ui/ReadOnlyBanner';
+import { useAuth } from '@/contexts/AuthContext';
+import { hasPermission } from '@/permissions/permissionUtils';
 
 export const PickingPage = () => {
   const { notifySuccess, notifyError } = useNotification();
+  const { user } = useAuth();
+  const canExecutePick = hasPermission(user, PERMISSIONS.PICKING_EXECUTE);
   const [pickLists, setPickLists] = useState([]);
   const [loadingPickLists, setLoadingPickLists] = useState(true);
   const [isFulfillModalOpen, setIsFulfillModalOpen] = useState(false);
@@ -93,7 +98,7 @@ export const PickingPage = () => {
       accessor: 'actions',
       cell: (row) => (
         <div className="flex gap-2">
-          {row.status === 'PENDING' && (
+          {row.status === 'PENDING' && canExecutePick && (
             <Button
               variant="primary"
               size="sm"
@@ -117,6 +122,10 @@ export const PickingPage = () => {
         description="Fulfill pick lists and prepare orders for packing"
         breadcrumbs={[{ label: 'Operations & Logistics' }, { label: 'Picking' }]}
       />
+
+      {!canExecutePick && (
+        <ReadOnlyBanner />
+      )}
 
       <div className="grid grid-cols-2 gap-2 border-b border-surface-200 dark:border-surface-800 sm:flex sm:gap-4">
         <button
@@ -167,9 +176,11 @@ export const PickingPage = () => {
             <Button variant="outline" onClick={() => setIsFulfillModalOpen(false)}>
               Cancel
             </Button>
-            <Button variant="primary" leftIcon={CheckCircle} onClick={handleFulfillPickList}>
-              Complete Pick
-            </Button>
+            {canExecutePick && (
+              <Button variant="primary" leftIcon={CheckCircle} onClick={handleFulfillPickList}>
+                Complete Pick
+              </Button>
+            )}
           </>
         }
       >

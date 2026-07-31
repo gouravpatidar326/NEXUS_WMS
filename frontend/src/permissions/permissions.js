@@ -36,6 +36,9 @@ export const PERMISSIONS = {
   PO_RECEIVE: 'po.receive',
   PO_DELETE: 'po.delete',
 
+  // Receiving Operations
+  RECEIVING_EXECUTE: 'receiving.execute',
+
   // Transfer Orders
   TO_VIEW: 'to.view',
   TO_CREATE: 'to.create',
@@ -49,6 +52,7 @@ export const PERMISSIONS = {
   SO_EDIT: 'so.edit',
   SO_PICK: 'so.pick',
   SO_SHIP: 'so.ship',
+  SO_APPROVE: 'so.approve',
   SO_DELETE: 'so.delete',
 
   // Warehouse Operations
@@ -56,23 +60,30 @@ export const PERMISSIONS = {
   WAREHOUSE_MANAGE: 'warehouse.manage',
   WAREHOUSE_ZONES: 'warehouse.zones',
   WAREHOUSE_LOCATIONS: 'warehouse.locations',
+  FACILITIES_VIEW: 'facilities.view',
 
   // Barcode
   BARCODE_VIEW: 'barcode.view',
   BARCODE_GENERATE: 'barcode.generate',
   BARCODE_PRINT: 'barcode.print',
 
+  // Picking Operations
+  PICKING_EXECUTE: 'picking.execute',
+
   // Shipping
   SHIPPING_VIEW: 'shipping.view',
   SHIPPING_CREATE: 'shipping.create',
   SHIPPING_TRACK: 'shipping.track',
   SHIPPING_MANAGE: 'shipping.manage',
+  SHIPPING_EXECUTE: 'shipping.execute',
+  SHIPPING_DELETE: 'shipping.delete',
 
   // Client Portal
   CLIENT_PORTAL_VIEW: 'client_portal.view',
   CLIENT_ORDERS_VIEW: 'client_portal.orders',
   CLIENT_TRACKING_VIEW: 'client_portal.tracking',
   CLIENT_REPORTS_VIEW: 'client_portal.reports',
+  CLIENTS_VIEW: 'clients.view',
 
   // Reports
   REPORTS_VIEW: 'reports.view',

@@ -35,11 +35,14 @@ class ProductService {
       // Create a default batch
       const batch = await prisma.batch.create({
         data: {
+          lotId: `OPENING-${Date.now()}`,
           lotNumber: `OPENING-${product.sku}`,
           productId: product.id,
           companyId,
           status: 'RELEASED',
           acceptedQty: openingStock,
+          mfgDate: new Date(),
+          coaLocked: false,
         }
       });
 
@@ -124,10 +127,15 @@ class ProductService {
       (sum, item) => sum + (item.quantity || 0),
       0
     );
+    const calculatedAvailableStock = (product.locationInventories || []).reduce(
+      (sum, item) => sum + (item.available || 0),
+      0
+    );
 
     return {
       ...product,
       calculatedTotalStock,
+      availableStock: calculatedAvailableStock,
     };
   }
 
@@ -150,7 +158,7 @@ class ProductService {
 
     const enrichedItems = items.map((prod) => {
       const stock = (prod.locationInventories || []).reduce(
-        (acc, bin) => acc + (bin.quantity || 0),
+        (acc, bin) => acc + (bin.available || 0),
         0
       );
       return {

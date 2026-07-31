@@ -7,7 +7,7 @@ export const AppLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="fixed inset-0 flex overflow-hidden bg-surface-50">
+    <div className="flex h-screen h-[100dvh] overflow-hidden bg-surface-50">
       {/* Sidebar — 240px static at lg+, fixed/overlay below lg */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
@@ -16,7 +16,7 @@ export const AppLayout = () => {
         <TopBar onOpenSidebar={() => setSidebarOpen(true)} />
 
         {/* Full-width content area with balanced mobile padding */}
-        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-surface-50 p-0 sm:p-4 lg:p-6 pb-24 sm:pb-8">
+        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-surface-50 p-2 sm:p-4 lg:p-6 pb-6 sm:pb-8">
           <div className="page-shell">
             <Outlet />
           </div>
