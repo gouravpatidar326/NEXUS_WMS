@@ -8,20 +8,18 @@ import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Button from '@/components/ui/Button';
+import DataTable from '@/components/data-display/DataTable';
 
 import { salesOrderService } from '@/services/salesOrderService';
 import { clientService } from '@/services/clientService';
 import { productService } from '@/services/productService';
-import { PERMISSIONS } from '@/permissions/permissions';
-import { hasPermission } from '@/permissions/permissionUtils';
 
 export const SalesOrdersPage = () => {
   const { user } = useAuth();
   const { notifySuccess, notifyError } = useNotification();
 
   const isClient = user?.role === ROLES.CLIENT;
-  const canApproveOrders = hasPermission(user, PERMISSIONS.SO_APPROVE);
-  const canDeleteOrders = hasPermission(user, PERMISSIONS.SO_DELETE);
+  const isManagerOrAdmin = user?.role === ROLES.SUPER_ADMIN || user?.role === ROLES.WAREHOUSE_MANAGER;
 
   const [salesOrders, setSalesOrders] = useState([]);
   const [clients, setClients] = useState([]);
@@ -44,6 +42,12 @@ export const SalesOrdersPage = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const searchParam = params.get('search') || '';
+    setSearchTerm(searchParam);
+  }, [window.location.search]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -135,16 +139,133 @@ export const SalesOrdersPage = () => {
     }
   };
 
-  const handleDeleteOrder = async (orderId, orderNum) => {
-    if (!window.confirm(`Are you sure you want to permanently delete Sales Order ${orderNum}? This action cannot be undone.`)) return;
-    try {
-      await salesOrderService.deleteSalesOrder(orderId);
-      notifySuccess(`Order ${orderNum} permanently deleted.`);
-      fetchData();
-    } catch (error) {
-      notifyError(error.message || `Failed to delete order ${orderNum}`);
+  const columns = [
+    {
+      header: 'Order ID',
+      accessor: 'orderNumber',
+      cell: (row) => (
+        <div>
+          <div className="font-mono font-bold text-primary">{row.orderNumber}</div>
+          {row.poNumber && <div className="text-[10px] text-surface-500 mt-1">PO: {row.poNumber}</div>}
+        </div>
+      )
+    },
+    {
+      header: 'Client',
+      accessor: 'client.name',
+      cell: (row) => (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded bg-secondary-container flex items-center justify-center text-xs font-bold text-on-secondary-container">
+            {row.client?.name ? row.client.name.substring(0, 2).toUpperCase() : 'NA'}
+          </div>
+          <span className="font-semibold text-on-surface">{row.client?.name || 'Unknown Client'}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Items (Qty)',
+      accessor: 'items',
+      cell: (row) => (
+        <div>
+          {row.items && row.items.length > 0 ? (
+            <div className="flex flex-col gap-1">
+              {row.items.map(item => (
+                <span key={item.id} className="text-xs text-on-surface">
+                  {item.product?.name || 'Unknown Product'} <span className="text-on-surface-variant font-bold">(x{item.quantity})</span>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <span className="text-xs text-on-surface-variant">No items</span>
+          )}
+          {row.shippingAddress && (
+            <div className="mt-2 text-[10px] text-surface-600 border-t border-outline-variant pt-1">
+              <span className="font-bold">Ship To:</span> {row.shippingAddress}
+            </div>
+          )}
+          {row.notes && (
+            <div className="mt-1 text-[10px] text-surface-600">
+              <span className="font-bold text-amber-700">Note:</span> {row.notes}
+            </div>
+          )}
+        </div>
+      )
+    },
+    {
+      header: 'Order Date',
+      accessor: 'createdAt',
+      cell: (row) => new Date(row.createdAt).toLocaleDateString()
+    },
+    {
+      header: 'Priority',
+      accessor: 'priority',
+      cell: (row) => (
+        <span
+          className={`px-2 py-1 rounded text-[11px] font-bold ${
+            row.priority === 'URGENT'
+              ? 'bg-red-100 text-red-700'
+              : row.priority === 'HIGH'
+              ? 'bg-amber-100 text-amber-700'
+              : 'bg-slate-100 text-slate-700'
+          }`}
+        >
+          {row.priority}
+        </span>
+      )
+    },
+    {
+      header: 'Status',
+      accessor: 'status',
+      cell: (row) => (
+        <div className="flex flex-col">
+          <span
+            className={`inline-block w-max px-2.5 py-1 rounded-full text-[11px] font-bold ${
+              row.status === 'PENDING_REVIEW'
+                ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                : row.status === 'SHIPPED' || row.status === 'COMPLETED'
+                ? 'bg-green-100 text-green-700'
+                : row.status === 'PACKING'
+                ? 'bg-blue-100 text-blue-700'
+                : row.status === 'PICKING'
+                ? 'bg-primary/10 text-primary'
+                : 'bg-red-100 text-red-700'
+            }`}
+          >
+            {row.status.replace('_', ' ')}
+          </span>
+          {row.status === 'REJECTED' && row.rejectionReason && (
+            <span className="text-[10px] text-red-600 font-bold mt-1">Reason: {row.rejectionReason}</span>
+          )}
+        </div>
+      )
+    },
+    {
+      header: 'Actions',
+      accessor: 'actions',
+      cell: (row) => (
+        row.status === 'PENDING_REVIEW' && isManagerOrAdmin ? (
+          <div className="flex items-center justify-end gap-2">
+            <button
+              onClick={() => handleApprove(row.id, row.orderNumber)}
+              className="px-3 py-1 bg-green-600 text-white rounded text-xs font-bold hover:bg-green-700 transition-colors cursor-pointer"
+            >
+              Approve
+            </button>
+            <button
+              onClick={() => setRejectingOrder(row)}
+              className="px-3 py-1 bg-red-100 text-red-700 rounded text-xs font-bold hover:bg-red-200 transition-colors cursor-pointer"
+            >
+              Reject
+            </button>
+          </div>
+        ) : (
+          <span className="text-xs text-on-surface-variant font-medium">
+            {row.status === 'SHIPPED' ? 'Fulfilling via Carrier' : (row.status === 'REJECTED' ? 'Rejected' : 'Processing')}
+          </span>
+        )
+      )
     }
-  };
+  ];
 
   if (isLoading) {
     return <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary-600" /></div>;
@@ -248,135 +369,12 @@ export const SalesOrdersPage = () => {
         </div>
 
         {/* Data Table */}
-        <div className="overflow-x-auto custom-scrollbar flex-1">
-          <table className="w-full text-left border-collapse min-w-[900px]">
-            <thead>
-              <tr className="bg-surface-container text-xs font-bold text-on-surface-variant uppercase tracking-wider border-b border-outline-variant">
-                <th className="px-6 py-4">Order ID</th>
-                <th className="px-6 py-4">Client</th>
-                <th className="px-6 py-4">Items (Qty)</th>
-                <th className="px-6 py-4">Order Date</th>
-                <th className="px-6 py-4">Priority</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant text-sm">
-              {filteredOrders.length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="text-center py-8 text-surface-500">No sales orders found</td>
-                </tr>
-              ) : filteredOrders.map((ord) => (
-                <tr key={ord.id} className="hover:bg-surface-container-low transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="font-mono font-bold text-primary">{ord.orderNumber}</div>
-                    {ord.poNumber && <div className="text-[10px] text-surface-500 mt-1">PO: {ord.poNumber}</div>}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded bg-secondary-container flex items-center justify-center text-xs font-bold text-on-secondary-container">
-                        {ord.client?.name ? ord.client.name.substring(0, 2).toUpperCase() : 'NA'}
-                      </div>
-                      <span className="font-semibold text-on-surface">{ord.client?.name || 'Unknown Client'}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    {ord.items && ord.items.length > 0 ? (
-                      <div className="flex flex-col gap-1">
-                        {ord.items.map(item => (
-                          <span key={item.id} className="text-xs text-on-surface">
-                            {item.product?.name || 'Unknown Product'} <span className="text-on-surface-variant font-bold">(x{item.quantity})</span>
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-on-surface-variant">No items</span>
-                    )}
-                    {ord.shippingAddress && (
-                      <div className="mt-2 text-[10px] text-surface-600 border-t border-outline-variant pt-1">
-                        <span className="font-bold">Ship To:</span> {ord.shippingAddress}
-                      </div>
-                    )}
-                    {ord.notes && (
-                      <div className="mt-1 text-[10px] text-surface-600">
-                        <span className="font-bold text-amber-700">Note:</span> {ord.notes}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-on-surface-variant text-xs">{new Date(ord.createdAt).toLocaleDateString()}</td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-2 py-1 rounded text-[11px] font-bold ${
-                        ord.priority === 'URGENT'
-                          ? 'bg-red-100 text-red-700'
-                          : ord.priority === 'HIGH'
-                          ? 'bg-amber-100 text-amber-700'
-                          : 'bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      {ord.priority}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span
-                        className={`inline-block w-max px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                          ord.status === 'PENDING_REVIEW'
-                            ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                            : ord.status === 'SHIPPED' || ord.status === 'COMPLETED'
-                            ? 'bg-green-100 text-green-700'
-                            : ord.status === 'PACKING'
-                            ? 'bg-blue-100 text-blue-700'
-                            : ord.status === 'PICKING'
-                            ? 'bg-primary/10 text-primary'
-                            : 'bg-red-100 text-red-700'
-                        }`}
-                      >
-                        {ord.status.replace('_', ' ')}
-                      </span>
-                      {ord.status === 'REJECTED' && ord.rejectionReason && (
-                        <span className="text-[10px] text-red-600 font-bold mt-1">Reason: {ord.rejectionReason}</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {ord.status === 'PENDING_REVIEW' && canApproveOrders ? (
-                        <>
-                          <button
-                            onClick={() => handleApprove(ord.id, ord.orderNumber)}
-                            className="px-3 py-1 bg-green-600 text-white rounded text-xs font-bold hover:bg-green-700 transition-colors cursor-pointer"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => setRejectingOrder(ord)}
-                            className="px-3 py-1 bg-red-100 text-red-700 rounded text-xs font-bold hover:bg-red-200 transition-colors cursor-pointer"
-                          >
-                            Reject
-                          </button>
-                        </>
-                      ) : (
-                        <span className="text-xs text-on-surface-variant font-medium">
-                          {ord.status === 'SHIPPED' ? 'Fulfilling via Carrier' : (ord.status === 'REJECTED' ? 'Rejected' : 'Processing')}
-                        </span>
-                      )}
-                      
-                      {canDeleteOrders && (
-                         <button
-                           onClick={() => handleDeleteOrder(ord.id, ord.orderNumber)}
-                           className="px-2 py-1 bg-red-50 text-red-600 rounded text-xs font-bold hover:bg-red-100 border border-red-200 transition-colors cursor-pointer ml-2 flex items-center justify-center"
-                           title="Permanently Delete Order"
-                         >
-                           <span className="material-symbols-outlined text-[14px]">delete</span>
-                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex-1">
+          <DataTable
+            columns={columns}
+            data={filteredOrders}
+            emptyTitle="No sales orders found"
+          />
         </div>
       </div>
 
