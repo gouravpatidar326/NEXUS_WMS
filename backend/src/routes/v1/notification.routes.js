@@ -8,21 +8,24 @@ router.use(verifyToken);
 // GET /api/v1/notifications - fetch notifications for user
 router.get('/', async (req, res) => {
   try {
-    const where = {
-      OR: [
-        { userId: req.user.id },
-        {
-          AND: [
-            { userId: null },
-            { companyId: req.user.companyId || null }
-          ]
-        }
-      ]
-    };
-    
-    // If user is SUPER_ADMIN, they can see notifications that are global or companyId-less
+    let where;
     if (req.user.role === 'SUPER_ADMIN') {
-      where.OR.push({ companyId: null });
+      where = {
+        OR: [
+          { userId: req.user.id },
+          { userId: null }
+        ]
+      };
+    } else {
+      where = {
+        OR: [
+          { userId: req.user.id },
+          {
+            userId: null,
+            companyId: req.user.companyId
+          }
+        ]
+      };
     }
 
     const notifications = await prisma.notification.findMany({
@@ -40,20 +43,24 @@ router.get('/', async (req, res) => {
 // PUT /api/v1/notifications/read-all - mark all as read
 router.put('/read-all', async (req, res) => {
   try {
-    const where = {
-      OR: [
-        { userId: req.user.id },
-        {
-          AND: [
-            { userId: null },
-            { companyId: req.user.companyId || null }
-          ]
-        }
-      ]
-    };
-    
+    let where;
     if (req.user.role === 'SUPER_ADMIN') {
-      where.OR.push({ companyId: null });
+      where = {
+        OR: [
+          { userId: req.user.id },
+          { userId: null }
+        ]
+      };
+    } else {
+      where = {
+        OR: [
+          { userId: req.user.id },
+          {
+            userId: null,
+            companyId: req.user.companyId
+          }
+        ]
+      };
     }
 
     await prisma.notification.updateMany({

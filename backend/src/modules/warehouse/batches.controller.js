@@ -153,6 +153,10 @@ const deleteBatch = async (req, res) => {
     await prisma.barcode.deleteMany({ where: { batchId: id } });
     await prisma.locationInventory.deleteMany({ where: { lotId: id } });
     await prisma.inventoryLedger.deleteMany({ where: { lotId: id } });
+    await prisma.transferItem.deleteMany({ where: { lotId: id } });
+    await prisma.stockAdjustment.deleteMany({ where: { lotId: id } });
+    await prisma.expiryAlert.deleteMany({ where: { lotId: id } });
+    await prisma.pickListItem.deleteMany({ where: { batchId: id } });
 
     await prisma.batch.delete({ where: { id } });
 
