@@ -152,7 +152,7 @@ export const TopBar = ({ onOpenSidebar }) => {
             <button
               aria-label="Help"
               onClick={() => notifySuccess('Help center: use global search or contact your Nexus WMS administrator.')}
-              className="p-2 text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container transition-colors"
+              className="p-2 text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container transition-colors hidden sm:block"
             >
               <span className="material-symbols-outlined">help</span>
             </button>
@@ -161,7 +161,7 @@ export const TopBar = ({ onOpenSidebar }) => {
               <button
                 aria-label="Settings"
                 onClick={() => navigate('/settings')}
-                className="p-2 text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container transition-colors"
+                className="p-2 text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container transition-colors hidden sm:block"
               >
                 <span className="material-symbols-outlined">settings</span>
               </button>
