@@ -258,6 +258,16 @@ const createSalesOrder = async (req, res) => {
       }
     });
 
+    try {
+      await NotificationService.send({
+        title: 'New Sales Order Request',
+        message: `New Sales Order ${newOrder.orderNumber} has been submitted by client ${newOrder.client?.name || 'Client'} for review.`,
+        companyId: companyId
+      });
+    } catch (err) {
+      console.error('Failed to trigger sales order creation notification:', err);
+    }
+
     res.status(201).json(newOrder);
   } catch (error) {
     console.error(error);

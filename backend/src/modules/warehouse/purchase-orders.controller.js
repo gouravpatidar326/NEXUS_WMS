@@ -1,4 +1,5 @@
 const prisma = require('../../utils/prisma');
+const NotificationService = require('../../utils/notification.service');
 
 const getPurchaseOrders = async (req, res) => {
   try {
@@ -70,6 +71,16 @@ const createPurchaseOrder = async (req, res) => {
         ipAddress: req.ip
       }
     });
+
+    try {
+      await NotificationService.send({
+        title: 'New Purchase Order Created',
+        message: `New Purchase Order ${newPO.poNumber} has been created for supplier ${newPO.supplier || 'Supplier'} by Super Admin.`,
+        companyId: companyId
+      });
+    } catch (err) {
+      console.error('Failed to trigger PO creation notification:', err);
+    }
 
     res.status(201).json(newPO);
   } catch (error) {
