@@ -39,7 +39,7 @@ export const Modal = ({
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-0 sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-fade-in"
@@ -48,7 +48,7 @@ export const Modal = ({
 
       <div
         className={clsx(
-          'relative flex max-h-[85dvh] sm:max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-surface-200 bg-white shadow-2xl transition-all transform animate-slide-up dark:border-surface-800 dark:bg-surface-900 sm:rounded-2xl z-10',
+          'relative flex max-h-[85dvh] sm:max-h-[92vh] w-full flex-col overflow-hidden rounded-2xl border border-surface-200 bg-white shadow-2xl transition-all transform animate-slide-up dark:border-surface-800 dark:bg-surface-900 z-10',
           SIZES[size]
         )}
       >
