@@ -16,10 +16,11 @@ const SEARCH_DESTINATIONS = [
 export const TopBar = ({ onOpenSidebar }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showMobileSearch, setShowMobileSearch] = useState(false);
-  const { user, permissions } = useAuth();
+  const { user, permissions, logout } = useAuth();
   const navigate = useNavigate();
   const { notifySuccess } = useNotification();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
 
   const handleGlobalSearch = (event) => {
     if (event.key !== 'Enter' || !searchQuery.trim()) return;
@@ -167,16 +168,63 @@ export const TopBar = ({ onOpenSidebar }) => {
             )}
 
             {/* User Avatar & Name */}
-            <div className="flex items-center gap-2 sm:gap-3.5 pl-2 sm:pl-3 border-l border-outline-variant">
-              <img
-                src={user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop'}
-                alt={user?.name}
-                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-outline-variant"
-              />
-              <div className="hidden sm:block text-left">
-                <div className="text-xs font-bold text-on-surface leading-tight">{user?.name || 'Super Admin'}</div>
-                <div className="text-[10px] text-on-surface-variant capitalize">{user?.role?.replace('_', ' ') || 'Role'}</div>
-              </div>
+            <div className="relative pl-2 sm:pl-3 border-l border-outline-variant">
+              <button
+                onClick={() => setShowProfileDropdown((prev) => !prev)}
+                className="flex items-center gap-2 sm:gap-3.5 text-left focus:outline-none hover:bg-slate-50 p-1 py-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <img
+                  src={user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop'}
+                  alt={user?.name}
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-outline-variant"
+                />
+                <div className="hidden sm:block text-left">
+                  <div className="text-xs font-bold text-on-surface leading-tight">{user?.name || 'Super Admin'}</div>
+                  <div className="text-[10px] text-on-surface-variant capitalize">{user?.role?.replace('_', ' ') || 'Role'}</div>
+                </div>
+                <span className="material-symbols-outlined text-[16px] text-slate-500 hidden sm:inline select-none">
+                  keyboard_arrow_down
+                </span>
+              </button>
+
+              {showProfileDropdown && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setShowProfileDropdown(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-48 rounded-xl border border-slate-200 bg-white py-1 shadow-lg z-50 ring-1 ring-black/5 animate-in fade-in slide-in-from-top-1 duration-100">
+                    <div className="px-4 py-2 border-b border-slate-100">
+                      <p className="text-xs font-bold text-slate-800 truncate">{user?.name}</p>
+                      <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
+                    </div>
+                    
+                    {permissions.includes(PERMISSIONS.SETTINGS_VIEW) && (
+                      <button
+                        onClick={() => {
+                          navigate('/settings');
+                          setShowProfileDropdown(false);
+                        }}
+                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">settings</span>
+                        Account Settings
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        setShowProfileDropdown(false);
+                        logout();
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs text-red-600 hover:bg-red-50 transition-colors border-t border-slate-100"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">logout</span>
+                      Sign Out
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </>
