@@ -11,6 +11,7 @@ import Badge from '@/components/ui/Badge';
 import LoadingState from '@/components/feedback/LoadingState';
 import { QrCode, Lock, CheckCircle2, ShieldAlert, Trash2 } from 'lucide-react';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import DataTable from '@/components/data-display/DataTable';
 
 export const BatchTrackingPage = () => {
   const { user } = useAuth();
@@ -206,6 +207,102 @@ export const BatchTrackingPage = () => {
     (lot.product?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const columns = [
+    {
+      header: 'Lot ID',
+      accessor: 'lotId',
+      cell: (row) => <span className="font-mono text-xs text-primary font-bold">{row.lotId}</span>
+    },
+    {
+      header: 'Product Name',
+      accessor: 'product.name',
+      cell: (row) => (
+        <div className="flex flex-col">
+          <span className="font-semibold text-slate-800 dark:text-slate-100">{row.product?.name || 'Unknown Product'}</span>
+          <span className="text-xs text-slate-500 font-mono">{row.product?.sku}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Received / Expiry',
+      accessor: 'dates',
+      cell: (row) => (
+        <div className="text-xs text-slate-500">
+          <div>Rec: {row.mfgDate ? new Date(row.mfgDate).toLocaleDateString() : 'N/A'}</div>
+          <div className="text-red-600 font-bold">Exp: {row.expiryDate ? new Date(row.expiryDate).toLocaleDateString() : 'N/A'}</div>
+        </div>
+      )
+    },
+    {
+      header: 'Status',
+      accessor: 'quarantine',
+      cell: (row) => row.quarantine ? (
+        <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-800">QUARANTINED</span>
+      ) : (
+        <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-green-100 text-green-800">ACTIVE</span>
+      )
+    },
+    {
+      header: '3rd-Party COA Lab Test Result',
+      accessor: 'coaLocked',
+      cell: (row) => !row.coaLocked ? (
+        <div className="flex items-center gap-2">
+          <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+            <span className="material-symbols-outlined text-[14px]">verified</span>
+            COA UNLOCKED (Passed)
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 flex items-center gap-1">
+            <span className="material-symbols-outlined text-[14px]">lock</span>
+            COA LOCKED (Payment Required)
+          </span>
+        </div>
+      )
+    },
+    {
+      header: 'Actions',
+      accessor: 'id',
+      cell: (row) => {
+        const isUnlocked = !row.coaLocked;
+        return (
+          <div className="flex flex-col gap-2 md:items-end justify-end w-full">
+            {isUnlocked ? (
+              <button
+                onClick={() => setSelectedLotCoa(row)}
+                className="px-3 py-1 bg-primary/10 text-primary rounded text-xs font-bold hover:bg-primary/20 transition-colors cursor-pointer w-full max-w-[160px]"
+              >
+                View Certificate
+              </button>
+            ) : (
+              <button
+                onClick={() => handleUnlockCoa(row.id)}
+                className="px-3 py-1 bg-amber-600 text-white rounded text-xs font-bold hover:bg-amber-700 transition-colors shadow-sm cursor-pointer w-full max-w-[160px]"
+              >
+                Pay $150 to Unlock COA
+              </button>
+            )}
+            <button
+              onClick={() => handleToggleQuarantine(row.id, row.quarantine)}
+              className={`px-3 py-1 border rounded text-xs font-bold transition-colors cursor-pointer w-full max-w-[160px] ${row.quarantine ? 'border-green-600 text-green-600 hover:bg-green-50' : 'border-red-600 text-red-600 hover:bg-red-50'}`}
+            >
+              {row.quarantine ? 'Remove Quarantine' : 'Quarantine'}
+            </button>
+            {user?.role?.toUpperCase() === 'SUPER_ADMIN' && (
+              <button
+                onClick={() => handleDeleteBatch(row.id, row.lotId)}
+                className="px-3 py-1 bg-red-600 text-white rounded text-xs font-bold hover:bg-red-700 transition-colors flex items-center gap-1 justify-center w-full max-w-[160px]"
+              >
+                <Trash2 className="w-3 h-3" /> Delete Batch
+              </button>
+            )}
+          </div>
+        );
+      }
+    }
+  ];
+
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col space-y-4 sm:space-y-6">
       {/* Header */}
@@ -275,100 +372,14 @@ export const BatchTrackingPage = () => {
       </div>
 
       {/* Main Data Table */}
-      <div className="flex-1 bg-white border border-outline-variant rounded-xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left border-collapse min-w-[950px]">
-            <thead className="bg-surface-container">
-              <tr className="border-b border-outline-variant text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
-                <th className="px-5 py-3">Lot ID</th>
-                <th className="px-5 py-3">Product Name</th>
-                <th className="px-5 py-3">Received / Expiry</th>
-                <th className="px-5 py-3">Status</th>
-                <th className="px-5 py-3">3rd-Party COA Lab Test Result</th>
-                <th className="px-5 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant text-sm">
-              {isLoading ? (
-                <tr><td colSpan="6" className="text-center py-8 text-on-surface-variant">Loading batches...</td></tr>
-              ) : filteredLots.length === 0 ? (
-                <tr><td colSpan="6" className="text-center py-8 text-on-surface-variant">No batches found. Create one to get started!</td></tr>
-              ) : filteredLots.map((lot) => {
-                const isUnlocked = !lot.coaLocked;
-                return (
-                  <tr key={lot.id} className="hover:bg-surface-container-low transition-colors group">
-                    <td className="px-5 py-4 font-mono text-xs text-primary font-bold">{lot.lotId}</td>
-                    <td className="px-5 py-4">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-on-surface">{lot.product?.name || 'Unknown Product'}</span>
-                        <span className="text-xs text-on-surface-variant font-mono">{lot.product?.sku}</span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 text-xs text-on-surface-variant">
-                      <div>Rec: {lot.mfgDate ? new Date(lot.mfgDate).toLocaleDateString() : 'N/A'}</div>
-                      <div className="text-red-600 font-bold">Exp: {lot.expiryDate ? new Date(lot.expiryDate).toLocaleDateString() : 'N/A'}</div>
-                    </td>
-                    <td className="px-5 py-4">
-                      {lot.quarantine ? (
-                         <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-800">QUARANTINED</span>
-                      ) : (
-                         <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-green-100 text-green-800">ACTIVE</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-4">
-                      {isUnlocked ? (
-                        <div className="flex items-center gap-2">
-                          <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[14px]">verified</span>
-                            COA UNLOCKED (Passed)
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[14px]">lock</span>
-                            COA LOCKED (Payment Required)
-                          </span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-5 py-4 flex flex-col gap-2 justify-end items-end">
-                      {isUnlocked ? (
-                        <button
-                          onClick={() => setSelectedLotCoa(lot)}
-                          className="px-3 py-1 bg-primary/10 text-primary rounded text-xs font-bold hover:bg-primary/20 transition-colors cursor-pointer w-full max-w-[160px]"
-                        >
-                          View Certificate
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleUnlockCoa(lot.id)}
-                          className="px-3 py-1 bg-amber-600 text-white rounded text-xs font-bold hover:bg-amber-700 transition-colors shadow-sm cursor-pointer w-full max-w-[160px]"
-                        >
-                          Pay $150 to Unlock COA
-                        </button>
-                      )}
-                       <button
-                        onClick={() => handleToggleQuarantine(lot.id, lot.quarantine)}
-                        className={`px-3 py-1 border rounded text-xs font-bold transition-colors cursor-pointer w-full max-w-[160px] ${lot.quarantine ? 'border-green-600 text-green-600 hover:bg-green-50' : 'border-red-600 text-red-600 hover:bg-red-50'}`}
-                       >
-                        {lot.quarantine ? 'Remove Quarantine' : 'Quarantine'}
-                       </button>
-                       {user?.role?.toUpperCase() === 'SUPER_ADMIN' && (
-                         <button
-                           onClick={() => handleDeleteBatch(lot.id, lot.lotId)}
-                           className="px-3 py-1 bg-red-600 text-white rounded text-xs font-bold hover:bg-red-700 transition-colors flex items-center gap-1 justify-center w-full max-w-[160px]"
-                         >
-                           <Trash2 className="w-3 h-3" /> Delete Batch
-                         </button>
-                       )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      <div className="flex-1">
+        <DataTable
+          columns={columns}
+          data={filteredLots}
+          isLoading={isLoading}
+          emptyTitle="No batches found"
+          emptyDescription="Create one to get started!"
+        />
       </div>
 
       {/* Add Batch Modal */}
