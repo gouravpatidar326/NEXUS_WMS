@@ -49,7 +49,7 @@ export const Modal = ({
       <div className="flex min-h-full items-end justify-center sm:items-center sm:p-4">
         <div
           className={clsx(
-            'relative flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-surface-200 bg-white shadow-2xl transition-all transform animate-slide-up dark:border-surface-800 dark:bg-surface-900 sm:max-h-[92vh] sm:rounded-2xl',
+            'relative flex max-h-[85dvh] sm:max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-surface-200 bg-white shadow-2xl transition-all transform animate-slide-up dark:border-surface-800 dark:bg-surface-900 sm:rounded-2xl',
             SIZES[size]
           )}
         >
