@@ -52,8 +52,8 @@ export const DataTable = ({
                     );
                   }
 
-                  // Determine if column should take full width (e.g. name, description, address, email or first column)
-                  const isFullWidth = cIdx === 0 || /name|desc|address|detail|info/i.test(col.header || col.accessor || '');
+                  // Determine if column should take full width (e.g. name, description, address, email, reference code, id, or first column)
+                  const isFullWidth = cIdx === 0 || /name|desc|address|detail|info|ref|id|code|email|phone/i.test(col.header || col.accessor || '');
                   
                   return (
                     <div key={col.key || col.accessor} className={`${isFullWidth ? 'col-span-2' : 'col-span-1'} min-w-0`}>
