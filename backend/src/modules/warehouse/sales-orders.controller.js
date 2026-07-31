@@ -182,8 +182,17 @@ const rejectSalesOrder = async (req, res) => {
 const createSalesOrder = async (req, res) => {
   try {
     const { clientId, priority, items, shippingAddress, poNumber, notes } = req.body;
+    let resolvedClientId = clientId;
+    if (!resolvedClientId && req.user && req.user.role === 'CLIENT') {
+      const clientRecord = await prisma.client.findFirst({
+        where: { email: req.user.email }
+      });
+      if (clientRecord) {
+        resolvedClientId = clientRecord.id;
+      }
+    }
 
-    if (!clientId || !items || items.length === 0) {
+    if (!resolvedClientId || !items || items.length === 0) {
       return res.status(400).json({ message: 'Client ID and items are required' });
     }
 
@@ -224,7 +233,7 @@ const createSalesOrder = async (req, res) => {
     const newOrder = await prisma.salesOrder.create({
       data: {
         orderNumber,
-        clientId,
+        clientId: resolvedClientId,
         companyId,
         priority: priority || 'NORMAL',
         shippingAddress,
