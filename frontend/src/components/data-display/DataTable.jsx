@@ -51,19 +51,25 @@ export const DataTable = ({
                   if (isAction) {
                     return (
                       <div key={col.key || col.accessor} className="col-span-2 border-t border-surface-100 pt-3 mt-1">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-surface-400">{col.header}</p>
-                        <div className="mt-1 text-sm text-surface-800">{content}</div>
+                        <div className="text-sm text-surface-800">{content}</div>
                       </div>
                     );
                   }
 
+                  const isFirst = cIdx === 0;
                   // Determine if column should take full width (e.g. name, description, address, email, reference code, id, or first column)
-                  const isFullWidth = cIdx === 0 || /name|desc|address|detail|info|ref|id|code|email|phone/i.test(col.header || col.accessor || '');
+                  const isFullWidth = isFirst || /name|desc|address|detail|info|ref|id|code|email|phone|role|tenant|company|carrier|recipient|destination|tracking|item|product|reason|comment|note|message/i.test(col.header || col.accessor || '');
                   
                   return (
                     <div key={col.key || col.accessor} className={`${isFullWidth ? 'col-span-2' : 'col-span-1'} min-w-0`}>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-surface-400 mb-0.5">{col.header}</p>
-                      <div className="min-w-0 break-words text-sm text-surface-800 [&_*]:max-w-full [&_button]:whitespace-normal">{content}</div>
+                      {!isFirst && (
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-surface-400 mb-0.5">
+                          {col.header}
+                        </p>
+                      )}
+                      <div className={isFirst ? "min-w-0 break-words text-base font-bold text-surface-900 [&_*]:max-w-full [&_button]:whitespace-normal" : "min-w-0 break-words text-sm text-surface-800 [&_*]:max-w-full [&_button]:whitespace-normal"}>
+                        {content}
+                      </div>
                     </div>
                   );
                 })}
