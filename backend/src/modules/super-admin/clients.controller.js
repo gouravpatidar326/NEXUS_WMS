@@ -3,7 +3,12 @@ const { logAudit } = require('../../utils/auditLogger');
 
 const getClients = async (req, res) => {
   try {
+    const where = {};
+    if (req.user && req.user.role === 'WAREHOUSE_MANAGER') {
+      where.companyId = req.user.companyId;
+    }
     const clients = await prisma.client.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
     });
     res.json(clients);
@@ -13,12 +18,17 @@ const getClients = async (req, res) => {
   }
 };
 
-const provisionClient = async (req, res) => {
+  const provisionClient = async (req, res) => {
   try {
-    const { name, creditLimit, tier, email, phone, address, status } = req.body;
+    const { name, creditLimit, tier, email, phone, address, status, companyId } = req.body;
 
     if (!name || !email || !phone || !address || !status) {
       return res.status(400).json({ message: 'Name, Email, Phone, Address, and Status are required' });
+    }
+
+    let finalCompanyId = companyId || null;
+    if (req.user && req.user.role === 'WAREHOUSE_MANAGER') {
+      finalCompanyId = req.user.companyId;
     }
 
     const client = await prisma.client.create({
@@ -28,6 +38,7 @@ const provisionClient = async (req, res) => {
         phone,
         address,
         status,
+        companyId: finalCompanyId,
         creditLimit: creditLimit ? parseFloat(creditLimit) : 0.0,
         tier: tier || 'STANDARD',
       },
@@ -45,25 +56,37 @@ const provisionClient = async (req, res) => {
 const updateClient = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, creditLimit, tier, email, phone, address, status } = req.body;
+    const { name, creditLimit, tier, email, phone, address, status, companyId } = req.body;
 
     const existingClient = await prisma.client.findUnique({ where: { id } });
     if (!existingClient) {
       return res.status(404).json({ message: 'Client not found' });
     }
 
+    if (req.user && req.user.role === 'WAREHOUSE_MANAGER') {
+      if (existingClient.companyId !== req.user.companyId) {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
+    }
+
+    const updateData = {
+      ...(name ? { name } : {}),
+      ...(email ? { email } : {}),
+      ...(phone ? { phone } : {}),
+      ...(address ? { address } : {}),
+      ...(status ? { status } : {}),
+      ...(creditLimit !== undefined ? { creditLimit: parseFloat(creditLimit) } : {}),
+      ...(tier ? { tier } : {}),
+      updatedAt: new Date(),
+    };
+
+    if (req.user && req.user.role === 'SUPER_ADMIN' && companyId !== undefined) {
+      updateData.companyId = companyId || null;
+    }
+
     const client = await prisma.client.update({
       where: { id },
-      data: {
-        ...(name ? { name } : {}),
-        ...(email ? { email } : {}),
-        ...(phone ? { phone } : {}),
-        ...(address ? { address } : {}),
-        ...(status ? { status } : {}),
-        ...(creditLimit !== undefined ? { creditLimit: parseFloat(creditLimit) } : {}),
-        ...(tier ? { tier } : {}),
-        updatedAt: new Date(),
-      },
+      data: updateData,
     });
 
     await logAudit(req, 'CLIENT_UPDATED');
@@ -82,6 +105,10 @@ const deleteClient = async (req, res) => {
     const existingClient = await prisma.client.findUnique({ where: { id } });
     if (!existingClient) {
       return res.status(200).json({ message: 'Client already deleted or not found', id });
+    }
+
+    if (req.user && req.user.role === 'WAREHOUSE_MANAGER' && existingClient.companyId !== req.user.companyId) {
+      return res.status(403).json({ message: 'Forbidden' });
     }
 
     await prisma.client.delete({

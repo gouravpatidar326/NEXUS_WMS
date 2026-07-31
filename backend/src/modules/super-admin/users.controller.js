@@ -4,7 +4,13 @@ const { logAudit } = require('../../utils/auditLogger');
 
 const getUsers = async (req, res) => {
   try {
+    const where = {};
+    if (req.user.role === 'WAREHOUSE_MANAGER') {
+      where.companyId = req.user.companyId;
+    }
+
     const users = await prisma.user.findMany({
+      where,
       select: {
         id: true,
         name: true,
@@ -30,11 +36,20 @@ const getUsers = async (req, res) => {
 
   const inviteUser = async (req, res) => {
   try {
-    const { name, email, role, companyId, password, phone, jobTitle } = req.body;
+    const { name, email, password, phone, jobTitle } = req.body;
+    let { role, companyId } = req.body;
 
-    const validRoles = ['SUPER_ADMIN', 'WAREHOUSE_MANAGER', 'INVENTORY_CLERK', 'CLIENT'];
-    if (!validRoles.includes(role)) {
-      return res.status(400).json({ message: 'Invalid role' });
+    if (req.user.role === 'WAREHOUSE_MANAGER') {
+      companyId = req.user.companyId;
+      const allowedRoles = ['INVENTORY_CLERK', 'CLIENT'];
+      if (!allowedRoles.includes(role)) {
+        return res.status(403).json({ message: 'Managers can only create Clerks or Clients' });
+      }
+    } else {
+      const validRoles = ['SUPER_ADMIN', 'WAREHOUSE_MANAGER', 'INVENTORY_CLERK', 'CLIENT'];
+      if (!validRoles.includes(role)) {
+        return res.status(400).json({ message: 'Invalid role' });
+      }
     }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
@@ -76,17 +91,32 @@ const updateUser = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    if (req.user.role === 'WAREHOUSE_MANAGER') {
+      if (existingUser.companyId !== req.user.companyId) {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
+      // Force companyId to remain the same for managers
+      if (role && !['INVENTORY_CLERK', 'CLIENT'].includes(role)) {
+        return res.status(403).json({ message: 'Forbidden role' });
+      }
+    }
+
+    const updateData = {
+      ...(name ? { name } : {}),
+      ...(role ? { role } : {}),
+      ...(status ? { status } : {}),
+      ...(phone !== undefined ? { phone } : {}),
+      ...(jobTitle !== undefined ? { jobTitle } : {}),
+      updatedAt: new Date(),
+    };
+    
+    if (req.user.role === 'SUPER_ADMIN' && companyId !== undefined) {
+      updateData.companyId = companyId;
+    }
+
     const user = await prisma.user.update({
       where: { id },
-      data: {
-        ...(name ? { name } : {}),
-        ...(role ? { role } : {}),
-        ...(status ? { status } : {}),
-        ...(phone !== undefined ? { phone } : {}),
-        ...(jobTitle !== undefined ? { jobTitle } : {}),
-        ...(companyId !== undefined ? { companyId } : {}),
-        updatedAt: new Date(),
-      },
+      data: updateData,
     });
 
     await logAudit(req, 'USER_UPDATED');
@@ -105,6 +135,10 @@ const deleteUser = async (req, res) => {
     const existingUser = await prisma.user.findUnique({ where: { id } });
     if (!existingUser) {
       return res.status(200).json({ message: 'User already deleted or not found', id });
+    }
+
+    if (req.user.role === 'WAREHOUSE_MANAGER' && existingUser.companyId !== req.user.companyId) {
+      return res.status(403).json({ message: 'Forbidden' });
     }
 
     // Unlink dependent relations before deletion to avoid foreign key errors

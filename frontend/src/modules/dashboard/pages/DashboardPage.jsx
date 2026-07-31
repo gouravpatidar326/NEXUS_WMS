@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { ROLES } from '@/permissions/roles';
 import { dashboardService } from '@/services/dashboardService';
 import LoadingState from '@/components/feedback/LoadingState';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export const DashboardPage = () => {
   const { user } = useAuth();
@@ -46,7 +48,34 @@ const SuperAdminDashboard = ({ user }) => {
   }, [notifyError]);
 
   const handleExportReport = () => {
-    notifySuccess('Generating platform report... Download started (CSV).');
+    try {
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text('System Overview Report', 14, 22);
+      
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
+      
+      const tableData = [
+        ['Active Companies', data?.activeCompanies || 0],
+        ['Global Inventory Value', `$${(data?.globalInventoryValue || 0).toFixed(2)}`]
+      ];
+
+      autoTable(doc, {
+        startY: 40,
+        head: [['Metric', 'Value']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [41, 128, 185] }
+      });
+
+      doc.save(`System_Overview_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+      notifySuccess('Platform report downloaded successfully (PDF).');
+    } catch (error) {
+      console.error(error);
+      notifyError('Failed to generate report');
+    }
   };
 
   if (loading) return <LoadingState message="Loading dashboard metrics..." />;

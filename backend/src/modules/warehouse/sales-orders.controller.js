@@ -6,11 +6,7 @@ const getSalesOrders = async (req, res) => {
     const { companyId } = req.user;
     const where = companyId ? { companyId } : {};
     const orders = await prisma.salesOrder.findMany({
-<<<<<<< HEAD
       where,
-=======
-      where: { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) },
->>>>>>> 76436a94e2abfa295c585eaa0ec513255b4ba0e6
       include: {
         items: { include: { product: true } },
         client: { select: { name: true, tier: true } }
@@ -35,11 +31,7 @@ const approveSalesOrder = async (req, res) => {
     }
 
     const order = await prisma.salesOrder.findFirst({
-<<<<<<< HEAD
       where,
-=======
-      where: { id, ...(req.user.companyId ? { companyId: req.user.companyId } : {}) },
->>>>>>> 76436a94e2abfa295c585eaa0ec513255b4ba0e6
       include: { items: true }
     });
 
@@ -149,11 +141,7 @@ const rejectSalesOrder = async (req, res) => {
     }
 
     const order = await prisma.salesOrder.findFirst({
-<<<<<<< HEAD
       where
-=======
-      where: { id, ...(req.user.companyId ? { companyId: req.user.companyId } : {}) }
->>>>>>> 76436a94e2abfa295c585eaa0ec513255b4ba0e6
     });
 
     if (!order) {

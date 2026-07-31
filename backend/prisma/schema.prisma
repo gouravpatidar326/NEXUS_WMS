@@ -21,6 +21,7 @@ model Company {
   users              User[]
   categories         Category[]
   products           Product[]
+  clients            Client[]
   batches            Batch[]
   locations          Location[]
   locationInventory  LocationInventory[]
@@ -72,7 +73,9 @@ model Client {
   status      String   @default("ACTIVE")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  companyId   String?
 
+  company     Company? @relation(fields: [companyId], references: [id])
   salesOrders SalesOrder[]
 }
 
@@ -129,6 +132,7 @@ model Product {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
+  attributes     Json?
 
   company             Company             @relation(fields: [companyId], references: [id])
   categoryRef         Category?           @relation(fields: [categoryId], references: [id])

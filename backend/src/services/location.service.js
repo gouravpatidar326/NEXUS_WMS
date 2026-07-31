@@ -12,6 +12,7 @@ class LocationService {
     const data = {
       code,
       name: payload.name || `Bin ${code}`,
+      warehouse: payload.warehouse || 'Main Warehouse',
       zone: payload.zone.toUpperCase(),
       aisle: payload.aisle.toUpperCase(),
       rack: payload.rack.toUpperCase(),

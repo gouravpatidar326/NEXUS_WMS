@@ -3,7 +3,7 @@ const prisma = require('../../utils/prisma');
 const getBatches = async (req, res) => {
   try {
     const batches = await prisma.batch.findMany({
-      where: { ...(req.user.companyId ? { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) } : {}) },
+      where: req.user.companyId ? { companyId: req.user.companyId } : {},
       include: { product: true },
       orderBy: { createdAt: 'desc' }
     });
@@ -52,7 +52,7 @@ const updateBatch = async (req, res) => {
     const { quarantine } = req.body;
 
     const batch = await prisma.batch.findFirst({
-      where: { id, companyId }
+      where: { id, ...(companyId ? { companyId } : {}) }
     });
 
     if (!batch) {
@@ -86,7 +86,7 @@ const unlockCoa = async (req, res) => {
     }
 
     const batch = await prisma.batch.findFirst({
-      where: { id, ...(req.user.companyId ? { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) } : {}) }
+      where: { id, ...(req.user.companyId ? { companyId: req.user.companyId } : {}) }
     });
 
     if (!batch) {
@@ -119,7 +119,7 @@ const deleteBatch = async (req, res) => {
     const { companyId } = req.user;
 
     const batch = await prisma.batch.findFirst({
-      where: { id, companyId }
+      where: { id, ...(companyId ? { companyId } : {}) }
     });
 
     if (!batch) {

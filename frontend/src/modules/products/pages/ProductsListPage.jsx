@@ -14,6 +14,9 @@ import { productService } from '@/services/productService';
 import { categoryService } from '@/services/categoryService';
 import { salesOrderService } from '@/services/salesOrderService';
 import { clientService } from '@/services/clientService';
+import { warehouseService } from '@/services/warehouseService';
+import { locationService } from '@/services/locationService';
+import { getCategoryFields } from '@/config/categoryConfig';
 import { ShoppingCart } from 'lucide-react';
 
 export const ProductsListPage = () => {
@@ -46,6 +49,16 @@ export const ProductsListPage = () => {
   const [unitCost, setUnitCost] = useState('0.00');
   const [wholesalePrice, setWholesalePrice] = useState('0.00');
   const [description, setDescription] = useState('');
+
+  // Dynamic Attributes State
+  const [attributes, setAttributes] = useState({});
+
+  // Opening Stock State
+  const [openingStock, setOpeningStock] = useState('0');
+  const [warehouseId, setWarehouseId] = useState('');
+  const [locationId, setLocationId] = useState('');
+  const [warehouses, setWarehouses] = useState([]);
+  const [locations, setLocations] = useState([]);
   
   // Specs
   const [weight, setWeight] = useState('');
@@ -80,23 +93,29 @@ export const ProductsListPage = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [prodRes, catRes, clientRes] = await Promise.all([
+      const [prodRes, catRes, clientRes, whRes, locRes] = await Promise.all([
         productService.getProducts({
           search: searchTerm,
           category: selectedCategory,
           status: selectedStatus,
         }),
         categoryService.getCategories(),
-        clientService.fetchClients().catch(() => ({ data: [] }))
+        clientService.fetchClients().catch(() => ({ data: [] })),
+        warehouseService.getWarehouses().catch(() => []),
+        locationService.getLocations().catch(() => ({ items: [] }))
       ]);
 
       const prodList = Array.isArray(prodRes) ? prodRes : prodRes?.items || prodRes?.data || [];
       const catList = Array.isArray(catRes) ? catRes : catRes?.data || [];
       const clientList = Array.isArray(clientRes) ? clientRes : clientRes?.data || [];
+      const whList = Array.isArray(whRes) ? whRes : whRes?.data || [];
+      const locList = Array.isArray(locRes) ? locRes : locRes?.items || locRes?.data || [];
 
       setProducts(prodList);
       setCategories(catList);
       setClients(clientList);
+      setWarehouses(whList);
+      setLocations(locList);
       if (clientList.length > 0) setOrderClientId(clientList[0].id);
     } catch (err) {
       console.error('Error loading products data:', err);
@@ -133,6 +152,10 @@ export const ProductsListPage = () => {
     setWidth('');
     setHeight('');
     setVolume('');
+    setAttributes({});
+    setOpeningStock('0');
+    setWarehouseId('');
+    setLocationId('');
     setIsProductModalOpen(true);
   };
 
@@ -156,6 +179,10 @@ export const ProductsListPage = () => {
     setWidth(prod.specification?.width !== undefined && prod.specification?.width !== null ? String(prod.specification.width) : '');
     setHeight(prod.specification?.height !== undefined && prod.specification?.height !== null ? String(prod.specification.height) : '');
     setVolume(prod.specification?.volume !== undefined && prod.specification?.volume !== null ? String(prod.specification.volume) : '');
+    setAttributes(prod.attributes || {});
+    setOpeningStock('0');
+    setWarehouseId('');
+    setLocationId('');
 
     setIsProductModalOpen(true);
   };
@@ -180,6 +207,10 @@ export const ProductsListPage = () => {
         unitCost: parseFloat(unitCost || '0'),
         wholesalePrice: parseFloat(wholesalePrice || '0'),
         description,
+        attributes,
+        openingStock: openingStock ? parseInt(openingStock, 10) : 0,
+        warehouseId,
+        locationId,
         specification: {
           weight: weight ? parseFloat(weight) : null,
           length: length ? parseFloat(length) : null,
@@ -458,6 +489,73 @@ export const ProductsListPage = () => {
               <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Enter Product Description" />
             </FormField>
           </div>
+
+          {/* Dynamic Attributes */}
+          {categoryId && (
+            (() => {
+              const selectedCat = categories.find(c => c.id === categoryId);
+              const dynamicFields = getCategoryFields(selectedCat?.name);
+              
+              if (dynamicFields.length > 0) {
+                return (
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-slate-800 border-b pb-2">{selectedCat.name} Details</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {dynamicFields.map(field => (
+                        <FormField key={field.name} label={field.label}>
+                          {field.type === 'select' ? (
+                            <Select
+                              value={attributes[field.name] || ''}
+                              onChange={(e) => setAttributes({ ...attributes, [field.name]: e.target.value })}
+                              options={field.options.map(opt => ({ value: opt, label: opt }))}
+                            />
+                          ) : (
+                            <Input
+                              type={field.type}
+                              placeholder={field.placeholder}
+                              value={attributes[field.name] || ''}
+                              onChange={(e) => setAttributes({ ...attributes, [field.name]: e.target.value })}
+                            />
+                          )}
+                        </FormField>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()
+          )}
+
+          {/* Opening Stock (Create Only) */}
+          {!editingProduct && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-slate-800 border-b pb-2">Opening Stock (Optional)</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <FormField label="Initial Quantity">
+                  <Input type="number" min="0" value={openingStock} onChange={(e) => setOpeningStock(e.target.value)} placeholder="0" />
+                </FormField>
+                {parseInt(openingStock, 10) > 0 && (
+                  <>
+                    <FormField label="Warehouse">
+                      <Select
+                        value={warehouseId}
+                        onChange={(e) => setWarehouseId(e.target.value)}
+                        options={[{value: '', label: 'Select Warehouse'}, ...warehouses.map(w => ({ value: w.id, label: w.name }))]}
+                      />
+                    </FormField>
+                    <FormField label="Location (Bin)">
+                      <Select
+                        value={locationId}
+                        onChange={(e) => setLocationId(e.target.value)}
+                        options={[{value: '', label: 'Select Location'}, ...locations.map(l => ({ value: l.id, label: l.name }))]}
+                      />
+                    </FormField>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Specifications (Optional) */}
           <div className="space-y-4">

@@ -37,6 +37,8 @@ export const WAREHOUSE_MANAGER_ITEMS = [
   { id: 'receiving', title: 'Receiving', path: '/purchase-orders', iconName: 'move_to_inbox' },
   { id: 'barcode', title: 'Barcode', path: '/barcode', iconName: 'qr_code_scanner' },
   { id: 'reports', title: 'Reports', path: '/reports', iconName: 'bar_chart' },
+  { id: 'users', title: 'Users Directory', path: '/users', iconName: 'group' },
+  { id: 'clients', title: 'Clients Directory', path: '/clients', iconName: 'person_pin' },
 ];
 
 export const INVENTORY_CLERK_ITEMS = [

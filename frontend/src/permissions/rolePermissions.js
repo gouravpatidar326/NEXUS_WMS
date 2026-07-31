@@ -59,6 +59,9 @@ const WAREHOUSE_MANAGER_PERMISSIONS = [
   PERMISSIONS.REPORTS_VIEW,
   PERMISSIONS.REPORTS_EXPORT,
   PERMISSIONS.USERS_VIEW,
+  PERMISSIONS.USERS_CREATE,
+  PERMISSIONS.USERS_EDIT,
+  PERMISSIONS.USERS_DELETE,
   PERMISSIONS.AUDIT_VIEW,
   PERMISSIONS.SETTINGS_VIEW,
 ];
@@ -115,6 +118,8 @@ export const ROLE_PERMISSIONS = {
 };
 
 // Apply administrator-saved RBAC overrides when the browser session starts.
+// Temporarily disabled to allow new permissions to take effect for WAREHOUSE_MANAGER
+/*
 if (typeof localStorage !== 'undefined') {
   try {
     const savedPermissions = JSON.parse(localStorage.getItem('wms_role_permissions') || 'null');
@@ -129,3 +134,4 @@ if (typeof localStorage !== 'undefined') {
     localStorage.removeItem('wms_role_permissions');
   }
 }
+*/
