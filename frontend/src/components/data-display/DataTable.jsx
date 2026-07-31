@@ -22,16 +22,21 @@ export const DataTable = ({
     data.length > 0 && data.every((row) => selectedRows.includes(row.id));
 
   return (
-    <div className="card overflow-hidden">
-      <div className="divide-y divide-surface-200 md:hidden">
+    <div className="bg-transparent md:bg-white md:border md:border-surface-200 md:rounded-2xl md:shadow-sm md:overflow-hidden">
+      <div className="space-y-4 md:hidden">
         {isLoading ? (
-          <div className="p-6"><LoadingState message="Loading dataset..." /></div>
+          <div className="p-6 bg-white rounded-2xl border border-surface-200 shadow-sm"><LoadingState message="Loading dataset..." /></div>
         ) : data.length === 0 ? (
-          <div className="p-6"><EmptyState title={emptyTitle} description={emptyDescription} /></div>
+          <div className="p-6 bg-white rounded-2xl border border-surface-200 shadow-sm"><EmptyState title={emptyTitle} description={emptyDescription} /></div>
         ) : data.map((row, idx) => {
           const isSelected = selectedRows.includes(row.id);
           return (
-            <article key={row.id || idx} className={`space-y-4 p-5 ${isSelected ? 'bg-primary-50/60' : 'bg-white'}`}>
+            <article
+              key={row.id || idx}
+              className={`space-y-4 p-5 rounded-2xl border border-surface-200/80 shadow-sm transition hover:shadow-md ${
+                isSelected ? 'bg-primary-50/60' : 'bg-white'
+              }`}
+            >
               {selectable && (
                 <label className="flex items-center gap-2 text-xs font-semibold text-surface-600 border-b border-surface-100 pb-2">
                   <input type="checkbox" checked={isSelected} onChange={(e) => onSelectRow && onSelectRow(row.id, e.target.checked)} className="rounded border-surface-300 text-primary-600" />
