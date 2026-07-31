@@ -203,13 +203,29 @@ const createSalesOrder = async (req, res) => {
       });
     }
 
+    let companyId = req.user.companyId;
+    if (!companyId) {
+      if (items && items.length > 0) {
+        const product = await prisma.product.findUnique({ where: { id: items[0].productId } });
+        if (product) {
+          companyId = product.companyId;
+        }
+      }
+      if (!companyId) {
+        const defaultCompany = await prisma.company.findFirst();
+        if (defaultCompany) {
+          companyId = defaultCompany.id;
+        }
+      }
+    }
+
     const orderNumber = `SO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const newOrder = await prisma.salesOrder.create({
       data: {
         orderNumber,
         clientId,
-        companyId: req.user.companyId || clientId.companyId || null, // Best effort for super admin
+        companyId,
         priority: priority || 'NORMAL',
         shippingAddress,
         poNumber,

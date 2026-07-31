@@ -1,5 +1,6 @@
 const locationRepository = require('../repositories/location.repository');
 const { getPaginationParams, formatPaginationMeta } = require('../utils/pagination');
+const prisma = require('../utils/prisma');
 
 class LocationService {
   async createLocation(companyId, payload) {
@@ -7,20 +8,43 @@ class LocationService {
       throw new Error('Zone, Aisle, Rack, Shelf, and Bin are required for location hierarchy');
     }
 
+    let targetCompanyId = companyId;
+    if (!targetCompanyId) {
+      if (payload.warehouse) {
+        const warehouseRecord = await prisma.warehouse.findFirst({
+          where: { name: payload.warehouse }
+        });
+        if (warehouseRecord) {
+          targetCompanyId = warehouseRecord.companyId;
+        }
+      }
+
+      if (!targetCompanyId) {
+        const defaultCompany = await prisma.company.findFirst();
+        if (defaultCompany) {
+          targetCompanyId = defaultCompany.id;
+        } else {
+          throw new Error('No company found to associate location with');
+        }
+      }
+    }
+
     const code = payload.code || `${payload.zone}-${payload.aisle}-${payload.rack}-${payload.shelf}-${payload.bin}`.toUpperCase();
 
     const data = {
       code,
       name: payload.name || `Bin ${code}`,
+      warehouse: payload.warehouse || 'Main Warehouse',
       zone: payload.zone.toUpperCase(),
       aisle: payload.aisle.toUpperCase(),
       rack: payload.rack.toUpperCase(),
       shelf: payload.shelf.toUpperCase(),
       bin: payload.bin.toUpperCase(),
+      capacityType: payload.capacityType || 'Items',
       maxCapacity: parseInt(payload.maxCapacity || '1000', 10),
       occupied: 0,
       status: payload.status || 'Active',
-      companyId,
+      companyId: targetCompanyId,
     };
 
     return await locationRepository.create(data);
@@ -60,11 +84,13 @@ class LocationService {
     
     const updateData = {};
     if (payload.code) updateData.code = payload.code;
+    if (payload.warehouse) updateData.warehouse = payload.warehouse;
     if (payload.zone) updateData.zone = payload.zone;
     if (payload.aisle) updateData.aisle = payload.aisle;
     if (payload.rack) updateData.rack = payload.rack;
     if (payload.shelf) updateData.shelf = payload.shelf;
     if (payload.bin) updateData.bin = payload.bin;
+    if (payload.capacityType) updateData.capacityType = payload.capacityType;
     if (payload.maxCapacity) updateData.maxCapacity = parseInt(payload.maxCapacity, 10);
     if (payload.status) updateData.status = payload.status;
 

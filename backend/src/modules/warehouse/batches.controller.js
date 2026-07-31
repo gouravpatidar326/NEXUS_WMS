@@ -16,11 +16,24 @@ const getBatches = async (req, res) => {
 
 const createBatch = async (req, res) => {
   try {
-    const { companyId } = req.user;
+    let companyId = req.user.companyId;
     const { lotId, productId, mfgDate, expiryDate } = req.body;
 
     if (!lotId || !productId) {
       return res.status(400).json({ message: 'lotId and productId are required' });
+    }
+
+    if (!companyId) {
+      const product = await prisma.product.findUnique({ where: { id: productId } });
+      if (product) {
+        companyId = product.companyId;
+      }
+      if (!companyId) {
+        const defaultCompany = await prisma.company.findFirst();
+        if (defaultCompany) {
+          companyId = defaultCompany.id;
+        }
+      }
     }
 
     const newBatch = await prisma.batch.create({
@@ -51,8 +64,13 @@ const updateBatch = async (req, res) => {
     const { id } = req.params;
     const { quarantine } = req.body;
 
+    const where = { id };
+    if (companyId) {
+      where.companyId = companyId;
+    }
+
     const batch = await prisma.batch.findFirst({
-      where: { id, companyId }
+      where
     });
 
     if (!batch) {
@@ -86,7 +104,7 @@ const unlockCoa = async (req, res) => {
     }
 
     const batch = await prisma.batch.findFirst({
-      where: { id, ...(req.user.companyId ? { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) } : {}) }
+      where: { id, ...(req.user.companyId ? { companyId: req.user.companyId } : {}) }
     });
 
     if (!batch) {
@@ -118,8 +136,13 @@ const deleteBatch = async (req, res) => {
     const { id } = req.params;
     const { companyId } = req.user;
 
+    const where = { id };
+    if (companyId) {
+      where.companyId = companyId;
+    }
+
     const batch = await prisma.batch.findFirst({
-      where: { id, companyId }
+      where
     });
 
     if (!batch) {
@@ -128,8 +151,8 @@ const deleteBatch = async (req, res) => {
 
     // Clear FK-linked records before deletion
     await prisma.barcode.deleteMany({ where: { batchId: id } });
-    await prisma.locationInventory.deleteMany({ where: { batchId: id } });
-    await prisma.inventoryLedger.deleteMany({ where: { batchId: id } });
+    await prisma.locationInventory.deleteMany({ where: { lotId: id } });
+    await prisma.inventoryLedger.deleteMany({ where: { lotId: id } });
 
     await prisma.batch.delete({ where: { id } });
 
