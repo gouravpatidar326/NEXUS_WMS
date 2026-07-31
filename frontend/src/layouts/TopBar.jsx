@@ -223,15 +223,7 @@ export const TopBar = ({ onOpenSidebar }) => {
 
 
 
-            {permissions.includes(PERMISSIONS.SETTINGS_VIEW) && (
-              <button
-                aria-label="Settings"
-                onClick={() => navigate('/settings')}
-                className="p-2 text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container transition-colors hidden sm:block"
-              >
-                <span className="material-symbols-outlined">settings</span>
-              </button>
-            )}
+
 
             {/* User Avatar & Name */}
             <div className="relative pl-2 sm:pl-3 border-l border-outline-variant">
