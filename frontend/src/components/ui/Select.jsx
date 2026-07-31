@@ -7,7 +7,7 @@ export const Select = forwardRef(
       <select
         ref={ref}
         className={clsx(
-          'w-full py-2 px-3 text-sm bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 rounded-lg border transition duration-150 focus:outline-none focus:ring-2',
+          'w-full py-2 px-3 text-xs bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 rounded-lg border transition duration-150 focus:outline-none focus:ring-2',
           error
             ? 'border-danger-500 focus:ring-danger-500'
             : 'border-surface-300 dark:border-surface-700 focus:ring-primary-500',
