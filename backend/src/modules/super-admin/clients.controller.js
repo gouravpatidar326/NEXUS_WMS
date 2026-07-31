@@ -1,4 +1,5 @@
 const prisma = require('../../utils/prisma');
+const bcrypt = require('bcrypt');
 const { logAudit } = require('../../utils/auditLogger');
 
 const getClients = async (req, res) => {
@@ -20,10 +21,10 @@ const getClients = async (req, res) => {
 
   const provisionClient = async (req, res) => {
   try {
-    const { name, creditLimit, tier, email, phone, address, status, companyId } = req.body;
+    const { name, creditLimit, tier, email, phone, address, shippingAddress, gstNumber, warehouseId, password, status, companyId } = req.body;
 
-    if (!name || !email || !phone || !address || !status) {
-      return res.status(400).json({ message: 'Name, Email, Phone, Address, and Status are required' });
+    if (!name || !email || !phone || !address || !status || !password) {
+      return res.status(400).json({ message: 'Name, Email, Phone, Address, Password, and Status are required' });
     }
 
     let finalCompanyId = companyId || null;
@@ -31,12 +32,18 @@ const getClients = async (req, res) => {
       finalCompanyId = req.user.companyId;
     }
 
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     const client = await prisma.client.create({
       data: {
         name,
         email,
         phone,
         address,
+        shippingAddress,
+        gstNumber,
+        warehouseId,
+        password: hashedPassword,
         status,
         companyId: finalCompanyId,
         creditLimit: creditLimit ? parseFloat(creditLimit) : 0.0,

@@ -9,16 +9,38 @@ class LocationService {
 
     const code = payload.code || `${payload.zone}-${payload.aisle}-${payload.rack}-${payload.shelf}-${payload.bin}`.toUpperCase();
 
+    const prisma = require('../utils/prisma');
+    const warehouseName = payload.warehouse || 'Main Warehouse';
+    
+    const facility = await prisma.warehouse.findFirst({
+      where: { name: warehouseName, companyId }
+    });
+    if (!facility) {
+      throw new Error('Associated facility not found for validation');
+    }
+
+    const existingLocs = await prisma.location.findMany({
+      where: { warehouse: warehouseName, companyId, deletedAt: null }
+    });
+    
+    const currentProvisioned = existingLocs.reduce((sum, loc) => sum + (loc.maxCapacity || 0), 0);
+    const newBinCapacity = parseInt(payload.maxCapacity || '1000', 10);
+
+    if (facility.capacityValue !== null && (currentProvisioned + newBinCapacity > facility.capacityValue)) {
+      throw new Error(`Bin capacity exceeds warehouse total capacity. Warehouse Capacity: ${facility.capacityValue} ${facility.capacityType || 'Items'}. Available to provision: ${facility.capacityValue - currentProvisioned} ${facility.capacityType || 'Items'}`);
+    }
+
     const data = {
       code,
       name: payload.name || `Bin ${code}`,
-      warehouse: payload.warehouse || 'Main Warehouse',
+      warehouse: warehouseName,
       zone: payload.zone.toUpperCase(),
       aisle: payload.aisle.toUpperCase(),
       rack: payload.rack.toUpperCase(),
       shelf: payload.shelf.toUpperCase(),
       bin: payload.bin.toUpperCase(),
-      maxCapacity: parseInt(payload.maxCapacity || '1000', 10),
+      capacityType: facility.capacityType || 'Items',
+      maxCapacity: newBinCapacity,
       occupied: 0,
       status: payload.status || 'Active',
       companyId,

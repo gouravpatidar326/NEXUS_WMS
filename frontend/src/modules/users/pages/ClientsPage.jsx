@@ -12,10 +12,12 @@ import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import LoadingState from '@/components/feedback/LoadingState';
 import { clientService } from '@/services/clientService';
+import { warehouseService } from '@/services/warehouseService';
 
 export const ClientsPage = () => {
   const { notifySuccess, notifyError } = useNotification();
   const [clients, setClients] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleteCliState, setDeleteCliState] = useState({ isOpen: false, client: null });
 
@@ -26,6 +28,12 @@ export const ClientsPage = () => {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [shippingAddress, setShippingAddress] = useState('');
+  const [sameAsBilling, setSameAsBilling] = useState(true);
+  const [gstNumber, setGstNumber] = useState('');
+  const [warehouseId, setWarehouseId] = useState('');
+  const [password, setPassword] = useState('client123');
+  const [confirmPassword, setConfirmPassword] = useState('client123');
   const [status, setStatus] = useState('ACTIVE');
   const [tier, setTier] = useState('STANDARD');
   const [creditLimit, setCreditLimit] = useState('100000');
@@ -34,8 +42,12 @@ export const ClientsPage = () => {
   const fetchClients = async () => {
     try {
       setLoading(true);
-      const data = await clientService.fetchClients();
+      const [data, whData] = await Promise.all([
+        clientService.fetchClients(),
+        warehouseService.getWarehouses().catch(() => [])
+      ]);
       setClients(Array.isArray(data) ? data : []);
+      setWarehouses(Array.isArray(whData) ? whData : []);
     } catch {
       notifyError('Failed to fetch client directory');
     } finally {
@@ -53,6 +65,12 @@ export const ClientsPage = () => {
     setEmail('');
     setPhone('');
     setAddress('');
+    setShippingAddress('');
+    setSameAsBilling(true);
+    setGstNumber('');
+    setWarehouseId('');
+    setPassword('client123');
+    setConfirmPassword('client123');
     setStatus('ACTIVE');
     setTier('STANDARD');
     setCreditLimit('100000');
@@ -66,6 +84,12 @@ export const ClientsPage = () => {
     setEmail(cli.email || '');
     setPhone(cli.phone || '');
     setAddress(cli.address || '');
+    setShippingAddress(cli.shippingAddress || '');
+    setSameAsBilling(cli.address === cli.shippingAddress);
+    setGstNumber(cli.gstNumber || '');
+    setWarehouseId(cli.warehouseId || '');
+    setPassword('');
+    setConfirmPassword('');
     setStatus(cli.status || 'ACTIVE');
     setTier(cli.tier || 'STANDARD');
     setCreditLimit(String(cli.creditLimit || '100000'));
@@ -82,6 +106,14 @@ export const ClientsPage = () => {
     if (!phone) newErrors.phone = 'Phone number is required';
     if (!address) newErrors.address = 'Billing address is required';
     if (!status) newErrors.status = 'Status is required';
+    if (!editingClient) {
+      if (!password) newErrors.password = 'Initial password is required';
+      if (password !== confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match';
+        notifyError('Passwords do not match');
+        return;
+      }
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -97,10 +129,17 @@ export const ClientsPage = () => {
         email,
         phone,
         address,
+        shippingAddress: sameAsBilling ? address : shippingAddress,
+        gstNumber,
+        warehouseId,
         status,
         tier,
         creditLimit: parseFloat(creditLimit || '0'),
       };
+
+      if (!editingClient && password) {
+        payload.password = password;
+      }
 
       if (editingClient) {
         await clientService.updateClient(editingClient.id, payload);
@@ -218,6 +257,17 @@ export const ClientsPage = () => {
               <Input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setErrors({...errors, email: ''}); }} placeholder="sam@acmecorp.com" error={errors.email} />
             </FormField>
           </div>
+
+          {!editingClient && (
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="Initial Password" required error={errors.password}>
+                <Input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setErrors({...errors, password: ''}); }} placeholder="client123" error={errors.password} />
+              </FormField>
+              <FormField label="Confirm Password" required error={errors.confirmPassword}>
+                <Input type="password" value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setErrors({...errors, confirmPassword: ''}); }} placeholder="client123" error={errors.confirmPassword} />
+              </FormField>
+            </div>
+          )}
           
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Phone Number" required error={errors.phone}>
@@ -238,6 +288,31 @@ export const ClientsPage = () => {
           <FormField label="Billing Address" required error={errors.address}>
             <Input value={address} onChange={(e) => { setAddress(e.target.value); setErrors({...errors, address: ''}); }} placeholder="123 Corporate Blvd, Suite 100" error={errors.address} />
           </FormField>
+          
+          <div className="flex items-center gap-2 mb-2">
+            <input type="checkbox" id="sameAsBilling" checked={sameAsBilling} onChange={(e) => setSameAsBilling(e.target.checked)} className="rounded border-slate-300" />
+            <label htmlFor="sameAsBilling" className="text-sm text-surface-600 dark:text-surface-300">Shipping Address is same as Billing Address</label>
+          </div>
+          {!sameAsBilling && (
+            <FormField label="Shipping Address">
+              <Input value={shippingAddress} onChange={(e) => setShippingAddress(e.target.value)} placeholder="Warehouse Delivery Address" />
+            </FormField>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="GST Number / Tax ID">
+              <Input value={gstNumber} onChange={(e) => setGstNumber(e.target.value)} placeholder="e.g. 27AADCB2230M1Z2" />
+            </FormField>
+            {warehouses.length > 0 && (
+              <FormField label="Assigned Warehouse (Optional)">
+                <Select
+                  value={warehouseId}
+                  onChange={(e) => setWarehouseId(e.target.value)}
+                  options={[{value: '', label: 'All Warehouses'}, ...warehouses.map((w) => ({ value: w.id, label: w.name }))]}
+                />
+              </FormField>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Account Tier" required>

@@ -376,11 +376,12 @@ export const WarehouseOpsPage = () => {
     ? locations.filter(loc => loc.warehouse === activeFacility.name) 
     : locations;
 
-  const totalFacilityCapacity = activeFacility?.capacity ? parseInt(activeFacility.capacity.replace(/,/g, ''), 10) * 1000 : 0;
+  const totalFacilityCapacity = activeFacility?.capacityValue || 0;
+  const facilityUnit = activeFacility?.capacityType || 'Items';
   const provisionedCapacity = filteredLocations.reduce((sum, loc) => sum + (loc.maxCapacity || 0), 0);
   const occupiedCapacity = filteredLocations.reduce((sum, loc) => sum + (loc.occupied || 0), 0);
-  const freeCapacity = totalFacilityCapacity - occupiedCapacity;
-  const fillPercentage = totalFacilityCapacity > 0 ? Math.min(100, Math.round((occupiedCapacity / totalFacilityCapacity) * 100)) : 0;
+  const freeCapacity = totalFacilityCapacity - provisionedCapacity;
+  const fillPercentage = totalFacilityCapacity > 0 ? Math.min(100, Math.round((provisionedCapacity / totalFacilityCapacity) * 100)) : 0;
 
   const filteredReceivings = activeFacility 
     ? receivings.filter(rec => rec.warehouse === activeFacility.name || !rec.warehouse)
@@ -426,19 +427,19 @@ export const WarehouseOpsPage = () => {
           <div className="flex items-center gap-8">
             <div className="flex flex-col items-end">
               <span className="text-xs text-slate-500">Total Capacity</span>
-              <span className="font-bold text-slate-800">{(totalFacilityCapacity / 1000).toLocaleString()} Tonnes</span>
+              <span className="font-bold text-slate-800">{totalFacilityCapacity.toLocaleString()} {facilityUnit}</span>
             </div>
             <div className="flex flex-col items-end">
               <span className="text-xs text-slate-500">Provisioned Bins Space</span>
-              <span className="font-bold text-slate-700">{provisionedCapacity.toLocaleString()} Kg</span>
+              <span className="font-bold text-slate-700">{provisionedCapacity.toLocaleString()} {facilityUnit}</span>
             </div>
             <div className="flex flex-col items-end">
               <span className="text-xs text-slate-500">Material Occupied</span>
-              <span className="font-bold text-blue-600">{occupiedCapacity.toLocaleString()} Kg</span>
+              <span className="font-bold text-blue-600">{occupiedCapacity.toLocaleString()} {facilityUnit}</span>
             </div>
             <div className="flex flex-col items-end">
               <span className="text-xs text-slate-500">Free Space</span>
-              <span className="font-bold text-green-600">{Math.max(0, freeCapacity).toLocaleString()} Kg</span>
+              <span className="font-bold text-green-600">{Math.max(0, freeCapacity).toLocaleString()} {facilityUnit}</span>
             </div>
             <div className="w-32 flex flex-col gap-1 ml-4 border-l border-slate-200 pl-4">
               <div className="flex justify-between text-xs">
@@ -514,17 +515,11 @@ export const WarehouseOpsPage = () => {
             </FormField>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <FormField label="Capacity Type" required>
-              <Select 
-                value={capacityType} 
-                onChange={(e) => setCapacityType(e.target.value)}
-                options={[
-                  {value: 'Items', label: 'Items'},
-                  {value: 'Kg', label: 'Kg'},
-                  {value: 'Pallets', label: 'Pallets'},
-                  {value: 'CBM', label: 'CBM (Cubic Meter)'}
-                ]}
-                required
+            <FormField label="Capacity Unit" required>
+              <Input 
+                value={activeFacility?.capacityType || 'Items'} 
+                readOnly 
+                className="bg-slate-50 text-slate-500" 
               />
             </FormField>
             <FormField label="Capacity Value" required>

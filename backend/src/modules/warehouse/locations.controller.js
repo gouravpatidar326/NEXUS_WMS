@@ -23,27 +23,48 @@ const createLocation = async (req, res) => {
     }
 
     const location = await prisma.$transaction(async (tx) => {
+      const facility = await tx.warehouse.findFirst({
+        where: { name: warehouse || 'Main Warehouse', companyId }
+      });
+      if (!facility) {
+        throw new Error('Associated facility not found for validation');
+      }
+
+      const existingLocs = await tx.location.findMany({
+        where: { warehouse: facility.name, companyId }
+      });
+      
+      const currentProvisioned = existingLocs.reduce((sum, loc) => sum + (loc.maxCapacity || 0), 0);
+      const newBinCapacity = parseInt(maxCapacity, 10);
+
+      if (facility.capacityValue !== null && (currentProvisioned + newBinCapacity > facility.capacityValue)) {
+        throw new Error(`Bin capacity exceeds warehouse total capacity. Warehouse Capacity: ${facility.capacityValue} ${facility.capacityType}. Available to provision: ${facility.capacityValue - currentProvisioned} ${facility.capacityType}`);
+      }
+
       const newLoc = await tx.location.create({
         data: {
-          warehouse: warehouse || 'Main Warehouse',
+          warehouse: facility.name,
           zone,
           aisle,
           rack,
           shelf,
           bin,
-          capacityType: capacityType || 'Items',
-          maxCapacity: parseInt(maxCapacity, 10),
+          capacityType: facility.capacityType || 'Items', // Enforce facility unit
+          maxCapacity: newBinCapacity,
           companyId
         }
       });
 
-      await tx.auditLog.create({
-        data: {
-          event: 'LOCATION_CREATED',
-          userId: req.user.id,
-          ipAddress: req.ip
-        }
-      });
+      const userExists = req.user?.id ? await tx.user.findUnique({ where: { id: req.user.id } }) : null;
+      if (userExists) {
+        await tx.auditLog.create({
+          data: {
+            event: 'LOCATION_CREATED',
+            userId: req.user.id,
+            ipAddress: req.ip
+          }
+        });
+      }
 
       return newLoc;
     });
@@ -51,6 +72,10 @@ const createLocation = async (req, res) => {
     res.status(201).json(location);
   } catch (error) {
     console.error('Error creating location:', error);
+    // Pass specific validation errors back to frontend
+    if (error.message && error.message.includes('Bin capacity exceeds')) {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: 'Internal server error' });
   }
 };
