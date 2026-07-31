@@ -46,13 +46,16 @@ const adjustStock = async (req, res) => {
       });
     });
 
-    await prisma.auditLog.create({
-      data: {
-        event: `STOCK_ADJUSTED_${quantityDelta > 0 ? 'UP' : 'DOWN'}`,
-        userId: req.user.id,
-        ipAddress: req.ip
-      }
-    });
+    const userExists = req.user?.id ? await prisma.user.findUnique({ where: { id: req.user.id } }) : null;
+    if (userExists) {
+      await prisma.auditLog.create({
+        data: {
+          event: `STOCK_ADJUSTED_${quantityDelta > 0 ? 'UP' : 'DOWN'}`,
+          userId: req.user.id,
+          ipAddress: req.ip
+        }
+      });
+    }
 
     res.status(200).json({ status: 'Adjusted' });
   } catch (error) {

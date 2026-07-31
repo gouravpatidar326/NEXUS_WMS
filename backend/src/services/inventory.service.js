@@ -62,12 +62,24 @@ class InventoryService {
     }
 
     return await prisma.$transaction(async (tx) => {
-      return await inventoryRepository.upsertAggregate(tx, {
+      const inv = await inventoryRepository.upsertAggregate(tx, {
         productId,
         companyId,
         totalDelta: 0,
         reservedDelta: qty,
       });
+
+      // Sync Product.availableStock cache dynamically
+      const allLocs = await tx.locationInventory.findMany({
+        where: { productId }
+      });
+      const totalAvailable = allLocs.reduce((sum, l) => sum + l.available, 0);
+      await tx.product.update({
+        where: { id: productId },
+        data: { availableStock: totalAvailable }
+      });
+
+      return inv;
     });
   }
 
@@ -81,12 +93,24 @@ class InventoryService {
     }
 
     return await prisma.$transaction(async (tx) => {
-      return await inventoryRepository.upsertAggregate(tx, {
+      const inv = await inventoryRepository.upsertAggregate(tx, {
         productId,
         companyId,
         totalDelta: 0,
         reservedDelta: -qty,
       });
+
+      // Sync Product.availableStock cache dynamically
+      const allLocs = await tx.locationInventory.findMany({
+        where: { productId }
+      });
+      const totalAvailable = allLocs.reduce((sum, l) => sum + l.available, 0);
+      await tx.product.update({
+        where: { id: productId },
+        data: { availableStock: totalAvailable }
+      });
+
+      return inv;
     });
   }
 
@@ -118,7 +142,7 @@ class InventoryService {
       });
 
       // 3. Record Immutable Inventory Transaction (SHIP)
-      return await inventoryTransactionRepository.create(tx, {
+      const txn = await inventoryTransactionRepository.create(tx, {
         productId,
         lotId,
         companyId,
@@ -129,6 +153,18 @@ class InventoryService {
         notes: `Outbound order fulfillment pick & ship from bin location ${locationId}`,
         createdBy: userId,
       });
+
+      // 4. Sync Product.availableStock cache dynamically
+      const allLocs = await tx.locationInventory.findMany({
+        where: { productId }
+      });
+      const totalAvailable = allLocs.reduce((sum, l) => sum + l.available, 0);
+      await tx.product.update({
+        where: { id: productId },
+        data: { availableStock: totalAvailable }
+      });
+
+      return txn;
     });
   }
 }

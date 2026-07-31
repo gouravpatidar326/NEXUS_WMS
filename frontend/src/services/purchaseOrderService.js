@@ -30,5 +30,15 @@ export const purchaseOrderService = {
       console.error('Error receiving purchase order goods:', error);
       throw error;
     }
+  },
+
+  deletePurchaseOrder: async (poId) => {
+    try {
+      const response = await api.delete(`/purchase-orders/${poId}`);
+      return response;
+    } catch (error) {
+      console.error('Error deleting purchase order:', error);
+      throw error;
+    }
   }
 };

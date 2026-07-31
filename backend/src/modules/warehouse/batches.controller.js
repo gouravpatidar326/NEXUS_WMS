@@ -16,24 +16,11 @@ const getBatches = async (req, res) => {
 
 const createBatch = async (req, res) => {
   try {
-    let companyId = req.user.companyId;
+    const { companyId } = req.user;
     const { lotId, productId, mfgDate, expiryDate } = req.body;
 
     if (!lotId || !productId) {
       return res.status(400).json({ message: 'lotId and productId are required' });
-    }
-
-    if (!companyId) {
-      const product = await prisma.product.findUnique({ where: { id: productId } });
-      if (product) {
-        companyId = product.companyId;
-      }
-      if (!companyId) {
-        const defaultCompany = await prisma.company.findFirst();
-        if (defaultCompany) {
-          companyId = defaultCompany.id;
-        }
-      }
     }
 
     const newBatch = await prisma.batch.create({
@@ -64,13 +51,8 @@ const updateBatch = async (req, res) => {
     const { id } = req.params;
     const { quarantine } = req.body;
 
-    const where = { id };
-    if (companyId) {
-      where.companyId = companyId;
-    }
-
     const batch = await prisma.batch.findFirst({
-      where
+      where: { id, ...(companyId ? { companyId } : {}) }
     });
 
     if (!batch) {
@@ -97,11 +79,6 @@ const updateBatch = async (req, res) => {
 const unlockCoa = async (req, res) => {
   try {
     const { id } = req.params;
-    const { paymentToken } = req.body; // Mock payment token validation
-
-    if (!paymentToken) {
-      return res.status(400).json({ message: 'Payment token required to unlock COA' });
-    }
 
     const batch = await prisma.batch.findFirst({
       where: { id, ...(req.user.companyId ? { companyId: req.user.companyId } : {}) }
@@ -116,13 +93,16 @@ const unlockCoa = async (req, res) => {
       data: { coaLocked: false }
     });
 
-    await prisma.auditLog.create({
-      data: {
-        event: 'COA_UNLOCKED',
-        userId: req.user.id,
-        ipAddress: req.ip
-      }
-    });
+    const userExists = req.user?.id ? await prisma.user.findUnique({ where: { id: req.user.id } }) : null;
+    if (userExists) {
+      await prisma.auditLog.create({
+        data: {
+          event: 'COA_UNLOCKED',
+          userId: req.user.id,
+          ipAddress: req.ip
+        }
+      });
+    }
 
     res.json({ id: updatedBatch.id, coaLocked: false, message: 'Unlocked successfully' });
   } catch (error) {
@@ -136,13 +116,8 @@ const deleteBatch = async (req, res) => {
     const { id } = req.params;
     const { companyId } = req.user;
 
-    const where = { id };
-    if (companyId) {
-      where.companyId = companyId;
-    }
-
     const batch = await prisma.batch.findFirst({
-      where
+      where: { id, ...(companyId ? { companyId } : {}) }
     });
 
     if (!batch) {
@@ -151,12 +126,8 @@ const deleteBatch = async (req, res) => {
 
     // Clear FK-linked records before deletion
     await prisma.barcode.deleteMany({ where: { batchId: id } });
-    await prisma.locationInventory.deleteMany({ where: { lotId: id } });
-    await prisma.inventoryLedger.deleteMany({ where: { lotId: id } });
-    await prisma.transferItem.deleteMany({ where: { lotId: id } });
-    await prisma.stockAdjustment.deleteMany({ where: { lotId: id } });
-    await prisma.expiryAlert.deleteMany({ where: { lotId: id } });
-    await prisma.pickListItem.deleteMany({ where: { batchId: id } });
+    await prisma.locationInventory.deleteMany({ where: { batchId: id } });
+    await prisma.inventoryLedger.deleteMany({ where: { batchId: id } });
 
     await prisma.batch.delete({ where: { id } });
 

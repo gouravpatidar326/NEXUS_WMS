@@ -13,6 +13,8 @@ import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
 import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
+import ReadOnlyBanner from '@/components/ui/ReadOnlyBanner';
+import { hasPermission } from '@/permissions/permissionUtils';
 
 import { purchaseOrderService } from '@/services/purchaseOrderService';
 import { productService } from '@/services/productService';
@@ -20,6 +22,7 @@ import { productService } from '@/services/productService';
 export const PurchaseOrdersPage = () => {
   const { user } = useAuth();
   const { notifySuccess, notifyError } = useNotification();
+  const canExecuteReceiving = hasPermission(user, PERMISSIONS.RECEIVING_EXECUTE);
 
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [products, setProducts] = useState([]);
@@ -176,6 +179,18 @@ export const PurchaseOrdersPage = () => {
     }
   };
 
+  const handleDeletePurchaseOrder = async (poId) => {
+    if (!window.confirm('Are you sure you want to delete this Purchase Order?')) return;
+    
+    try {
+      await purchaseOrderService.deletePurchaseOrder(poId);
+      notifySuccess('Purchase Order deleted successfully');
+      fetchData(); // Refresh list
+    } catch (error) {
+      notifyError('Failed to delete purchase order');
+    }
+  };
+
   const columns = [
     {
       header: 'PO Reference',
@@ -211,23 +226,41 @@ export const PurchaseOrdersPage = () => {
       },
     },
     {
-      header: 'Receiving Action',
+      header: 'Actions',
       accessor: 'actions',
       cell: (row) => (
-        <PermissionGuard permission={PERMISSIONS.PO_RECEIVE}>
-          {row.status !== 'RECEIVED' && row.status !== 'Received' ? (
+        <div className="flex items-center gap-2">
+          {canExecuteReceiving && (
+            <>
+              {row.status !== 'RECEIVED' && row.status !== 'Received' ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  leftIcon={PackageCheck}
+                  onClick={() => handleOpenReceiveModal(row)}
+                >
+                  Open Receiving Dock
+                </Button>
+              ) : (
+                <span className="text-xs text-emerald-600 font-bold mr-2">✓ Stock Posted</span>
+              )}
+            </>
+          )}
+          {!canExecuteReceiving && row.status === 'RECEIVED' && (
+            <span className="text-xs text-emerald-600 font-bold mr-2">✓ Stock Posted</span>
+          )}
+          {row.status !== 'RECEIVED' && row.status !== 'Received' && (
             <Button
               size="sm"
-              variant="outline"
-              leftIcon={PackageCheck}
-              onClick={() => handleOpenReceiveModal(row)}
+              variant="ghost"
+              onClick={() => handleDeletePurchaseOrder(row.id)}
+              className="text-slate-400 hover:text-red-600 hover:bg-red-50 p-2"
+              title="Delete Purchase Order"
             >
-              Open Receiving Dock
+              <Trash2 className="h-4 w-4" />
             </Button>
-          ) : (
-            <span className="text-xs text-emerald-600 font-bold">✓ Stock Posted</span>
           )}
-        </PermissionGuard>
+        </div>
       ),
     },
   ];
@@ -243,13 +276,15 @@ export const PurchaseOrdersPage = () => {
         description="Procurement workflow, vendor goods receiving dock, automated Lot generation, and inventory posting"
         breadcrumbs={[{ label: 'Order Management' }, { label: 'Purchase Orders' }]}
         actions={
-          user?.role?.toUpperCase() !== 'SUPER_ADMIN' && (
-            <PermissionGuard permission={PERMISSIONS.PO_CREATE}>
-              <Button leftIcon={Plus} onClick={() => setIsModalOpen(true)}>Create Purchase Order</Button>
-            </PermissionGuard>
-          )
+          canExecuteReceiving && user?.role?.toUpperCase() !== 'SUPER_ADMIN' ? (
+            <Button leftIcon={Plus} onClick={() => setIsModalOpen(true)}>Create Purchase Order</Button>
+          ) : null
         }
       />
+
+      {!canExecuteReceiving && (
+        <ReadOnlyBanner />
+      )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="card flex items-center gap-3 p-4"><ShoppingCart className="h-9 w-9 rounded-xl bg-primary-50 p-2 text-primary-600" /><div><p className="text-xs text-surface-500">Total purchase orders</p><p className="text-xl font-bold">{purchaseOrders.length}</p></div></div>

@@ -1,5 +1,4 @@
 const prisma = require('../../utils/prisma');
-const NotificationService = require('../../utils/notification.service');
 
 const getPurchaseOrders = async (req, res) => {
   try {
@@ -64,22 +63,15 @@ const createPurchaseOrder = async (req, res) => {
       return po;
     });
 
-    await prisma.auditLog.create({
-      data: {
-        event: 'PO_CREATED',
-        userId: req.user.id,
-        ipAddress: req.ip
-      }
-    });
-
-    try {
-      await NotificationService.send({
-        title: 'New Purchase Order Created',
-        message: `New Purchase Order ${newPO.poNumber} has been created for supplier ${newPO.supplier || 'Supplier'} by Super Admin.`,
-        companyId: companyId
+    const userExists = req.user?.id ? await prisma.user.findUnique({ where: { id: req.user.id } }) : null;
+    if (userExists) {
+      await prisma.auditLog.create({
+        data: {
+          event: 'PO_CREATED',
+          userId: req.user.id,
+          ipAddress: req.ip
+        }
       });
-    } catch (err) {
-      console.error('Failed to trigger PO creation notification:', err);
     }
 
     res.status(201).json(newPO);
@@ -153,13 +145,16 @@ const receiveGoods = async (req, res) => {
       }
     });
 
-    await prisma.auditLog.create({
-      data: {
-        event: 'PO_RECEIVED',
-        userId: req.user.id,
-        ipAddress: req.ip
-      }
-    });
+    const userExists = req.user?.id ? await prisma.user.findUnique({ where: { id: req.user.id } }) : null;
+    if (userExists) {
+      await prisma.auditLog.create({
+        data: {
+          event: 'PO_RECEIVED',
+          userId: req.user.id,
+          ipAddress: req.ip
+        }
+      });
+    }
 
     res.json({ id, status: 'RECEIVED' });
   } catch (error) {
@@ -168,4 +163,48 @@ const receiveGoods = async (req, res) => {
   }
 };
 
-module.exports = { getPurchaseOrders, createPurchaseOrder, receiveGoods };
+const deletePurchaseOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.user.companyId;
+
+    const order = await prisma.purchaseOrder.findFirst({
+      where: { id, companyId }
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: 'Purchase order not found' });
+    }
+
+    if (order.status === 'RECEIVED') {
+      return res.status(400).json({ message: 'Cannot delete a received purchase order' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.purchaseOrderItem.deleteMany({
+        where: { purchaseOrderId: id }
+      });
+      await tx.purchaseOrder.delete({
+        where: { id }
+      });
+    });
+
+    const userExists = req.user?.id ? await prisma.user.findUnique({ where: { id: req.user.id } }) : null;
+    if (userExists) {
+      await prisma.auditLog.create({
+        data: {
+          event: 'PO_DELETED',
+          userId: req.user.id,
+          ipAddress: req.ip
+        }
+      });
+    }
+
+    res.json({ message: 'Purchase order deleted successfully' });
+  } catch (error) {
+    console.error('Delete PO Error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+module.exports = { getPurchaseOrders, createPurchaseOrder, receiveGoods, deletePurchaseOrder };

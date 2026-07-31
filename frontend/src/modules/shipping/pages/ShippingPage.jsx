@@ -5,6 +5,8 @@ import { salesOrderService } from '@/services/salesOrderService';
 import { useNotification } from '@/contexts/NotificationContext';
 import { PERMISSIONS } from '@/permissions/permissions';
 import PermissionGuard from '@/guards/PermissionGuard';
+import { useAuth } from '@/contexts/AuthContext';
+import { hasPermission } from '@/permissions/permissionUtils';
 
 import PageHeader from '@/components/navigation/PageHeader';
 import DataTable from '@/components/data-display/DataTable';
@@ -15,9 +17,12 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
+import ReadOnlyBanner from '@/components/ui/ReadOnlyBanner';
 
 export const ShippingPage = () => {
   const { notifySuccess, notifyError } = useNotification();
+  const { user } = useAuth();
+  const canExecuteShipping = hasPermission(user, PERMISSIONS.SHIPPING_EXECUTE);
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -32,6 +37,9 @@ export const ShippingPage = () => {
   const [weight, setWeight] = useState('5.5');
   const [shippingSpeed, setShippingSpeed] = useState('Express 2-Day');
   const [trackingNumber, setTrackingNumber] = useState(`SS-TRACK-${Math.floor(10000 + Math.random() * 90000)}`);
+  const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
+  const [numberOfPackages, setNumberOfPackages] = useState('1');
+  const [specialInstructions, setSpecialInstructions] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   // Delete State
@@ -100,6 +108,9 @@ export const ShippingPage = () => {
         weight: `${weight} lbs`,
         shippingSpeed,
         trackingNumber,
+        expectedDeliveryDate,
+        numberOfPackages,
+        specialInstructions,
       });
       notifySuccess(`Shipping Label generated for ${carrier} (${trackingNumber}). Dispatch queued.`);
       setIsModalOpen(false);
@@ -182,13 +193,17 @@ export const ShippingPage = () => {
         description="ShipStation API carrier integration, tracking barcode label dispatch, and real-time fleet monitoring"
         breadcrumbs={[{ label: 'Operations & Logistics' }, { label: 'Shipping & Carriers' }]}
         actions={
-          <PermissionGuard permission={PERMISSIONS.SHIPPING_CREATE}>
+          canExecuteShipping ? (
             <Button variant="primary" leftIcon={Plus} onClick={handleOpenCreateModal}>
               Generate Shipping Label
             </Button>
-          </PermissionGuard>
+          ) : null
         }
       />
+
+      {!canExecuteShipping && (
+        <ReadOnlyBanner />
+      )}
 
       <DataTable columns={columns} data={shipments} isLoading={loading} emptyMessage="No shipping dispatch labels created yet." />
 
@@ -263,11 +278,13 @@ export const ShippingPage = () => {
               }}
               options={
                 salesOrders.length > 0
-                  ? salesOrders.map((o) => ({
-                      value: o.id,
-                      label: `${o.orderNumber || o.id} - ${o.client?.name || 'Client'} (${o.status || 'READY'})`,
-                    }))
-                  : [{ value: 'SO-1001', label: 'SO-1001 - Acme Corp (Approved Picked)' }]
+                  ? salesOrders
+                      .filter((o) => ['PICKED', 'READY_TO_SHIP', 'PACKING'].includes(o.status))
+                      .map((o) => ({
+                        value: o.id,
+                        label: `${o.orderNumber || o.id} - ${o.client?.name || 'Client'} (${o.status || 'READY'})`,
+                      }))
+                  : [{ value: 'SO-1001', label: 'SO-1001 - Acme Corp (PICKED)' }]
               }
             />
           </FormField>
@@ -281,8 +298,21 @@ export const ShippingPage = () => {
             </FormField>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Expected Delivery Date" required>
+              <Input type="date" value={expectedDeliveryDate} onChange={(e) => setExpectedDeliveryDate(e.target.value)} required />
+            </FormField>
+            <FormField label="Number of Packages" required>
+              <Input type="number" min="1" value={numberOfPackages} onChange={(e) => setNumberOfPackages(e.target.value)} required />
+            </FormField>
+          </div>
+
           <FormField label="Destination Shipping Address" required>
             <Input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="123 Distribution Way, Building B, Austin TX 78701" required />
+          </FormField>
+
+          <FormField label="Special Instructions (Optional)">
+            <Input value={specialInstructions} onChange={(e) => setSpecialInstructions(e.target.value)} placeholder="e.g. Fragile, Handle with care..." />
           </FormField>
         </form>
       </Modal>

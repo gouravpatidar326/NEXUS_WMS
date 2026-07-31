@@ -100,13 +100,16 @@ const approveSalesOrder = async (req, res) => {
       });
     });
 
-    await prisma.auditLog.create({
-      data: {
-        event: 'SALES_ORDER_APPROVED',
-        userId: req.user.id,
-        ipAddress: req.ip
-      }
-    });
+    const userExists = req.user?.id ? await prisma.user.findUnique({ where: { id: req.user.id } }) : null;
+    if (userExists) {
+      await prisma.auditLog.create({
+        data: {
+          event: 'SALES_ORDER_APPROVED',
+          userId: req.user.id,
+          ipAddress: req.ip
+        }
+      });
+    }
 
     // Notify Client
     await NotificationService.send({
@@ -157,13 +160,16 @@ const rejectSalesOrder = async (req, res) => {
       data: { status: 'REJECTED', rejectionReason: reason }
     });
 
-    await prisma.auditLog.create({
-      data: {
-        event: 'SALES_ORDER_REJECTED',
-        userId: req.user.id,
-        ipAddress: req.ip
-      }
-    });
+    const userExists = req.user?.id ? await prisma.user.findUnique({ where: { id: req.user.id } }) : null;
+    if (userExists) {
+      await prisma.auditLog.create({
+        data: {
+          event: 'SALES_ORDER_REJECTED',
+          userId: req.user.id,
+          ipAddress: req.ip
+        }
+      });
+    }
 
     // Notify Client
     await NotificationService.send({
@@ -182,17 +188,8 @@ const rejectSalesOrder = async (req, res) => {
 const createSalesOrder = async (req, res) => {
   try {
     const { clientId, priority, items, shippingAddress, poNumber, notes } = req.body;
-    let resolvedClientId = clientId;
-    if (!resolvedClientId && req.user && req.user.role === 'CLIENT') {
-      const clientRecord = await prisma.client.findFirst({
-        where: { email: req.user.email }
-      });
-      if (clientRecord) {
-        resolvedClientId = clientRecord.id;
-      }
-    }
 
-    if (!resolvedClientId || !items || items.length === 0) {
+    if (!clientId || !items || items.length === 0) {
       return res.status(400).json({ message: 'Client ID and items are required' });
     }
 
@@ -212,29 +209,13 @@ const createSalesOrder = async (req, res) => {
       });
     }
 
-    let companyId = req.user.companyId;
-    if (!companyId) {
-      if (items && items.length > 0) {
-        const product = await prisma.product.findUnique({ where: { id: items[0].productId } });
-        if (product) {
-          companyId = product.companyId;
-        }
-      }
-      if (!companyId) {
-        const defaultCompany = await prisma.company.findFirst();
-        if (defaultCompany) {
-          companyId = defaultCompany.id;
-        }
-      }
-    }
-
     const orderNumber = `SO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const newOrder = await prisma.salesOrder.create({
       data: {
         orderNumber,
-        clientId: resolvedClientId,
-        companyId,
+        clientId,
+        companyId: req.user.companyId || clientId.companyId || null, // Best effort for super admin
         priority: priority || 'NORMAL',
         shippingAddress,
         poNumber,
@@ -250,22 +231,15 @@ const createSalesOrder = async (req, res) => {
       }
     });
 
-    await prisma.auditLog.create({
-      data: {
-        event: 'SALES_ORDER_CREATED',
-        userId: req.user.id,
-        ipAddress: req.ip
-      }
-    });
-
-    try {
-      await NotificationService.send({
-        title: 'New Sales Order Request',
-        message: `New Sales Order ${newOrder.orderNumber} has been submitted by client ${newOrder.client?.name || 'Client'} for review.`,
-        companyId: companyId
+    const userExists = req.user?.id ? await prisma.user.findUnique({ where: { id: req.user.id } }) : null;
+    if (userExists) {
+      await prisma.auditLog.create({
+        data: {
+          event: 'SALES_ORDER_CREATED',
+          userId: req.user.id,
+          ipAddress: req.ip
+        }
       });
-    } catch (err) {
-      console.error('Failed to trigger sales order creation notification:', err);
     }
 
     res.status(201).json(newOrder);
@@ -275,4 +249,41 @@ const createSalesOrder = async (req, res) => {
   }
 };
 
-module.exports = { getSalesOrders, approveSalesOrder, rejectSalesOrder, createSalesOrder };
+const deleteSalesOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { companyId } = req.user;
+
+    const where = { id };
+    if (companyId) {
+      where.companyId = companyId;
+    }
+
+    const order = await prisma.salesOrder.findFirst({ where });
+    if (!order) {
+      return res.status(404).json({ message: 'Sales order not found' });
+    }
+
+    // Delete associated items first due to FK constraints
+    await prisma.salesOrderItem.deleteMany({ where: { salesOrderId: id } });
+    await prisma.salesOrder.delete({ where: { id } });
+
+    const userExists = req.user?.id ? await prisma.user.findUnique({ where: { id: req.user.id } }) : null;
+    if (userExists) {
+      await prisma.auditLog.create({
+        data: {
+          event: 'SALES_ORDER_DELETED',
+          userId: req.user.id,
+          ipAddress: req.ip
+        }
+      });
+    }
+
+    res.json({ message: 'Order deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+module.exports = { getSalesOrders, approveSalesOrder, rejectSalesOrder, createSalesOrder, deleteSalesOrder };

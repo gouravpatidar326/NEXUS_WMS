@@ -19,8 +19,8 @@ export const batchService = {
     return await api.put(`/batches/${id}`, updateData);
   },
 
-  async unlockCoa(id, paymentToken) {
-    return await api.post(`/batches/${id}/unlock-coa`, { paymentToken });
+  async unlockCoa(id) {
+    return await api.post(`/batches/${id}/unlock-coa`, {});
   },
 
   async deleteBatch(id) {

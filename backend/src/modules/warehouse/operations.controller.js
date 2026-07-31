@@ -75,21 +75,63 @@ const completePick = async (req, res) => {
 
         const pickedQty = item.pickedQuantity;
 
-        // Deduct from LocationInventory (source of truth)
+        // Deduct from LocationInventory (source of truth) - ensure sufficient stock exists
         const locInv = await tx.locationInventory.findFirst({
+          where: { 
+            productId: pickItem.productId,
+            quantity: { gte: pickedQty }
+          }
+        });
+        
+        if (!locInv) {
+          throw new Error(`Insufficient stock for Product ID ${pickItem.productId}. Cannot pick ${pickedQty} units.`);
+        }
+
+        // 1. Deduct bin stock location quantity & available
+        await tx.locationInventory.update({
+          where: { id: locInv.id },
+          data: { 
+            quantity: { decrement: pickedQty },
+            available: { decrement: pickedQty }
+          }
+        });
+
+        // 2. Deduct totalStock and reservedStock from company aggregate
+        const inv = await tx.inventory.findFirst({
           where: { productId: pickItem.productId }
         });
-        if (locInv) {
-          await tx.locationInventory.update({
-            where: { id: locInv.id },
-            data: { quantity: { decrement: pickedQty } }
+        if (inv) {
+          await tx.inventory.update({
+            where: { id: inv.id },
+            data: {
+              totalStock: { decrement: pickedQty },
+              reservedStock: { decrement: pickedQty }
+            }
           });
         }
 
-        // Sync Product.availableStock cache
+        // 3. Record Immutable Inventory Transaction (SHIP)
+        await tx.inventoryLedger.create({
+          data: {
+            productId: pickItem.productId,
+            lotId: assignedBatchId || null,
+            ...(req.user.companyId ? { companyId: req.user.companyId } : {}),
+            locationId: locInv.locationId,
+            quantityDelta: -pickedQty,
+            movementType: 'SHIP',
+            referenceId: `ORDER-${pickList.orderId || Date.now()}`,
+            notes: `Outbound pick & ship from location ${locInv.locationId}`,
+          }
+        });
+
+        // 4. Sync Product.availableStock cache dynamically to prevent desync
+        const allLocs = await tx.locationInventory.findMany({
+          where: { productId: pickItem.productId }
+        });
+        const totalAvailable = allLocs.reduce((sum, l) => sum + l.available, 0);
         await tx.product.update({
           where: { id: pickItem.productId },
-          data: { availableStock: { decrement: pickedQty } }
+          data: { availableStock: totalAvailable }
         });
       }
 
@@ -110,13 +152,17 @@ const completePick = async (req, res) => {
       }
     });
 
-    await prisma.auditLog.create({
-      data: { event: 'PICK_LIST_COMPLETED', userId: req.user.id, ipAddress: req.ip }
-    });
+    const userExists = req.user?.id ? await prisma.user.findUnique({ where: { id: req.user.id } }) : null;
+    if (userExists) {
+      await prisma.auditLog.create({
+        data: { event: 'PICK_LIST_COMPLETED', userId: req.user.id, ipAddress: req.ip }
+      });
+    }
 
     res.json({ id, status: 'COMPLETED' });
   } catch (error) {
     console.error(error);
+    require('fs').writeFileSync('error.log', error.stack || error.toString());
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -130,9 +176,12 @@ const updateLocation = async (req, res) => {
       return res.status(400).json({ message: 'Barcode and newLocation required' });
     }
 
-    await prisma.auditLog.create({
-      data: { event: 'BARCODE_LOCATION_UPDATED', userId: req.user.id, ipAddress: req.ip }
-    });
+    const userExists = req.user?.id ? await prisma.user.findUnique({ where: { id: req.user.id } }) : null;
+    if (userExists) {
+      await prisma.auditLog.create({
+        data: { event: 'BARCODE_LOCATION_UPDATED', userId: req.user.id, ipAddress: req.ip }
+      });
+    }
 
     res.json({ status: 'Location Updated', barcode, location: newLocation });
   } catch (error) {
@@ -180,9 +229,12 @@ const generateShippingLabel = async (req, res) => {
         }
       });
 
-      await tx.auditLog.create({
-        data: { event: 'SHIPSTATION_LABEL_GENERATED', userId: req.user.id, ipAddress: req.ip }
-      });
+      const userExists = req.user?.id ? await tx.user.findUnique({ where: { id: req.user.id } }) : null;
+      if (userExists) {
+        await tx.auditLog.create({
+          data: { event: 'SHIPSTATION_LABEL_GENERATED', userId: req.user.id, ipAddress: req.ip }
+        });
+      }
 
       // Update SalesOrder status to SHIPPED
       const salesOrder = await tx.salesOrder.findUnique({ where: { id: orderId } });
@@ -231,9 +283,12 @@ const deleteShipment = async (req, res) => {
 
     await prisma.shipment.delete({ where: { id } });
 
-    await prisma.auditLog.create({
-      data: { event: 'SHIPMENT_DELETED', userId: req.user.id, ipAddress: req.ip }
-    });
+    const userExists = req.user?.id ? await prisma.user.findUnique({ where: { id: req.user.id } }) : null;
+    if (userExists) {
+      await prisma.auditLog.create({
+        data: { event: 'SHIPMENT_DELETED', userId: req.user.id, ipAddress: req.ip }
+      });
+    }
 
     res.json({ message: 'Shipment deleted successfully' });
   } catch (error) {

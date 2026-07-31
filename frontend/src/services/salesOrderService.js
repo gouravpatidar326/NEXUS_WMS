@@ -39,5 +39,15 @@ export const salesOrderService = {
       console.error('Error rejecting sales order:', error);
       throw error;
     }
+  },
+
+  deleteSalesOrder: async (orderId) => {
+    try {
+      const response = await api.delete(`/sales-orders/${orderId}`);
+      return response;
+    } catch (error) {
+      console.error('Error deleting sales order:', error);
+      throw error;
+    }
   }
 };
