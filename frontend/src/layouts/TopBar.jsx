@@ -82,13 +82,27 @@ export const TopBar = ({ onOpenSidebar }) => {
   const handleGlobalSearch = (event) => {
     if (event.key !== 'Enter' || !searchQuery.trim()) return;
     const query = searchQuery.toLowerCase();
-    const match = SEARCH_DESTINATIONS.find(
-      (item) => item.matches.some((term) => query.includes(term)) && permissions.includes(item.permission)
-    );
-    const destination = match?.path || '/dashboard';
-    navigate(destination);
+    
+    let destination = '';
+    if (query.includes('user') || query.includes('clerk') || query.includes('admin') || query.includes('manager')) {
+      destination = '/users';
+    } else if (query.includes('purchase') || query.includes('po-') || query.includes('supplier')) {
+      destination = '/purchase-orders';
+    } else if (query.includes('order') || query.includes('so-') || query.includes('client') || query.includes('sales')) {
+      destination = '/sales-orders';
+    } else if (query.includes('lot') || query.includes('batch')) {
+      destination = '/batch-tracking';
+    } else if (query.includes('ship') || query.includes('track') || query.includes('carrier')) {
+      destination = '/shipping';
+    } else {
+      // Default to /products for SKU and item searches
+      destination = '/products';
+    }
+
+    navigate(`${destination}?search=${encodeURIComponent(searchQuery.trim())}`);
     setShowMobileSearch(false);
-    notifySuccess(`Showing results for “${searchQuery}”.`);
+    setSearchQuery('');
+    notifySuccess(`Searching for "${searchQuery.trim()}" in ${destination.substring(1)}...`);
   };
 
   return (

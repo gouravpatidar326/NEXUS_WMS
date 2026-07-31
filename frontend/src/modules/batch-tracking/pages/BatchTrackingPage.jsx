@@ -57,6 +57,12 @@ export const BatchTrackingPage = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const searchParam = params.get('search') || '';
+    setSearchTerm(searchParam);
+  }, [window.location.search]);
+
   const handleAddBatch = async (e) => {
     e.preventDefault();
     try {

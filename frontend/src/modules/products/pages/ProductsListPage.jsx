@@ -128,8 +128,14 @@ export const ProductsListPage = () => {
   };
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const searchParam = params.get('search') || '';
+    setSearchTerm(searchParam);
+  }, [window.location.search]);
+
+  useEffect(() => {
     fetchData();
-  }, [selectedCategory, selectedStatus]);
+  }, [selectedCategory, selectedStatus, searchTerm]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();

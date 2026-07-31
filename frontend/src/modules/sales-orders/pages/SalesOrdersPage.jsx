@@ -43,6 +43,12 @@ export const SalesOrdersPage = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const searchParam = params.get('search') || '';
+    setSearchTerm(searchParam);
+  }, [window.location.search]);
+
   const fetchData = async () => {
     setIsLoading(true);
     try {
