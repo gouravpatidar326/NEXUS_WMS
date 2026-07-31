@@ -7,6 +7,7 @@ class ProductService {
       throw new Error('SKU and Product Name are required');
     }
 
+    const prisma = require('../utils/prisma');
     const existingSku = await productRepository.findBySku(payload.sku, companyId);
     if (existingSku) {
       throw new Error(`Product with SKU '${payload.sku}' already exists`);
@@ -23,9 +24,93 @@ class ProductService {
       wholesalePrice: parseFloat(payload.wholesalePrice || '0'),
       status: payload.status || 'ACTIVE',
       companyId,
+      attributes: payload.attributes || null,
     };
 
-    return await productRepository.create(data);
+    const product = await productRepository.create(data);
+
+    // Handle Opening Stock
+    const openingStock = parseInt(payload.openingStock || '0', 10);
+    if (openingStock > 0) {
+      // Create a default batch
+      const batch = await prisma.batch.create({
+        data: {
+          lotNumber: `OPENING-${product.sku}`,
+          productId: product.id,
+          companyId,
+          status: 'RELEASED',
+          acceptedQty: openingStock,
+        }
+      });
+
+      let locId = payload.locationId;
+      if (!locId) {
+        // Find or create default "Unassigned" location
+        let unassigned = await prisma.location.findFirst({
+          where: { name: 'Unassigned', companyId, deletedAt: null }
+        });
+        if (!unassigned) {
+          unassigned = await prisma.location.create({
+            data: {
+              name: 'Unassigned',
+              warehouse: 'Default Warehouse',
+              zone: 'A',
+              aisle: '1',
+              rack: '1',
+              shelf: '1',
+              bin: '1',
+              companyId,
+            }
+          });
+        }
+        locId = unassigned.id;
+      }
+
+      // Add to LocationInventory
+      await prisma.locationInventory.create({
+        data: {
+          locationId: locId,
+          productId: product.id,
+          lotId: batch.id,
+          quantity: openingStock,
+          available: openingStock,
+          companyId,
+        }
+      });
+
+      // Add to InventoryLedger
+      await prisma.inventoryLedger.create({
+        data: {
+          productId: product.id,
+          lotId: batch.id,
+          companyId,
+          locationId: locId,
+          quantityDelta: openingStock,
+          movementType: 'OPENING_STOCK',
+          notes: 'Initial opening stock',
+        }
+      });
+      
+      // Update Total Inventory
+      const inv = await prisma.inventory.findFirst({ where: { productId: product.id, companyId } });
+      if (inv) {
+        await prisma.inventory.update({
+          where: { id: inv.id },
+          data: { totalStock: { increment: openingStock }, availableStock: { increment: openingStock } }
+        });
+      } else {
+        await prisma.inventory.create({
+          data: {
+            productId: product.id,
+            companyId,
+            totalStock: openingStock,
+            availableStock: openingStock,
+          }
+        });
+      }
+    }
+
+    return product;
   }
 
   async getProductById(id, companyId) {

@@ -3,7 +3,7 @@ const prisma = require('../../utils/prisma');
 const getBatches = async (req, res) => {
   try {
     const batches = await prisma.batch.findMany({
-      where: { ...(req.user.companyId ? { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) } : {}) },
+      where: req.user.companyId ? { companyId: req.user.companyId } : {},
       include: { product: true },
       orderBy: { createdAt: 'desc' }
     });

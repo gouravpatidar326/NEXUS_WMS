@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { UserPlus, UserCheck, UserX, Trash2, Users, ShieldCheck, Briefcase, ClipboardList, Building } from 'lucide-react';
 import { ROLES, ROLE_LABELS, ROLE_COLORS } from '@/permissions/roles';
 import { useNotification } from '@/contexts/NotificationContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { PERMISSIONS } from '@/permissions/permissions';
 import PermissionGuard from '@/guards/PermissionGuard';
 import PageHeader from '@/components/navigation/PageHeader';
@@ -19,6 +20,7 @@ import { companyService } from '@/services/companyService';
 
 export const UsersPage = () => {
   const { notifySuccess, notifyError } = useNotification();
+  const { user: currentUser } = useAuth();
 
   const [usersList, setUsersList] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -40,13 +42,19 @@ export const UsersPage = () => {
   const fetchData = async (isSilent = false) => {
     try {
       if (!isSilent) setLoading(true);
-      const [usersData, companiesData] = await Promise.all([
-        userService.getUsers(),
-        companyService.getCompanies(),
-      ]);
+      
+      const usersData = await userService.getUsers();
       setUsersList(Array.isArray(usersData) ? usersData : []);
-      setCompanies(Array.isArray(companiesData) ? companiesData : []);
-      if (companiesData && companiesData.length > 0) setCompanyId(companiesData[0].id);
+
+      if (currentUser?.role === ROLES.SUPER_ADMIN) {
+        try {
+          const companiesData = await companyService.getCompanies();
+          setCompanies(Array.isArray(companiesData) ? companiesData : []);
+          if (companiesData && companiesData.length > 0) setCompanyId(companiesData[0].id);
+        } catch (companyErr) {
+          console.error('Failed to load companies:', companyErr);
+        }
+      }
     } catch {
       notifyError('Failed to load users from database');
     } finally {
@@ -167,7 +175,7 @@ export const UsersPage = () => {
       header: 'Actions',
       accessor: 'action',
       cell: (row) => (
-        <PermissionGuard permission={PERMISSIONS.USERS_EDIT}>
+        [ROLES.SUPER_ADMIN, ROLES.WAREHOUSE_MANAGER].includes(currentUser?.role) ? (
           <div className="flex items-center gap-2">
             <Button size="sm" variant="ghost" leftIcon={row.status === 'Active' ? UserX : UserCheck} onClick={() => toggleUserStatus(row)}>
               {row.status === 'Active' ? 'Suspend' : 'Activate'}
@@ -176,7 +184,7 @@ export const UsersPage = () => {
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
-        </PermissionGuard>
+        ) : null
       ),
     },
   ];
@@ -190,11 +198,11 @@ export const UsersPage = () => {
         description="Provision accounts, assign multi-tenant company access, and manage RBAC security roles"
         breadcrumbs={[{ label: 'Administration' }, { label: 'Users' }]}
         actions={
-          <PermissionGuard permission={PERMISSIONS.USERS_CREATE}>
+          [ROLES.SUPER_ADMIN, ROLES.WAREHOUSE_MANAGER].includes(currentUser?.role) && (
             <Button variant="primary" leftIcon={UserPlus} onClick={() => setIsModalOpen(true)}>
               Provision User Account
             </Button>
-          </PermissionGuard>
+          )
         }
       />
 
@@ -336,15 +344,22 @@ export const UsersPage = () => {
             <Select
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              options={[
-                { value: ROLES.SUPER_ADMIN, label: 'Super Admin' },
-                { value: ROLES.WAREHOUSE_MANAGER, label: 'Warehouse Manager' },
-                { value: ROLES.INVENTORY_CLERK, label: 'Inventory Clerk' },
-                { value: ROLES.CLIENT, label: 'Client User' },
-              ]}
+              options={
+                currentUser?.role === ROLES.SUPER_ADMIN
+                  ? [
+                      { value: ROLES.SUPER_ADMIN, label: 'Super Admin' },
+                      { value: ROLES.WAREHOUSE_MANAGER, label: 'Warehouse Manager' },
+                      { value: ROLES.INVENTORY_CLERK, label: 'Inventory Clerk' },
+                      { value: ROLES.CLIENT, label: 'Client User' },
+                    ]
+                  : [
+                      { value: ROLES.INVENTORY_CLERK, label: 'Inventory Clerk' },
+                      { value: ROLES.CLIENT, label: 'Client User' },
+                    ]
+              }
             />
           </FormField>
-          {role !== ROLES.SUPER_ADMIN && (
+          {currentUser?.role === ROLES.SUPER_ADMIN && role !== ROLES.SUPER_ADMIN && (
             <FormField label="Assign Client Company">
               <Select
                 value={companyId}
