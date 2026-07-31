@@ -221,13 +221,7 @@ export const TopBar = ({ onOpenSidebar }) => {
               )}
             </div>
 
-            <button
-              aria-label="Help"
-              onClick={() => notifySuccess('Help center: use global search or contact your Nexus WMS administrator.')}
-              className="p-2 text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container transition-colors hidden sm:block"
-            >
-              <span className="material-symbols-outlined">help</span>
-            </button>
+
 
             {permissions.includes(PERMISSIONS.SETTINGS_VIEW) && (
               <button
