@@ -281,10 +281,6 @@ const WarehouseManagerDashboard = ({ user }) => {
         setWarehouses(whData || []);
 
         if (whData) {
-          const globalOccupied = whData.reduce((sum, wh) => sum + (wh.occupiedCapacity || 0), 0);
-          const globalTotal = whData.reduce((sum, wh) => sum + (wh.totalCapacity || 0), 0);
-          setGlobalCapacityPct(globalTotal > 0 ? Math.round((globalOccupied / globalTotal) * 100) : 0);
-
           whData.forEach(wh => {
             if (wh.bins) {
               wh.bins.forEach(bin => {
@@ -326,9 +322,9 @@ const WarehouseManagerDashboard = ({ user }) => {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
           <p className="text-xs text-on-surface-variant flex justify-between">Warehouse Capacity <span className="bg-green-100 text-green-700 px-1 rounded text-[10px] font-bold">LIVE</span></p>
-          <h3 className="text-2xl font-bold text-primary">{summary ? `${globalCapacityPct}%` : '...'}</h3>
+          <h3 className="text-2xl font-bold text-primary">{summary ? `${summary.capacityPercentage || 0}%` : '...'}</h3>
           <div className="w-full bg-slate-100 h-1.5 rounded-full mt-2 overflow-hidden">
-            <div className={`h-full transition-all duration-500 ${globalCapacityPct > 80 ? 'bg-red-500' : 'bg-primary'}`} style={{ width: `${globalCapacityPct}%` }}></div>
+            <div className={`h-full transition-all duration-500 ${(summary?.capacityPercentage || 0) > 80 ? 'bg-red-500' : 'bg-primary'}`} style={{ width: `${summary?.capacityPercentage || 0}%` }}></div>
           </div>
         </div>
         <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
@@ -431,7 +427,7 @@ const WarehouseManagerDashboard = ({ user }) => {
                 </div>
               );
             }) : (
-              <p className="text-sm text-center text-on-surface-variant p-4">Loading capacity data...</p>
+              <p className="text-sm text-center text-on-surface-variant p-4">No active facilities to display.</p>
             )}
           </div>
         </div>
