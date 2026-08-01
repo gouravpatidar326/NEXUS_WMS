@@ -89,7 +89,7 @@ export const ReportsPage = () => {
       const tableData = sourceProducts.map((p) => [
         p.sku,
         p.name,
-        p.category?.name || p.category || 'General',
+        p.categoryRef?.name || p.category || 'General',
         p.availableStock || p.totalStock || 0,
         p.availableStock || 0,
         p.unitCost || 0,
@@ -113,7 +113,7 @@ export const ReportsPage = () => {
       ...products.map((p) => [
         p.sku,
         p.name,
-        p.category?.name || p.category || 'General',
+        p.categoryRef?.name || p.category || 'General',
         p.totalStock || p.availableStock || 0,
         p.availableStock || 0,
         p.unitCost || 0,
@@ -130,7 +130,7 @@ export const ReportsPage = () => {
         ...products.map((p) => [
           p.sku,
           p.name,
-          p.category?.name || p.category || 'General',
+          p.categoryRef?.name || p.category || 'General',
           p.availableStock || 0,
           p.unitCost || 0,
           (Number(p.availableStock || 0) * Number(p.unitCost || 0)).toFixed(2),

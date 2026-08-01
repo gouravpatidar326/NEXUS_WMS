@@ -70,19 +70,23 @@ const getManagerSummary = async (req, res) => {
     });
 
     // 7. Warehouse Capacity
-    const locations = await prisma.location.aggregate({
-      where: whereCompany,
-      _sum: {
-        maxCapacity: true,
-        occupied: true,
-      },
+    const activeLocations = await prisma.location.findMany({
+      where: { ...whereCompany, deletedAt: null },
+      include: { locationInventories: { select: { quantity: true } } }
+    });
+
+    let totalMaxCapacity = 0;
+    let totalOccupied = 0;
+
+    activeLocations.forEach(loc => {
+      totalMaxCapacity += (loc.maxCapacity || 0);
+      const locOccupied = loc.locationInventories.reduce((sum, inv) => sum + (inv.quantity || 0), 0);
+      totalOccupied += locOccupied;
     });
 
     let capacityPercentage = 0;
-    if (locations._sum?.maxCapacity && locations._sum.maxCapacity > 0) {
-      capacityPercentage = Math.round(((locations._sum.occupied || 0) / locations._sum.maxCapacity) * 100);
-    } else {
-      capacityPercentage = 42;
+    if (totalMaxCapacity > 0) {
+      capacityPercentage = Math.round((totalOccupied / totalMaxCapacity) * 100);
     }
 
     res.json({

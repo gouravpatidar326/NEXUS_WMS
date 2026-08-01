@@ -357,8 +357,8 @@ export const ProductsListPage = () => {
     },
     {
       header: 'Category',
-      accessor: 'category.name',
-      cell: (row) => row.category?.name || 'Uncategorized'
+      accessor: 'categoryRef.name',
+      cell: (row) => row.categoryRef?.name || row.category || 'Uncategorized'
     },
     {
       header: 'Available Stock',

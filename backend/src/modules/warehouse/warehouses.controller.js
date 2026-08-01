@@ -12,7 +12,7 @@ const getWarehouses = async (req, res) => {
 
     const enrichedWarehouses = await Promise.all(warehouses.map(async (warehouse) => {
       const locations = await prisma.location.findMany({
-        where: { warehouse: warehouse.name, companyId: warehouse.companyId },
+        where: { warehouse: warehouse.name, companyId: warehouse.companyId, deletedAt: null },
         include: { locationInventories: { select: { quantity: true } } }
       });
       
