@@ -113,7 +113,7 @@ const deleteCompany = async (req, res) => {
       await tx.receivingItem.deleteMany({ where: { companyId: id } });
       await tx.receiving.deleteMany({ where: { companyId: id } });
       
-      // Delete orders that reference Product
+      // Delete orders that reference Product or Client
       await tx.salesOrderItem.deleteMany({ where: { salesOrder: { companyId: id } } });
       await tx.salesOrder.deleteMany({ where: { companyId: id } });
       await tx.purchaseOrderItem.deleteMany({ where: { purchaseOrder: { companyId: id } } });
@@ -123,6 +123,10 @@ const deleteCompany = async (req, res) => {
       await tx.product.deleteMany({ where: { companyId: id } });
       await tx.category.deleteMany({ where: { companyId: id } });
       await tx.location.deleteMany({ where: { companyId: id } });
+      
+      // Client and Warehouse
+      await tx.client.deleteMany({ where: { companyId: id } });
+      await tx.warehouse.deleteMany({ where: { companyId: id } });
 
       // Clean up audit logs for company users so users can be deleted
       if (userIds.length > 0) {

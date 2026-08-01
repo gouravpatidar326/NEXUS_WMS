@@ -23,4 +23,7 @@ router.use('/transfers', transferRoutes);
 router.use('/adjustments', adjustmentRoutes);
 router.use('/expiry', expiryRoutes);
 
+// Stub for notifications to prevent 404 errors
+router.get('/notifications', (req, res) => res.json({ notifications: [] }));
+
 module.exports = router;
