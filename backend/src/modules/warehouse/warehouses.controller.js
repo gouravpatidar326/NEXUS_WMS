@@ -9,7 +9,42 @@ const getWarehouses = async (req, res) => {
       orderBy: { createdAt: 'desc' },
       include: { manager: true, company: { select: { name: true } } }
     });
-    res.json(warehouses);
+
+    const enrichedWarehouses = await Promise.all(warehouses.map(async (warehouse) => {
+      const locations = await prisma.location.findMany({
+        where: { warehouse: warehouse.name, companyId: warehouse.companyId },
+        include: { locationInventories: { select: { quantity: true } } }
+      });
+      
+      const totalCapacity = warehouse.capacityValue || 0;
+      let occupiedCapacity = 0;
+      
+      const bins = locations.map(loc => {
+        const occupied = loc.locationInventories.reduce((acc, inv) => acc + (inv.quantity || 0), 0);
+        occupiedCapacity += occupied;
+        const maxCapacity = loc.maxCapacity || 0;
+        return {
+          locationCode: loc.code || loc.bin,
+          maxCapacity,
+          occupied,
+          available: maxCapacity - occupied,
+          utilizationPercent: maxCapacity > 0 ? Math.round((occupied / maxCapacity) * 100) : 0
+        };
+      });
+      
+      const utilizationPercent = totalCapacity > 0 ? Math.round((occupiedCapacity / totalCapacity) * 100) : 0;
+
+      return {
+        ...warehouse,
+        totalCapacity,
+        occupiedCapacity,
+        freeCapacity: totalCapacity - occupiedCapacity,
+        utilizationPercent,
+        bins
+      };
+    }));
+
+    res.json(enrichedWarehouses);
   } catch (error) {
     console.error('Error fetching warehouses:', error);
     res.status(500).json({ message: 'Internal server error' });

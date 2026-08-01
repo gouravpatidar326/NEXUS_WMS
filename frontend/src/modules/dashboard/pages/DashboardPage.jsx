@@ -266,13 +266,35 @@ const WarehouseManagerDashboard = ({ user }) => {
   const navigate = useNavigate();
   const { notifySuccess, notifyError } = useNotification();
   const [summary, setSummary] = useState(null);
+  const [warehouses, setWarehouses] = useState([]);
+  const [globalCapacityPct, setGlobalCapacityPct] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchSummary = async () => {
       try {
-        const data = await dashboardService.getManagerSummary();
+        const [data, whData] = await Promise.all([
+          dashboardService.getManagerSummary(),
+          import('@/services/warehouseService').then(m => m.warehouseService.getWarehouses())
+        ]);
         setSummary(data);
+        setWarehouses(whData || []);
+
+        if (whData) {
+          const globalOccupied = whData.reduce((sum, wh) => sum + (wh.occupiedCapacity || 0), 0);
+          const globalTotal = whData.reduce((sum, wh) => sum + (wh.totalCapacity || 0), 0);
+          setGlobalCapacityPct(globalTotal > 0 ? Math.round((globalOccupied / globalTotal) * 100) : 0);
+
+          whData.forEach(wh => {
+            if (wh.bins) {
+              wh.bins.forEach(bin => {
+                if (bin.utilizationPercent > 80) {
+                  notifyError(`Bin ${bin.locationCode} is ${bin.utilizationPercent}% full in ${wh.name}`);
+                }
+              });
+            }
+          });
+        }
       } catch (error) {
         notifyError('Failed to fetch dashboard summary');
       } finally {
@@ -304,9 +326,9 @@ const WarehouseManagerDashboard = ({ user }) => {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
           <p className="text-xs text-on-surface-variant flex justify-between">Warehouse Capacity <span className="bg-green-100 text-green-700 px-1 rounded text-[10px] font-bold">LIVE</span></p>
-          <h3 className="text-2xl font-bold text-primary">{summary ? `${summary.capacityPercentage}%` : '...'}</h3>
+          <h3 className="text-2xl font-bold text-primary">{summary ? `${globalCapacityPct}%` : '...'}</h3>
           <div className="w-full bg-slate-100 h-1.5 rounded-full mt-2 overflow-hidden">
-            <div className="bg-primary h-full transition-all duration-500" style={{ width: `${summary?.capacityPercentage || 0}%` }}></div>
+            <div className={`h-full transition-all duration-500 ${globalCapacityPct > 80 ? 'bg-red-500' : 'bg-primary'}`} style={{ width: `${globalCapacityPct}%` }}></div>
           </div>
         </div>
         <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
@@ -378,6 +400,39 @@ const WarehouseManagerDashboard = ({ user }) => {
               <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Shipping</span>
               <span className="text-xs text-on-surface-variant">14/20 Trucks</span>
             </div>
+          </div>
+        </div>
+
+        {/* Detailed Warehouse Capacity Widget */}
+        <div className="lg:col-span-1 bg-white border border-outline-variant rounded-xl p-6 flex flex-col shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h4 className="text-base font-bold text-on-surface">Warehouse Capacity Details</h4>
+          </div>
+          <div className="space-y-4 overflow-y-auto custom-scrollbar flex-1">
+            {warehouses.length > 0 ? warehouses.map((wh) => {
+              const isDanger = wh.utilizationPercent > 80;
+              return (
+                <div key={wh.id} className="p-3 border border-outline-variant rounded-lg">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm font-bold text-on-surface">{wh.name}</span>
+                    <span className={`text-xs font-bold flex items-center gap-1 ${isDanger ? 'text-red-600' : 'text-primary'}`}>
+                      {isDanger && <span className="material-symbols-outlined text-[14px]">warning</span>}
+                      {wh.utilizationPercent}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mb-2">
+                    <div className={`h-full transition-all ${isDanger ? 'bg-red-500' : 'bg-green-500'}`} style={{ width: `${wh.utilizationPercent}%` }}></div>
+                  </div>
+                  <div className="flex justify-between text-[11px] text-on-surface-variant">
+                    <span>{wh.occupiedCapacity} Occupied</span>
+                    <span>{wh.freeCapacity} Free</span>
+                    <span>{wh.totalCapacity} Total</span>
+                  </div>
+                </div>
+              );
+            }) : (
+              <p className="text-sm text-center text-on-surface-variant p-4">Loading capacity data...</p>
+            )}
           </div>
         </div>
 

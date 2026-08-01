@@ -45,7 +45,8 @@ const WAREHOUSE_MANAGER_PERMISSIONS = [
   PERMISSIONS.SO_EDIT,
   PERMISSIONS.SO_APPROVE,  // Can approve/reject sales orders
   PERMISSIONS.SO_DELETE,
-  // No SO_PICK, PICKING_EXECUTE — read-only on Picking
+  PERMISSIONS.SO_PICK,     // Added to view picking menu
+  // No PICKING_EXECUTE — read-only on Picking
   PERMISSIONS.SHIPPING_VIEW,
   PERMISSIONS.SHIPPING_TRACK,
   // No SHIPPING_CREATE, SHIPPING_EXECUTE, SHIPPING_DELETE — read-only on Shipping

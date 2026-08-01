@@ -19,6 +19,10 @@ class LocationService {
       throw new Error('Associated facility not found for validation');
     }
 
+    if (payload.capacityType && payload.capacityType !== (facility.capacityType || 'Items')) {
+      throw new Error(`Unit mismatch! Warehouse uses '${facility.capacityType || 'Items'}', Bin cannot be created in '${payload.capacityType}'.`);
+    }
+
     const existingLocs = await prisma.location.findMany({
       where: { warehouse: warehouseName, companyId, deletedAt: null }
     });
@@ -27,7 +31,7 @@ class LocationService {
     const newBinCapacity = parseInt(payload.maxCapacity || '1000', 10);
 
     if (facility.capacityValue !== null && (currentProvisioned + newBinCapacity > facility.capacityValue)) {
-      throw new Error(`Bin capacity exceeds warehouse total capacity. Warehouse Capacity: ${facility.capacityValue} ${facility.capacityType || 'Items'}. Available to provision: ${facility.capacityValue - currentProvisioned} ${facility.capacityType || 'Items'}`);
+      throw new Error(`Warehouse capacity is ${facility.capacityValue}. Existing bins are using ${currentProvisioned}. A new bin can have a maximum capacity of ${facility.capacityValue - currentProvisioned}.`);
     }
 
     const data = {
@@ -59,12 +63,14 @@ class LocationService {
 
   async getLocations(companyId, query) {
     const { page, limit, skip, sortBy, sortOrder } = getPaginationParams(query);
+    const warehouse = query.warehouse || null;
     const zone = query.zone || null;
     const status = query.status || null;
     const search = query.search || null;
 
     const { items, total } = await locationRepository.findAll({
       companyId,
+      warehouse,
       zone,
       status,
       search,
@@ -79,7 +85,31 @@ class LocationService {
   }
 
   async updateLocation(id, companyId, payload) {
-    await this.getLocationById(id, companyId);
+    const existingLocation = await this.getLocationById(id, companyId);
+    const prisma = require('../utils/prisma');
+    
+    const facility = await prisma.warehouse.findFirst({
+      where: { name: existingLocation.warehouse, companyId }
+    });
+    if (!facility) {
+      throw new Error('Associated facility not found for validation');
+    }
+
+    if (payload.capacityType && payload.capacityType !== (facility.capacityType || 'Items')) {
+      throw new Error(`Unit mismatch! Warehouse uses '${facility.capacityType || 'Items'}', Bin cannot be created in '${payload.capacityType}'.`);
+    }
+
+    if (payload.maxCapacity !== undefined && facility.capacityValue !== null) {
+      const newMaxCapacity = parseInt(payload.maxCapacity, 10);
+      const allLocs = await prisma.location.findMany({
+        where: { warehouse: existingLocation.warehouse, companyId, deletedAt: null }
+      });
+      // Sum all OTHER bins
+      const otherProvisioned = allLocs.filter(l => l.id !== id).reduce((sum, loc) => sum + (loc.maxCapacity || 0), 0);
+      if (otherProvisioned + newMaxCapacity > facility.capacityValue) {
+        throw new Error(`Warehouse capacity is ${facility.capacityValue}. Existing bins are using ${otherProvisioned}. A new bin can have a maximum capacity of ${facility.capacityValue - otherProvisioned}.`);
+      }
+    }
     
     const updateData = {};
     if (payload.code) updateData.code = payload.code;
@@ -88,8 +118,9 @@ class LocationService {
     if (payload.rack) updateData.rack = payload.rack;
     if (payload.shelf) updateData.shelf = payload.shelf;
     if (payload.bin) updateData.bin = payload.bin;
-    if (payload.maxCapacity) updateData.maxCapacity = parseInt(payload.maxCapacity, 10);
+    if (payload.maxCapacity !== undefined) updateData.maxCapacity = parseInt(payload.maxCapacity, 10);
     if (payload.status) updateData.status = payload.status;
+    if (payload.capacityType) updateData.capacityType = payload.capacityType;
 
     await locationRepository.update(id, companyId, updateData);
     return await this.getLocationById(id, companyId);

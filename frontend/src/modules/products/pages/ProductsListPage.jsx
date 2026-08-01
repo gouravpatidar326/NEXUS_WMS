@@ -95,7 +95,7 @@ export const ProductsListPage = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [prodRes, catRes, clientRes, whRes, locRes] = await Promise.all([
+      const [prodRes, catRes, clientRes, whRes] = await Promise.all([
         productService.getProducts({
           search: searchTerm,
           category: selectedCategory,
@@ -104,20 +104,17 @@ export const ProductsListPage = () => {
         categoryService.getCategories(),
         clientService.fetchClients().catch(() => ({ data: [] })),
         warehouseService.getWarehouses().catch(() => []),
-        locationService.getLocations().catch(() => ({ items: [] }))
       ]);
 
       const prodList = Array.isArray(prodRes) ? prodRes : prodRes?.items || prodRes?.data || [];
       const catList = Array.isArray(catRes) ? catRes : catRes?.data || [];
       const clientList = Array.isArray(clientRes) ? clientRes : clientRes?.data || [];
       const whList = Array.isArray(whRes) ? whRes : whRes?.data || [];
-      const locList = Array.isArray(locRes) ? locRes : locRes?.items || locRes?.data || [];
 
       setProducts(prodList);
       setCategories(catList);
       setClients(clientList);
       setWarehouses(whList);
-      setLocations(locList);
       if (clientList.length > 0) setOrderClientId(clientList[0].id);
     } catch (err) {
       console.error('Error loading products data:', err);
@@ -136,6 +133,23 @@ export const ProductsListPage = () => {
   useEffect(() => {
     fetchData();
   }, [selectedCategory, selectedStatus, searchTerm]);
+
+  useEffect(() => {
+    if (warehouseId) {
+      const selectedWarehouse = warehouses.find(w => w.id === warehouseId);
+      if (selectedWarehouse) {
+        locationService.getLocations({ warehouse: selectedWarehouse.name, status: 'Active' })
+          .then(res => {
+            const locList = Array.isArray(res) ? res : res?.items || res?.data || [];
+            // Additional fallback filtering on client-side just in case
+            setLocations(locList.filter(l => l.status === 'Active' || l.status === 'ACTIVE'));
+          })
+          .catch(() => setLocations([]));
+      }
+    } else {
+      setLocations([]);
+    }
+  }, [warehouseId, warehouses]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -200,6 +214,13 @@ export const ProductsListPage = () => {
     if (!name || !sku) {
       notifyError('Product Name and SKU are required.');
       return;
+    }
+
+    if (openingStock && parseInt(openingStock, 10) > 0) {
+      if (!warehouseId || !locationId) {
+        notifyError('Please select a warehouse and a bin for opening stock');
+        return;
+      }
     }
 
     try {
@@ -553,14 +574,16 @@ export const ProductsListPage = () => {
                       <Select
                         value={warehouseId}
                         onChange={(e) => setWarehouseId(e.target.value)}
-                        options={[{value: '', label: 'Select Warehouse'}, ...warehouses.map(w => ({ value: w.id, label: w.name }))]}
+                        placeholder="Select Warehouse"
+                        options={warehouses.map(w => ({ value: w.id, label: w.name }))}
                       />
                     </FormField>
                     <FormField label="Location (Bin)">
                       <Select
                         value={locationId}
                         onChange={(e) => setLocationId(e.target.value)}
-                        options={[{value: '', label: 'Select Location'}, ...locations.map(l => ({ value: l.id, label: l.name }))]}
+                        placeholder="Select Location"
+                        options={locations.map(l => ({ value: l.id, label: l.name }))}
                       />
                     </FormField>
                   </>

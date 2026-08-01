@@ -169,14 +169,31 @@ const FacilitiesPage = () => {
       cell: (row) => <div className="text-sm font-medium text-slate-700">{row.company?.name || '-'}</div>
     },
     {
-      header: 'Type & Capacity',
-      accessor: 'facilityType',
-      cell: (row) => (
-        <div>
-          <div className="text-sm font-medium">{row.facilityType || 'General'}</div>
-          {row.capacityValue && <div className="text-xs text-slate-500 mt-0.5">{row.capacityValue} {row.capacityType}</div>}
-        </div>
-      )
+      header: 'Capacity & Utilization',
+      accessor: 'capacity',
+      cell: (row) => {
+        if (row.utilizationPercent === undefined) {
+           return <div className="text-xs text-slate-500">{row.capacityValue ? `${row.capacityValue} ${row.capacityType || 'Items'}` : 'N/A'}</div>;
+        }
+        
+        const isDanger = row.utilizationPercent > 80;
+        const isWarning = row.utilizationPercent > 50 && row.utilizationPercent <= 80;
+        const colorClass = isDanger ? 'bg-red-500' : (isWarning ? 'bg-yellow-500' : 'bg-green-500');
+        
+        return (
+          <div className="flex flex-col gap-1 w-full min-w-[120px] max-w-[180px]">
+             <div className="flex justify-between items-center text-[11px] font-bold">
+                <span className="text-slate-700">{row.occupiedCapacity || 0}/{row.totalCapacity || 0} {row.capacityType || 'Items'}</span>
+                <span className={isDanger ? 'text-red-600' : (isWarning ? 'text-yellow-600' : 'text-green-600')}>
+                  ({row.utilizationPercent}%)
+                </span>
+             </div>
+             <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                <div className={`h-full transition-all ${colorClass}`} style={{ width: `${row.utilizationPercent}%` }}></div>
+             </div>
+          </div>
+        )
+      }
     },
     {
       header: 'Supported Items',

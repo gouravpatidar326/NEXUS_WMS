@@ -279,20 +279,20 @@ export const WarehouseOpsPage = () => {
     {
       header: 'Occupied / Max Capacity',
       accessor: 'occupied',
-      cell: (row) => (
-        <div className="space-y-1 w-36">
-          <div className="flex justify-between text-xs font-mono">
-            <span>{row.occupied}/{row.maxCapacity}</span>
-            <span>{Math.round(((row.occupied || 0) / (row.maxCapacity || 1)) * 100)}%</span>
+      cell: (row) => {
+        const pct = Math.round(((row.occupied || 0) / (row.maxCapacity || 1)) * 100);
+        const filledBlocks = Math.round(pct / 10);
+        const emptyBlocks = 10 - filledBlocks;
+        const bar = '█'.repeat(filledBlocks) + '░'.repeat(emptyBlocks);
+        const isDanger = pct > 80;
+        const isWarning = pct > 50 && pct <= 80;
+        
+        return (
+          <div className={`font-mono text-xs font-bold ${isDanger ? 'text-red-600' : (isWarning ? 'text-yellow-600' : 'text-primary')}`}>
+            {bar} {pct}% | {row.occupied}/{row.maxCapacity}
           </div>
-          <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
-            <div
-              className={`h-full ${row.occupied / row.maxCapacity > 0.9 ? 'bg-red-500' : 'bg-primary'}`}
-              style={{ width: `${Math.min(100, ((row.occupied || 0) / (row.maxCapacity || 1)) * 100)}%` }}
-            />
-          </div>
-        </div>
-      ),
+        );
+      }
     },
     {
       header: 'Status',

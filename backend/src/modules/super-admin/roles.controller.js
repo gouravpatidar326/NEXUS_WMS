@@ -30,7 +30,7 @@ const defaultPermissions = {
     'expiry.view', 'expiry.manage',
     'po.view', 'po.create', 'po.edit', 'po.approve',
     'to.view', 'to.create', 'to.edit', 'to.execute',
-    'so.view', 'so.create', 'so.edit', 'so.approve',
+    'so.view', 'so.create', 'so.edit', 'so.approve', 'so.pick',
     'warehouse.view', 'warehouse.manage', 'warehouse.zones', 'warehouse.locations', 'facilities.view',
     'barcode.view', 'barcode.generate', 'barcode.print',
     'shipping.view', 'shipping.track',

@@ -13,6 +13,41 @@ class ProductService {
       throw new Error(`Product with SKU '${payload.sku}' already exists`);
     }
 
+    const openingStock = parseInt(payload.openingStock || '0', 10);
+    if (openingStock > 0) {
+      if (!payload.warehouseId || !payload.locationId) {
+        throw new Error('Warehouse and Location (Bin) are required when adding opening stock');
+      }
+      
+      const destLoc = await prisma.location.findUnique({ where: { id: payload.locationId } });
+      if (!destLoc) throw new Error('Location not found');
+
+      const currentBinStock = await prisma.locationInventory.aggregate({
+        where: { locationId: destLoc.id, companyId },
+        _sum: { quantity: true }
+      });
+      const currentBinQty = currentBinStock._sum.quantity || 0;
+      
+      if (currentBinQty + openingStock > destLoc.maxCapacity) {
+        throw new Error(`Bin ${destLoc.code || destLoc.bin} has only ${destLoc.maxCapacity - currentBinQty} items of space available. You are trying to receive ${openingStock} items.`);
+      }
+
+      const destFacility = await prisma.warehouse.findFirst({ where: { name: destLoc.warehouse, companyId } });
+      if (destFacility && destFacility.capacityValue !== null) {
+         const allFacilityLocs = await prisma.location.findMany({ where: { warehouse: destFacility.name, companyId } });
+         const locIds = allFacilityLocs.map(l => l.id);
+         const totalFacilityStock = await prisma.locationInventory.aggregate({
+           where: { locationId: { in: locIds }, companyId },
+           _sum: { quantity: true }
+         });
+         const currentFacilityQty = totalFacilityStock._sum.quantity || 0;
+         
+         if (currentFacilityQty + openingStock > destFacility.capacityValue) {
+           throw new Error(`Warehouse ${destFacility.name} has only ${destFacility.capacityValue - currentFacilityQty} items of space available. You are trying to receive ${openingStock} items.`);
+         }
+      }
+    }
+
     const data = {
       sku: payload.sku,
       barcode: payload.barcode || null,
@@ -30,7 +65,6 @@ class ProductService {
     const product = await productRepository.create(data);
 
     // Handle Opening Stock
-    const openingStock = parseInt(payload.openingStock || '0', 10);
     if (openingStock > 0) {
       // Create a default batch
       const batch = await prisma.batch.create({
@@ -46,28 +80,7 @@ class ProductService {
         }
       });
 
-      let locId = payload.locationId;
-      if (!locId) {
-        // Find or create default "Unassigned" location
-        let unassigned = await prisma.location.findFirst({
-          where: { name: 'Unassigned', companyId, deletedAt: null }
-        });
-        if (!unassigned) {
-          unassigned = await prisma.location.create({
-            data: {
-              name: 'Unassigned',
-              warehouse: 'Default Warehouse',
-              zone: 'A',
-              aisle: '1',
-              rack: '1',
-              shelf: '1',
-              bin: '1',
-              companyId,
-            }
-          });
-        }
-        locId = unassigned.id;
-      }
+      const locId = payload.locationId;
 
       // Add to LocationInventory
       await prisma.locationInventory.create({

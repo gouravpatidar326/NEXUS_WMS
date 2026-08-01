@@ -1,9 +1,4 @@
 export const categoryConfig = {
-  mobile: [
-    { name: 'imei', label: 'IMEI Number', type: 'text', placeholder: 'Enter IMEI' },
-    { name: 'storage', label: 'Storage Variant', type: 'select', options: ['64GB', '128GB', '256GB', '512GB'] },
-    { name: 'color', label: 'Color', type: 'text', placeholder: 'Enter Color' }
-  ],
   grocery: [
     { name: 'expiryDate', label: 'Expiry Date', type: 'date' },
     { name: 'batchNumber', label: 'Batch Number', type: 'text', placeholder: 'Enter Batch' },

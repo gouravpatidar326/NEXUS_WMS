@@ -16,10 +16,11 @@ class LocationRepository {
     });
   }
 
-  async findAll({ companyId, zone, status, search, skip, limit, sortBy, sortOrder }) {
+  async findAll({ companyId, warehouse, zone, status, search, skip, limit, sortBy, sortOrder }) {
     const where = {
       ...(companyId ? { companyId } : {}),
       deletedAt: null,
+      ...(warehouse ? { warehouse } : {}),
       ...(zone ? { zone } : {}),
       ...(status ? { status } : {}),
       ...(search
@@ -43,13 +44,23 @@ class LocationRepository {
         take: limit,
         orderBy: { [sortBy]: sortOrder },
         include: {
+          locationInventories: { select: { quantity: true } },
           _count: { select: { locationInventories: true } },
         },
       }),
       prisma.location.count({ where }),
     ]);
 
-    return { items, total };
+    const formattedItems = items.map(item => {
+      const dynamicOccupied = item.locationInventories.reduce((sum, inv) => sum + (inv.quantity || 0), 0);
+      return {
+        ...item,
+        occupied: dynamicOccupied,
+        locationInventories: undefined
+      };
+    });
+
+    return { items: formattedItems, total };
   }
 
   async update(id, companyId, data) {

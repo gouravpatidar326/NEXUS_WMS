@@ -90,6 +90,35 @@ class ReceivingService {
         const acceptedQty = putaway.acceptedQty || recItem.acceptedQty;
         if (acceptedQty <= 0) continue;
 
+        // Capacity Validations
+        const destLoc = await tx.location.findUnique({ where: { id: putaway.locationId } });
+        if (!destLoc) throw new Error('Destination bin not found');
+
+        const currentBinStock = await tx.locationInventory.aggregate({
+          where: { locationId: destLoc.id, companyId },
+          _sum: { quantity: true }
+        });
+        const currentBinQty = currentBinStock._sum.quantity || 0;
+        
+        if (currentBinQty + acceptedQty > destLoc.maxCapacity) {
+          throw new Error(`Bin ${destLoc.code || destLoc.bin} has only ${destLoc.maxCapacity - currentBinQty} items of space available. You are trying to receive ${acceptedQty} items.`);
+        }
+
+        const destFacility = await tx.warehouse.findFirst({ where: { name: destLoc.warehouse, companyId } });
+        if (destFacility && destFacility.capacityValue !== null) {
+           const allFacilityLocs = await tx.location.findMany({ where: { warehouse: destFacility.name, companyId } });
+           const locIds = allFacilityLocs.map(l => l.id);
+           const totalFacilityStock = await tx.locationInventory.aggregate({
+             where: { locationId: { in: locIds }, companyId },
+             _sum: { quantity: true }
+           });
+           const currentFacilityQty = totalFacilityStock._sum.quantity || 0;
+           
+           if (currentFacilityQty + acceptedQty > destFacility.capacityValue) {
+             throw new Error(`Warehouse ${destFacility.name} has only ${destFacility.capacityValue - currentFacilityQty} items of space available. You are trying to receive ${acceptedQty} items.`);
+           }
+        }
+
         // 1. Create Lot / Batch
         const lotNumber = putaway.lotNumber || `LOT-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
         const batch = await tx.batch.create({

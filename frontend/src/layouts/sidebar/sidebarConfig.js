@@ -29,7 +29,7 @@ export const WAREHOUSE_MANAGER_ITEMS = [
   { id: 'lots', title: 'Lots & Batches', path: '/batch-tracking', iconName: 'qr_code_2' },
   { id: 'expiry', title: 'Expiry Tracking', path: '/expiry-tracking', iconName: 'calendar_clock' },
   { id: 'facilities', title: 'Facilities', path: '/facilities', iconName: 'factory' },
-  { id: 'locations', title: 'Locations', path: '/warehouse-ops', iconName: 'location_on' },
+  { id: 'warehouses', title: 'Warehouse Operations', path: '/warehouse-ops', iconName: 'warehouse' },
   { id: 'sales-orders', title: 'Sales Orders', path: '/sales-orders', iconName: 'shopping_cart' },
   { id: 'picking', title: 'Picking', path: '/picking', iconName: 'conveyor_belt' },
   { id: 'shipping', title: 'Shipping', path: '/shipping', iconName: 'local_shipping' },
@@ -47,11 +47,11 @@ export const INVENTORY_CLERK_ITEMS = [
   { id: 'inventory', title: 'Inventory', path: '/inventory', iconName: 'inventory' },
   { id: 'lots', title: 'Lots & Batches', path: '/batch-tracking', iconName: 'qr_code_2' },
   { id: 'expiry', title: 'Expiry', path: '/expiry-tracking', iconName: 'calendar_clock' },
-  { id: 'sales-orders', title: 'Sales Orders', path: '/sales-orders', iconName: 'shopping_cart' },
+  { id: 'warehouses', title: 'Warehouse Operations', path: '/warehouse-ops', iconName: 'warehouse' },
+  { id: 'receiving', title: 'Receiving', path: '/purchase-orders', iconName: 'move_to_inbox' },
   { id: 'picking', title: 'Picking', path: '/picking', iconName: 'conveyor_belt' },
   { id: 'shipping', title: 'Shipping', path: '/shipping', iconName: 'local_shipping' },
   { id: 'transfers', title: 'Transfers', path: '/transfer-orders', iconName: 'sync_alt' },
-  { id: 'receiving', title: 'Receiving', path: '/purchase-orders', iconName: 'move_to_inbox' },
   { id: 'barcode', title: 'Barcode', path: '/barcode', iconName: 'qr_code_scanner' },
 ];
 

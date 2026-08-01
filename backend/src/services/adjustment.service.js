@@ -27,6 +27,36 @@ class AdjustmentService {
     const adjustmentNumber = `ADJ-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
 
     return await prisma.$transaction(async (tx) => {
+      // Capacity Validations
+      if (delta > 0) {
+        const destLoc = await tx.location.findUnique({ where: { id: locationId } });
+        if (!destLoc) throw new Error('Location not found');
+
+        const currentBinStock = await tx.locationInventory.aggregate({
+          where: { locationId: destLoc.id, companyId },
+          _sum: { quantity: true }
+        });
+        const currentBinQty = currentBinStock._sum.quantity || 0;
+        
+        if (currentBinQty + delta > destLoc.maxCapacity) {
+          throw new Error(`Bin ${destLoc.code || destLoc.bin} has only ${destLoc.maxCapacity - currentBinQty} items of space available. You are trying to receive ${delta} items.`);
+        }
+
+        const destFacility = await tx.warehouse.findFirst({ where: { name: destLoc.warehouse, companyId } });
+        if (destFacility && destFacility.capacityValue !== null) {
+           const allFacilityLocs = await tx.location.findMany({ where: { warehouse: destFacility.name, companyId } });
+           const locIds = allFacilityLocs.map(l => l.id);
+           const totalFacilityStock = await tx.locationInventory.aggregate({
+             where: { locationId: { in: locIds }, companyId },
+             _sum: { quantity: true }
+           });
+           const currentFacilityQty = totalFacilityStock._sum.quantity || 0;
+           
+           if (currentFacilityQty + delta > destFacility.capacityValue) {
+             throw new Error(`Warehouse ${destFacility.name} has only ${destFacility.capacityValue - currentFacilityQty} items of space available. You are trying to receive ${delta} items.`);
+           }
+        }
+      }
       // 1. Update bin stock location quantity
       await locationInventoryRepository.upsertQuantity(tx, {
         locationId,

@@ -2,7 +2,7 @@ import { api } from './api';
 
 export const locationService = {
   async getLocations(params = {}) {
-    const res = await api.get('/v1/locations');
+    const res = await api.get('/v1/locations', { params });
     return res.data || [];
   },
 
