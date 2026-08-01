@@ -1,8 +1,13 @@
 import { api } from './api';
 
 export const userService = {
-  getUsers: async () => {
-    return await api.get('/users');
+  getUsers: async (role, companyId) => {
+    let url = '/users';
+    const params = new URLSearchParams();
+    if (role) params.append('role', role);
+    if (companyId) params.append('companyId', companyId);
+    if (params.toString()) url += `?${params.toString()}`;
+    return await api.get(url);
   },
   inviteUser: async (data) => {
     return await api.post('/users', data);

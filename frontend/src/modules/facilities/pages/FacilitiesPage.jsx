@@ -7,13 +7,19 @@ import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import { useNotification } from '@/contexts/NotificationContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { warehouseService } from '@/services/warehouseService';
+import { userService } from '@/services/userService';
+import { companyService } from '@/services/companyService';
 import { Factory, Plus, Edit, Trash2 } from 'lucide-react';
 import LoadingState from '@/components/feedback/LoadingState';
 
 const FacilitiesPage = () => {
   const { notifySuccess, notifyError } = useNotification();
+  const { user } = useAuth();
   const [facilities, setFacilities] = useState([]);
+  const [managers, setManagers] = useState([]);
+  const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Modal states
@@ -27,7 +33,8 @@ const FacilitiesPage = () => {
   const [capacityType, setCapacityType] = useState('Items');
   const [capacityValue, setCapacityValue] = useState('');
   const [supportedItems, setSupportedItems] = useState('');
-  const [managerName, setManagerName] = useState('');
+  const [managerId, setManagerId] = useState('');
+  const [companyId, setCompanyId] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
@@ -37,8 +44,18 @@ const FacilitiesPage = () => {
   const fetchFacilities = async () => {
     try {
       setLoading(true);
-      const data = await warehouseService.getWarehouses();
-      setFacilities(data || []);
+      setLoading(true);
+      const [facData, compData] = await Promise.all([
+        warehouseService.getWarehouses(),
+        user.role === 'SUPER_ADMIN' ? companyService.getCompanies() : Promise.resolve(null)
+      ]);
+      setFacilities(facData || []);
+      if (compData) setCompanies(compData || []);
+      
+      if (user.role !== 'SUPER_ADMIN') {
+        const mgrData = await userService.getUsers('WAREHOUSE_MANAGER', user.companyId);
+        setManagers(mgrData?.data || []);
+      }
     } catch (error) {
       notifyError('Failed to fetch facilities');
     } finally {
@@ -59,7 +76,11 @@ const FacilitiesPage = () => {
       setCapacityType(facility.capacityType || 'Items');
       setCapacityValue(facility.capacityValue !== undefined && facility.capacityValue !== null ? String(facility.capacityValue) : '');
       setSupportedItems(facility.supportedItems || '');
-      setManagerName(facility.managerName || '');
+      setCompanyId(facility.companyId || '');
+      setManagerId(facility.managerId || '');
+      if (user.role === 'SUPER_ADMIN' && facility.companyId) {
+        userService.getUsers('WAREHOUSE_MANAGER', facility.companyId).then(res => setManagers(res?.data || []));
+      }
       setContactPhone(facility.contactPhone || '');
       setAddress(facility.address || '');
       setCity(facility.city || '');
@@ -73,7 +94,9 @@ const FacilitiesPage = () => {
       setCapacityType('Items');
       setCapacityValue('');
       setSupportedItems('');
-      setManagerName('');
+      setCompanyId('');
+      setManagerId('');
+      if (user.role === 'SUPER_ADMIN') setManagers([]);
       setContactPhone('');
       setAddress('');
       setCity('');
@@ -94,7 +117,8 @@ const FacilitiesPage = () => {
       capacityType,
       capacityValue: capacityValue ? parseFloat(capacityValue) : null,
       supportedItems,
-      managerName,
+      managerId: user.role === 'SUPER_ADMIN' ? managerId : user.id,
+      companyId: user.role === 'SUPER_ADMIN' ? companyId : user.companyId,
       contactPhone,
       address,
       city,
@@ -140,6 +164,11 @@ const FacilitiesPage = () => {
       )
     },
     {
+      header: 'Company',
+      accessor: 'company',
+      cell: (row) => <div className="text-sm font-medium text-slate-700">{row.company?.name || '-'}</div>
+    },
+    {
       header: 'Type & Capacity',
       accessor: 'facilityType',
       cell: (row) => (
@@ -169,10 +198,10 @@ const FacilitiesPage = () => {
     },
     {
       header: 'Manager',
-      accessor: 'managerName',
+      accessor: 'manager',
       cell: (row) => (
         <div>
-          <div className="text-sm">{row.managerName || '-'}</div>
+          <div className="text-sm">{row.manager?.name || '-'}</div>
           {row.contactPhone && <div className="text-xs text-slate-500">{row.contactPhone}</div>}
         </div>
       )
@@ -229,8 +258,8 @@ const FacilitiesPage = () => {
             <FormField label="Facility Name" required>
               <Input value={name} onChange={e => setName(e.target.value)} placeholder="Enter Facility Name" required />
             </FormField>
-            <FormField label="Facility Code" required>
-              <Input value={code} onChange={e => setCode(e.target.value)} placeholder="Enter Facility Code" required />
+            <FormField label="Facility Code">
+              <Input value={code} onChange={e => setCode(e.target.value)} placeholder="Auto-generated if empty" />
             </FormField>
           </div>
 
@@ -257,8 +286,8 @@ const FacilitiesPage = () => {
                     options={[
                       {value: 'Items', label: 'Items'},
                       {value: 'Kg', label: 'Kg'},
-                      {value: 'Pallets', label: 'Pallets'},
-                      {value: 'CBM', label: 'CBM (Cubic Meter)'}
+                      {value: 'Cubic Meter', label: 'Cubic Meter'},
+                      {value: 'Tonnes', label: 'Tonnes'}
                     ]}
                     required
                   />
@@ -270,15 +299,60 @@ const FacilitiesPage = () => {
             </div>
 
           <FormField label="Supported Items (What is this built for?)" required>
-            <Input value={supportedItems} onChange={e => setSupportedItems(e.target.value)} placeholder="Enter Supported Items" required />
+            <Input value={supportedItems} onChange={e => setSupportedItems(e.target.value)} placeholder="e.g. Electronics, Mobile Phones, FMCG, Cold Storage Items" required />
           </FormField>
 
           <div className="border-t border-slate-200 pt-4 mt-2">
-            <h4 className="text-sm font-semibold text-slate-800 mb-4">Location & Contact</h4>
+            <h4 className="text-sm font-semibold text-slate-800 mb-4">Company & Manager</h4>
             <div className="grid grid-cols-2 gap-4 mb-4">
-              <FormField label="Manager Name" required>
-                <Input value={managerName} onChange={e => setManagerName(e.target.value)} placeholder="Enter Manager Name" required />
+              <FormField label="Company" required>
+                {user.role === 'SUPER_ADMIN' ? (
+                  <Select
+                    value={companyId}
+                    onChange={e => {
+                      setCompanyId(e.target.value);
+                      setManagerId('');
+                      if (e.target.value) {
+                        userService.getUsers('WAREHOUSE_MANAGER', e.target.value).then(res => setManagers(res?.data || []));
+                      } else {
+                        setManagers([]);
+                      }
+                    }}
+                    options={[
+                      { value: '', label: 'Select Company' },
+                      ...companies.map(c => ({ value: c.id, label: c.name }))
+                    ]}
+                    required
+                  />
+                ) : (
+                  <Input value={user.companyName || user.company?.name || 'N/A'} readOnly className="bg-slate-50 text-slate-500" />
+                )}
               </FormField>
+              <FormField label="Manager Name" required>
+                {user.role === 'SUPER_ADMIN' ? (
+                  <Select
+                    value={managerId}
+                    onChange={e => setManagerId(e.target.value)}
+                    options={
+                      managers.length > 0
+                        ? [
+                            { value: '', label: 'Select Manager' },
+                            ...managers.map(m => ({ value: m.id, label: `${m.name} (${m.email})` }))
+                          ]
+                        : [{ value: '', label: 'No managers found' }]
+                    }
+                    required
+                  />
+                ) : (
+                  <Input value={user.name} readOnly className="bg-slate-50 text-slate-500" />
+                )}
+              </FormField>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 pt-4 mt-2">
+            <h4 className="text-sm font-semibold text-slate-800 mb-4">Location & Contact</h4>
+            <div className="mb-4">
               <FormField label="Contact Phone" required>
                 <Input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="Enter Contact Number" required />
               </FormField>

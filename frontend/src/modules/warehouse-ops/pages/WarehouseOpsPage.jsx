@@ -380,8 +380,8 @@ export const WarehouseOpsPage = () => {
   const facilityUnit = activeFacility?.capacityType || 'Items';
   const provisionedCapacity = filteredLocations.reduce((sum, loc) => sum + (loc.maxCapacity || 0), 0);
   const occupiedCapacity = filteredLocations.reduce((sum, loc) => sum + (loc.occupied || 0), 0);
-  const freeCapacity = totalFacilityCapacity - provisionedCapacity;
-  const fillPercentage = totalFacilityCapacity > 0 ? Math.min(100, Math.round((provisionedCapacity / totalFacilityCapacity) * 100)) : 0;
+  const freeCapacity = totalFacilityCapacity - occupiedCapacity;
+  const fillPercentage = totalFacilityCapacity > 0 ? Math.min(100, Math.round((occupiedCapacity / totalFacilityCapacity) * 100)) : 0;
 
   const filteredReceivings = activeFacility 
     ? receivings.filter(rec => rec.warehouse === activeFacility.name || !rec.warehouse)

@@ -41,7 +41,8 @@ const login = async (req, res) => {
           role: user.role,
           companyId: user.companyId,
           warehouseId: user.warehouseId,
-          companyName: user.company ? user.company.name : null
+          companyName: user.company ? user.company.name : null,
+          company: user.company ? { id: user.company.id, name: user.company.name } : null
         }
       });
     }
@@ -77,7 +78,8 @@ const login = async (req, res) => {
           role: 'CLIENT',
           companyId: client.companyId,
           warehouseId: client.warehouseId,
-          companyName: client.company ? client.company.name : null
+          companyName: client.company ? client.company.name : null,
+          company: client.company ? { id: client.company.id, name: client.company.name } : null
         }
       });
     }

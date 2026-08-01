@@ -6,7 +6,8 @@ const getWarehouses = async (req, res) => {
     const where = companyId ? { companyId } : {};
     const warehouses = await prisma.warehouse.findMany({
       where,
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: { manager: true, company: { select: { name: true } } }
     });
     res.json(warehouses);
   } catch (error) {
@@ -15,10 +16,11 @@ const getWarehouses = async (req, res) => {
   }
 };
 
-const createWarehouse = async (req, res) => {
+  const createWarehouse = async (req, res) => {
   try {
-    let { companyId } = req.user;
-    const { name, code, address, city, state, country, zipCode, managerName, contactPhone, capacityType, capacityValue, facilityType, supportedItems } = req.body;
+    let companyId = req.user.role === 'SUPER_ADMIN' && req.body.companyId ? req.body.companyId : req.user.companyId;
+    let managerId = req.user.role === 'SUPER_ADMIN' && req.body.managerId ? req.body.managerId : req.user.id;
+    const { name, code, address, city, state, country, zipCode, contactPhone, capacityType, capacityValue, facilityType, supportedItems } = req.body;
 
     if (!name) {
       return res.status(400).json({ message: 'Facility Name is required' });
@@ -33,24 +35,36 @@ const createWarehouse = async (req, res) => {
       }
     }
 
+    let finalCode = code;
+    if (!finalCode) {
+      const count = await prisma.warehouse.count({ where: { companyId } });
+      finalCode = `FAC-${(count + 1).toString().padStart(3, '0')}`;
+    } else {
+      const existing = await prisma.warehouse.findFirst({ where: { companyId, code: finalCode } });
+      if (existing) {
+        return res.status(400).json({ message: 'Facility code already exists' });
+      }
+    }
+
     const warehouse = await prisma.$transaction(async (tx) => {
       const newWarehouse = await tx.warehouse.create({
         data: {
           name,
-          code,
+          code: finalCode,
           address,
           city,
           state,
           country,
           zipCode,
-          managerName,
+          managerId,
           contactPhone,
           capacityType,
           capacityValue,
           facilityType,
           supportedItems,
           companyId
-        }
+        },
+        include: { manager: true, company: { select: { name: true } } }
       });
 
       // Safely check if user exists before logging to avoid FK constraint errors with stale JWTs
@@ -75,28 +89,22 @@ const createWarehouse = async (req, res) => {
   }
 };
 
-const updateWarehouse = async (req, res) => {
+  const updateWarehouse = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, facilityType, capacityType, capacityValue, supportedItems, managerName, contactPhone, address, city, state, country, zipCode } = req.body;
+    const { name, code, facilityType, capacityType, capacityValue, supportedItems, contactPhone, address, city, state, country, zipCode } = req.body;
+    
+    let updateData = {
+      name, code, facilityType, capacityType, capacityValue, supportedItems, contactPhone, address, city, state, country, zipCode
+    };
+    if (req.user.role === 'SUPER_ADMIN' && req.body.managerId) {
+      updateData.managerId = req.body.managerId;
+    }
 
     const warehouse = await prisma.warehouse.update({
       where: { id, ...(req.user.companyId ? { companyId: req.user.companyId } : {}) },
-      data: {
-        name,
-        code,
-        facilityType,
-        capacityType,
-        capacityValue,
-        supportedItems,
-        managerName,
-        contactPhone,
-        address,
-        city,
-        state,
-        country,
-        zipCode,
-      }
+      data: updateData,
+      include: { manager: true, company: { select: { name: true } } }
     });
 
     res.json(warehouse);

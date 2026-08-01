@@ -62,6 +62,7 @@ model User {
   receivings         Receiving[]         @relation("InspectorUser")
   createdTransfers   InventoryTransfer[] @relation("TransferCreatedUser")
   createdAdjustments StockAdjustment[]   @relation("AdjustmentCreatedUser")
+  managedWarehouses  Warehouse[]         @relation("WarehouseManager")
 }
 
 model Client {
@@ -287,6 +288,7 @@ model Warehouse {
   country        String?
   zipCode        String?
   managerName    String?
+  managerId      String?
   contactPhone   String?
   capacityType   String?  // Items, Kg, Pallets, CBM
   capacityValue  Float?
@@ -300,6 +302,7 @@ model Warehouse {
   locationInventories LocationInventory[]
   users               User[]
   clients             Client[]
+  manager             User?               @relation("WarehouseManager", fields: [managerId], references: [id])
 }
 
 model LocationInventory {

@@ -5,6 +5,12 @@ const { logAudit } = require('../../utils/auditLogger');
 const getUsers = async (req, res) => {
   try {
     const where = {};
+    if (req.query.role) {
+      where.role = req.query.role;
+    }
+    if (req.query.companyId) {
+      where.companyId = req.query.companyId;
+    }
     if (req.user.role === 'WAREHOUSE_MANAGER') {
       where.companyId = req.user.companyId;
     }

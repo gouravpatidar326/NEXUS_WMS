@@ -3,10 +3,27 @@ const prisma = require('../../utils/prisma');
 const getLocations = async (req, res) => {
   try {
     const { companyId } = req.user;
+    
     const locations = await prisma.location.findMany({
-      where: { companyId }
+      where: { companyId },
+      include: {
+        locationInventories: {
+          where: { quantity: { gt: 0 } },
+          select: { quantity: true }
+        }
+      }
     });
-    res.json(locations);
+
+    const formattedLocations = locations.map(loc => {
+      const dynamicOccupied = loc.locationInventories.reduce((sum, inv) => sum + (inv.quantity || 0), 0);
+      return {
+        ...loc,
+        occupied: dynamicOccupied,
+        locationInventories: undefined
+      };
+    });
+
+    res.json(formattedLocations);
   } catch (error) {
     console.error('Error fetching locations:', error);
     res.status(500).json({ message: 'Internal server error' });

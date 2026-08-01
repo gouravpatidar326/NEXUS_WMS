@@ -209,7 +209,7 @@ export const BatchTrackingPage = () => {
   };
 
   const filteredLots = lots.filter((lot) =>
-    lot.lotId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (lot.lotId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (lot.product?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
