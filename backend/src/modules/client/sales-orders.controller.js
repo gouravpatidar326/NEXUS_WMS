@@ -28,8 +28,24 @@ const createSalesOrder = async (req, res) => {
       return res.status(400).json({ message: 'Items are required' });
     }
 
-    // In a real app, clientId would be strictly enforced by the auth token
-    const effectiveClientId = clientId || "unknown-client"; // Mocking clientId for phase 3 test without full client auth state
+    // Ensure we have a valid clientId to satisfy the foreign key constraint
+    let effectiveClientId = clientId;
+    if (!effectiveClientId) {
+      const existingClient = await prisma.client.findFirst({
+        where: { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) }
+      });
+      if (existingClient) {
+        effectiveClientId = existingClient.id;
+      } else {
+        const newClient = await prisma.client.create({
+          data: {
+            name: "Default Client",
+            ...(req.user.companyId ? { companyId: req.user.companyId } : {})
+          }
+        });
+        effectiveClientId = newClient.id;
+      }
+    }
 
     let totalCost = 0;
     

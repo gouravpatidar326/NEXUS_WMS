@@ -206,6 +206,36 @@ class ProductService {
     await productRepository.softDelete(id, companyId);
     return { id, deleted: true };
   }
+
+  async createBulkProducts(companyId, products) {
+    if (!products || !Array.isArray(products) || products.length === 0) {
+      throw new Error('No products provided for bulk creation.');
+    }
+
+    const prisma = require('../utils/prisma');
+
+    const productsData = products.map((p) => ({
+      sku: p.sku || `SKU-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      name: p.name || 'Unnamed Product',
+      barcode: p.barcode || null,
+      status: p.status || 'ACTIVE',
+      companyId: companyId,
+      unitCost: 0.0,
+      wholesalePrice: 0.0,
+      uom: 'Piece',
+      storageType: 'General Storage',
+      trackingMethod: 'None',
+      availableStock: 0,
+      committedStock: 0
+    }));
+
+    const result = await prisma.product.createMany({
+      data: productsData,
+      skipDuplicates: true
+    });
+
+    return { count: result.count, message: `Successfully imported ${result.count} products.` };
+  }
 }
 
 module.exports = new ProductService();

@@ -11,11 +11,15 @@ import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import LoadingState from '@/components/feedback/LoadingState';
 import { companyService } from '@/services/companyService';
+import { useAuth } from '@/contexts/AuthContext';
+import DataScopeTabs from '@/components/navigation/DataScopeTabs';
 
 export const CompaniesPage = () => {
+  const { user: currentUser } = useAuth();
   const { notifySuccess, notifyError } = useNotification();
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('OWN');
 
   // Add / Edit Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -125,7 +129,12 @@ export const CompaniesPage = () => {
             {(row.name || 'CO').slice(0, 2).toUpperCase()}
           </div>
           <div>
-            <span className="font-semibold text-surface-900 dark:text-surface-100 block">{row.name}</span>
+            <span className="font-semibold text-surface-900 dark:text-surface-100 flex items-center gap-2">
+              {row.name}
+              {currentUser?.companyId === row.id && (
+                <Badge variant="primary" dot>Owner</Badge>
+              )}
+            </span>
             <span className="text-xs font-mono text-surface-400">{row.clientCode || row.id?.substring(0, 8)}</span>
           </div>
         </div>
@@ -169,17 +178,24 @@ export const CompaniesPage = () => {
           >
             <Edit2 className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => openDeleteModal(row)}
-            className="p-1.5 rounded-lg text-surface-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-            title="Delete Company"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {currentUser?.companyId !== row.id && (
+            <button
+              onClick={() => openDeleteModal(row)}
+              className="p-1.5 rounded-lg text-surface-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+              title="Delete Company"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       ),
     },
   ];
+
+  const filteredCompanies = companies.filter(c => {
+    if (activeTab === 'OWN') return c.id === currentUser?.companyId;
+    return c.id !== currentUser?.companyId;
+  });
 
   if (loading) return <LoadingState message="Fetching real companies from database..." />;
 
@@ -196,8 +212,12 @@ export const CompaniesPage = () => {
         }
       />
 
+      <div className="flex justify-start">
+        <DataScopeTabs activeTab={activeTab} onChange={setActiveTab} />
+      </div>
+
       <div className="flex-1">
-        <DataTable columns={columns} data={companies} />
+        <DataTable columns={columns} data={filteredCompanies} />
       </div>
 
       {/* Add / Edit Modal */}
@@ -226,7 +246,7 @@ export const CompaniesPage = () => {
             <Input value={clientCode} onChange={(e) => setClientCode(e.target.value)} placeholder="e.g. NEX-AI-009" required />
           </FormField>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Contact Email" required>
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="contact@company.com" required />
             </FormField>

@@ -107,6 +107,21 @@ export const WarehouseOpsPage = () => {
   // Location Handlers
   const handleSaveLocation = async (e) => {
     e.preventDefault();
+    
+    // Front-end capacity limit check if facility limit is set (> 0)
+    if (activeFacility?.capacityValue && activeFacility.capacityValue > 0) {
+      const newBinCap = parseInt(maxCapacity, 10) || 0;
+      const otherBinsProvisioned = editingLocation 
+        ? provisionedCapacity - (editingLocation.maxCapacity || 0)
+        : provisionedCapacity;
+      
+      if (otherBinsProvisioned + newBinCap > activeFacility.capacityValue) {
+        const avail = Math.max(0, activeFacility.capacityValue - otherBinsProvisioned);
+        notifyError(`Warehouse capacity limit reached! Facility Total: ${activeFacility.capacityValue} ${activeFacility.capacityType || 'Items'}. Already Provisioned: ${otherBinsProvisioned} ${activeFacility.capacityType || 'Items'}. Available to provision: ${avail} ${activeFacility.capacityType || 'Items'}.`);
+        return;
+      }
+    }
+
     try {
       const payload = {
         warehouse,
@@ -271,25 +286,42 @@ export const WarehouseOpsPage = () => {
       header: '6-Tier Hierarchy',
       accessor: 'zone',
       cell: (row) => (
-        <span className="font-mono text-xs">
-          {row.warehouse || 'Main Warehouse'} &rarr; Zone {row.zone} &rarr; Aisle {row.aisle} &rarr; Rack {row.rack} &rarr; Shelf {row.shelf} &rarr; Bin {row.bin}
-        </span>
+        <div className="flex flex-wrap gap-1 items-center font-mono text-[11px]">
+          <span className="bg-slate-100 dark:bg-surface-800 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-300 font-medium">{row.warehouse || 'Main'}</span>
+          <span className="text-slate-400 text-[10px]">&rsaquo;</span>
+          <span className="bg-slate-100 dark:bg-surface-800 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-300">Z-{row.zone}</span>
+          <span className="text-slate-400 text-[10px]">&rsaquo;</span>
+          <span className="bg-slate-100 dark:bg-surface-800 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-300">A-{row.aisle}</span>
+          <span className="text-slate-400 text-[10px]">&rsaquo;</span>
+          <span className="bg-slate-100 dark:bg-surface-800 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-300">R-{row.rack}</span>
+          <span className="text-slate-400 text-[10px]">&rsaquo;</span>
+          <span className="bg-slate-100 dark:bg-surface-800 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-300">S-{row.shelf}</span>
+          <span className="text-slate-400 text-[10px]">&rsaquo;</span>
+          <span className="bg-primary-50 text-primary-700 dark:bg-primary-950/50 px-1.5 py-0.5 rounded font-bold border border-primary-200">Bin {row.bin}</span>
+        </div>
       ),
     },
     {
       header: 'Occupied / Max Capacity',
       accessor: 'occupied',
       cell: (row) => {
-        const pct = Math.round(((row.occupied || 0) / (row.maxCapacity || 1)) * 100);
-        const filledBlocks = Math.round(pct / 10);
-        const emptyBlocks = 10 - filledBlocks;
-        const bar = '█'.repeat(filledBlocks) + '░'.repeat(emptyBlocks);
-        const isDanger = pct > 80;
-        const isWarning = pct > 50 && pct <= 80;
-        
+        const occupied = row.occupied || 0;
+        const maxCap = row.maxCapacity || 1;
+        const pct = Math.min(100, Math.round((occupied / maxCap) * 100));
+        let barColor = 'bg-primary-600';
+        let textColor = 'text-primary-700';
+        if (pct > 80) { barColor = 'bg-red-500'; textColor = 'text-red-600'; }
+        else if (pct > 50) { barColor = 'bg-amber-500'; textColor = 'text-amber-600'; }
+
         return (
-          <div className={`font-mono text-xs font-bold ${isDanger ? 'text-red-600' : (isWarning ? 'text-yellow-600' : 'text-primary')}`}>
-            {bar} {pct}% | {row.occupied}/{row.maxCapacity}
+          <div className="w-full max-w-[200px] space-y-1">
+            <div className="flex justify-between items-center text-xs font-mono font-semibold">
+              <span className={textColor}>{pct}%</span>
+              <span className="text-slate-600 font-bold">{occupied.toLocaleString()}/{maxCap.toLocaleString()}</span>
+            </div>
+            <div className="w-full bg-slate-100 dark:bg-surface-800 rounded-full h-1.5 overflow-hidden">
+              <div className={`h-full ${barColor} transition-all duration-300`} style={{ width: `${pct}%` }}></div>
+            </div>
           </div>
         );
       }
@@ -396,7 +428,7 @@ export const WarehouseOpsPage = () => {
         description="Receiving, Quality Inspection, Lot/Barcode Generation, and Storage Location Management"
         breadcrumbs={[{ label: 'Operations' }, { label: 'Warehouse Ops' }]}
         actions={
-          <div className="flex gap-3 items-center">
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center w-full sm:w-auto">
             {facilities.length > 0 && (
               <Select 
                 value={activeFacility?.name || ''} 
@@ -405,7 +437,7 @@ export const WarehouseOpsPage = () => {
                   if (fac) setActiveFacility(fac);
                 }}
                 options={facilities.map(f => ({ value: f.name, label: f.name }))} 
-                className="w-48 bg-white"
+                className="w-full sm:w-48 bg-white"
               />
             )}
             <Button variant="outline" leftIcon={PackageCheck} onClick={() => setIsCreateRecModalOpen(true)}>
@@ -419,54 +451,58 @@ export const WarehouseOpsPage = () => {
       />
 
       {activeFacility && (
-        <div className="bg-white rounded-lg border border-slate-200 p-4 flex items-center justify-between shadow-sm">
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Facility Overview</span>
-            <span className="text-lg font-bold text-slate-800">{activeFacility.name} <span className="text-sm font-normal text-slate-500">({activeFacility.facilityType || 'General'})</span></span>
+        <div className="bg-white dark:bg-surface-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 shadow-sm">
+          <div className="flex flex-col min-w-[160px]">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Facility Overview</span>
+            <span className="text-lg font-bold text-slate-800 dark:text-white">{activeFacility.name} <span className="text-xs font-normal text-slate-500">({activeFacility.facilityType || 'General'})</span></span>
           </div>
-          <div className="flex items-center gap-8">
-            <div className="flex flex-col items-end">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full lg:w-auto">
+            <div className="flex flex-col">
               <span className="text-xs text-slate-500">Total Capacity</span>
-              <span className="font-bold text-slate-800">{totalFacilityCapacity.toLocaleString()} {facilityUnit}</span>
+              <span className="font-bold text-slate-800 dark:text-slate-200">{totalFacilityCapacity.toLocaleString()} {facilityUnit}</span>
             </div>
-            <div className="flex flex-col items-end">
-              <span className="text-xs text-slate-500">Provisioned Bins Space</span>
-              <span className="font-bold text-slate-700">{provisionedCapacity.toLocaleString()} {facilityUnit}</span>
+            <div className="flex flex-col">
+              <span className="text-xs text-slate-500">Provisioned Space</span>
+              <span className="font-bold text-slate-700 dark:text-slate-300">{provisionedCapacity.toLocaleString()} {facilityUnit}</span>
             </div>
-            <div className="flex flex-col items-end">
+            <div className="flex flex-col">
               <span className="text-xs text-slate-500">Material Occupied</span>
               <span className="font-bold text-blue-600">{occupiedCapacity.toLocaleString()} {facilityUnit}</span>
             </div>
-            <div className="flex flex-col items-end">
+            <div className="flex flex-col">
               <span className="text-xs text-slate-500">Free Space</span>
               <span className="font-bold text-green-600">{Math.max(0, freeCapacity).toLocaleString()} {facilityUnit}</span>
             </div>
-            <div className="w-32 flex flex-col gap-1 ml-4 border-l border-slate-200 pl-4">
-              <div className="flex justify-between text-xs">
-                <span className="font-medium text-slate-600">Utilization</span>
-                <span className="font-bold text-slate-800">{fillPercentage}%</span>
-              </div>
-              <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                <div className={`h-full ${fillPercentage > 90 ? 'bg-red-500' : fillPercentage > 75 ? 'bg-orange-500' : 'bg-green-500'}`} style={{ width: `${fillPercentage}%` }}></div>
-              </div>
+          </div>
+          <div className="w-full sm:w-36 flex flex-col gap-1 lg:border-l border-slate-200 dark:border-slate-800 lg:pl-4">
+            <div className="flex justify-between text-xs">
+              <span className="font-medium text-slate-600 dark:text-slate-400">Utilization</span>
+              <span className="font-bold text-slate-800 dark:text-slate-200">{fillPercentage}%</span>
+            </div>
+            <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div className={`h-full ${fillPercentage > 90 ? 'bg-red-500' : fillPercentage > 75 ? 'bg-orange-500' : 'bg-green-500'}`} style={{ width: `${fillPercentage}%` }}></div>
             </div>
           </div>
         </div>
       )}
 
       {/* Tabs Header */}
-      <div className="flex border-b border-slate-200">
+      <div className="flex border-b border-slate-200 dark:border-surface-800 gap-2 overflow-x-auto whitespace-nowrap scrollbar-none pb-0.5">
         <button
           onClick={() => setActiveTab('locations')}
-          className={`px-4 py-2 font-bold text-sm border-b-2 transition-colors ${activeTab === 'locations' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={`px-3 py-2 font-bold text-xs sm:text-sm border-b-2 transition-colors shrink-0 ${
+            activeTab === 'locations' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
         >
           Storage Locations ({filteredLocations.length})
         </button>
         <button
           onClick={() => setActiveTab('receiving')}
-          className={`px-4 py-2 font-bold text-sm border-b-2 transition-colors ${activeTab === 'receiving' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={`px-3 py-2 font-bold text-xs sm:text-sm border-b-2 transition-colors shrink-0 ${
+            activeTab === 'receiving' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
         >
-          Inbound Receiving & Inspection ({filteredReceivings.length})
+          Inbound Receiving & Inspection ({receivings.length})
         </button>
       </div>
 
@@ -492,6 +528,39 @@ export const WarehouseOpsPage = () => {
         }
       >
         <form onSubmit={handleSaveLocation} className="space-y-4">
+          {activeFacility?.capacityValue && activeFacility.capacityValue > 0 ? (
+            (() => {
+              const otherBinsProvisioned = editingLocation 
+                ? provisionedCapacity - (editingLocation.maxCapacity || 0)
+                : provisionedCapacity;
+              const avail = Math.max(0, activeFacility.capacityValue - otherBinsProvisioned);
+              
+              if (avail <= 0) {
+                return (
+                  <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg flex items-start gap-2.5 text-xs">
+                    <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-amber-900">Facility Provisioning Capacity Reached</p>
+                      <p className="mt-0.5">
+                        Total Capacity: <strong>{activeFacility.capacityValue} {activeFacility.capacityType || 'Items'}</strong> | Provisioned: <strong>{otherBinsProvisioned} {activeFacility.capacityType || 'Items'}</strong> | Available: <strong className="text-red-600">0 {activeFacility.capacityType || 'Items'}</strong>
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div className="p-2.5 bg-blue-50 border border-blue-100 text-blue-800 rounded-lg text-xs flex justify-between items-center">
+                  <span>Facility Total: <strong>{activeFacility.capacityValue} {activeFacility.capacityType || 'Items'}</strong> (Provisioned: {otherBinsProvisioned})</span>
+                  <span>Available to Provision: <strong className="text-green-700">{avail} {activeFacility.capacityType || 'Items'}</strong></span>
+                </div>
+              );
+            })()
+          ) : (
+            <div className="p-2.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-xs flex justify-between items-center">
+              <span>Facility Capacity Limit: <strong>Unlimited</strong> (No max limit set for {activeFacility?.name || 'facility'})</span>
+            </div>
+          )}
+
           <FormField label="Warehouse Facility" required>
             <Input value={warehouse} readOnly className="bg-slate-50 text-slate-500" />
           </FormField>

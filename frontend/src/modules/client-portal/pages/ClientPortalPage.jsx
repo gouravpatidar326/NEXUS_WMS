@@ -112,15 +112,17 @@ export const ClientPortalPage = () => {
       cell: (row) => (
         <Badge
           variant={
-            row.status === 'APPROVED' || row.status === 'COMPLETED'
+            row.status === 'APPROVED' || row.status === 'COMPLETED' || row.status === 'SHIPPED'
               ? 'success'
+              : row.status === 'PACKING' || row.status === 'PICKING'
+              ? 'info'
               : row.status === 'PENDING_REVIEW'
               ? 'warning'
               : 'danger'
           }
           dot
         >
-          {row.status}
+          {row.status.replace('_', ' ')}
         </Badge>
       ),
     },
@@ -133,7 +135,7 @@ export const ClientPortalPage = () => {
 
   if (loading) return <LoadingState message="Loading Client Portal Dashboard & Live Orders..." />;
 
-  const activeOrdersCount = orders.filter((o) => o.status === 'PENDING_REVIEW' || o.status === 'PICKING').length;
+  const activeOrdersCount = orders.filter((o) => o.status !== 'COMPLETED' && o.status !== 'SHIPPED' && o.status !== 'REJECTED').length;
   const totalSpend = orders.reduce((sum, o) => sum + (o.totalCost || 0), 0);
 
   return (

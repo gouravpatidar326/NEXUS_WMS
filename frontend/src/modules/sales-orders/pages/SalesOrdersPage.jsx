@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { ROLES } from '@/permissions/roles';
 import { useNotification } from '@/contexts/NotificationContext';
@@ -258,9 +259,17 @@ export const SalesOrdersPage = () => {
               Reject
             </button>
           </div>
+        ) : row.status === 'PACKING' ? (
+          <Link
+            to="/shipping"
+            className="px-3 py-1 bg-primary text-white rounded text-xs font-bold hover:bg-primary-container transition-colors inline-flex items-center gap-1"
+          >
+            <span>Proceed to Shipping</span>
+            <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+          </Link>
         ) : (
           <span className="text-xs text-on-surface-variant font-medium">
-            {row.status === 'SHIPPED' ? 'Fulfilling via Carrier' : (row.status === 'REJECTED' ? 'Rejected' : 'Processing')}
+            {row.status === 'SHIPPED' || row.status === 'COMPLETED' ? '✓ Shipped & Dispatched' : (row.status === 'REJECTED' ? 'Rejected' : 'Processing Pick')}
           </span>
         )
       )
@@ -335,15 +344,15 @@ export const SalesOrdersPage = () => {
       </div>
 
       {/* Table Section */}
-      <div className="flex-1 bg-white border border-outline-variant rounded-xl overflow-hidden shadow-sm flex flex-col">
+      <div className="flex-1 flex flex-col gap-4 md:gap-0 md:bg-white md:border md:border-outline-variant md:rounded-xl md:overflow-hidden md:shadow-sm">
         {/* Status Filter Tabs */}
-        <div className="flex flex-wrap items-center justify-between p-4 border-b border-outline-variant bg-surface-container-low gap-4">
-          <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center justify-between p-4 border border-outline-variant md:border-0 md:border-b md:border-outline-variant bg-white md:bg-surface-container-low rounded-xl md:rounded-none gap-4">
+          <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 hide-scrollbar w-full md:w-auto">
             {['All Orders', 'Pending Review', 'PICKING', 'PACKING', 'SHIPPED', 'REJECTED'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setSelectedStatus(tab)}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                className={`whitespace-nowrap px-4 py-2 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
                   selectedStatus === tab
                     ? 'bg-primary text-white'
                     : 'text-on-surface-variant hover:bg-surface-container'
@@ -354,7 +363,7 @@ export const SalesOrdersPage = () => {
             ))}
           </div>
 
-          <div className="relative w-64">
+          <div className="relative w-full md:w-64">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">
               search
             </span>
@@ -363,13 +372,13 @@ export const SalesOrdersPage = () => {
               placeholder="Filter orders..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-white border border-outline-variant rounded-lg text-xs focus:outline-none focus:border-primary"
+              className="w-full pl-9 pr-3 py-2 md:py-1.5 bg-surface-50 md:bg-white border border-outline-variant rounded-lg text-xs focus:outline-none focus:border-primary"
             />
           </div>
         </div>
 
         {/* Data Table */}
-        <div className="flex-1">
+        <div className="flex-1 rounded-xl md:rounded-none overflow-hidden">
           <DataTable
             columns={columns}
             data={filteredOrders}

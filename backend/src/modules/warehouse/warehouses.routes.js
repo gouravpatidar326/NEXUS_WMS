@@ -4,14 +4,11 @@ const { getWarehouses, createWarehouse, updateWarehouse, deleteWarehouse } = req
 const { verifyToken, requireRole } = require('../../middlewares/auth');
 
 router.use(verifyToken);
-router.use(requireRole(['SUPER_ADMIN', 'WAREHOUSE_MANAGER']));
 
-router.route('/')
-  .get(getWarehouses)
-  .post(createWarehouse);
+router.get('/', getWarehouses);
+router.post('/', requireRole(['SUPER_ADMIN', 'WAREHOUSE_MANAGER']), createWarehouse);
 
-router.route('/:id')
-  .put(updateWarehouse)
-  .delete(deleteWarehouse);
+router.put('/:id', requireRole(['SUPER_ADMIN', 'WAREHOUSE_MANAGER']), updateWarehouse);
+router.delete('/:id', requireRole(['SUPER_ADMIN', 'WAREHOUSE_MANAGER']), deleteWarehouse);
 
 module.exports = router;

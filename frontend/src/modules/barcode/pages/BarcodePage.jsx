@@ -85,6 +85,19 @@ export const BarcodePage = () => {
       cell: (row) => <span className="font-mono text-xs uppercase">{row.format || 'CODE128'}</span>,
     },
     {
+      header: 'Tracking Status',
+      accessor: 'trackingStatus',
+      cell: (row) => (
+        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+          row.trackingStatus === 'IN_TRANSIT' ? 'bg-amber-100 text-amber-800' :
+          row.trackingStatus === 'DELIVERED' ? 'bg-emerald-100 text-emerald-800' :
+          'bg-slate-100 text-slate-800'
+        }`}>
+          {row.trackingStatus || 'GENERATED'}
+        </span>
+      ),
+    },
+    {
       header: 'Date Generated',
       accessor: 'createdAt',
       cell: (row) => (row.createdAt ? new Date(row.createdAt).toLocaleString() : 'N/A'),
@@ -125,10 +138,36 @@ export const BarcodePage = () => {
             </div>
 
             {scannedResult && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-left space-y-1 text-xs">
-                <p className="font-bold text-green-900">Scanned Item Result:</p>
-                <p className="text-slate-700">Product: <strong>{scannedResult.product?.name || 'Mapped SKU'}</strong></p>
-                <p className="text-slate-700">Lot Ref: <strong>{scannedResult.batch?.lotNumber || scannedResult.batchId || 'N/A'}</strong></p>
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-left space-y-2 text-xs mt-3">
+                <p className="font-bold text-green-900 pb-1 border-b border-green-200">Scanned Item Result:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <p className="text-slate-500 text-[10px] uppercase">Product</p>
+                    <p className="text-slate-800 font-semibold">{scannedResult.product?.name || 'Mapped SKU'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 text-[10px] uppercase">Lot Ref</p>
+                    <p className="text-slate-800 font-semibold">{scannedResult.batch?.lotNumber || scannedResult.batchId || 'N/A'}</p>
+                  </div>
+                </div>
+                {scannedResult.shipStation && (
+                  <div className="pt-2 mt-2 border-t border-green-200 bg-white p-2 rounded border border-slate-100 shadow-sm">
+                    <div className="flex items-center gap-1 mb-1">
+                      <span className="material-symbols-outlined text-blue-600 text-[14px]">local_shipping</span>
+                      <p className="font-bold text-slate-800 text-xs">ShipStation Tracking API</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1 text-[11px]">
+                      <p className="text-slate-500">Carrier:</p>
+                      <p className="font-medium text-slate-800">{scannedResult.shipStation.carrier}</p>
+                      <p className="text-slate-500">Tracking #:</p>
+                      <p className="font-mono font-bold text-slate-800">{scannedResult.shipStation.trackingNumber}</p>
+                      <p className="text-slate-500">Status:</p>
+                      <p className="font-bold text-blue-700">{scannedResult.shipStation.status}</p>
+                      <p className="text-slate-500">ETA:</p>
+                      <p className="font-medium text-slate-800">{scannedResult.shipStation.estimatedDelivery}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

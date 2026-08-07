@@ -2,8 +2,8 @@ import { api } from './api';
 
 export const batchService = {
   async getBatches() {
-    const res = await api.get('/v1/lots');
-    return res.data || [];
+    const res = await api.get('/batches');
+    return res.data || res;
   },
 
   async getExpiringBatches() {

@@ -15,8 +15,10 @@ const getCompanies = async (req, res) => {
 
 const getPickLists = async (req, res) => {
   try {
+    const { companyId } = req.user;
+    const where = companyId ? { companyId } : {};
     const pickLists = await prisma.pickList.findMany({
-      where: { ...(req.user.companyId ? { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) } : {}) },
+      where,
       include: {
         items: {
           include: { product: true, batch: true }
@@ -40,9 +42,11 @@ const completePick = async (req, res) => {
       return res.status(400).json({ message: 'Invalid pick items payload' });
     }
 
-    const pickList = await prisma.pickList.findFirst({
-      where: { id, ...(req.user.companyId ? { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) } : {}) }
-    });
+    const { companyId } = req.user;
+    const where = { id };
+    if (companyId) where.companyId = companyId;
+
+    const pickList = await prisma.pickList.findFirst({ where });
 
     if (!pickList) {
       return res.status(404).json({ message: 'Pick list not found' });
@@ -54,84 +58,92 @@ const completePick = async (req, res) => {
           where: { id: item.pickListItemId }
         });
 
+        if (!pickItem) continue;
+
         let assignedBatchId = pickItem.batchId;
 
         if (!assignedBatchId) {
           const batch = await tx.batch.findFirst({
-            where: { productId: pickItem.productId, ...(req.user.companyId ? { companyId: req.user.companyId } : {}), quarantine: false },
+            where: { productId: pickItem.productId, ...(companyId ? { companyId } : {}), quarantine: false },
             orderBy: { expiryDate: 'asc' }
           });
           if (batch) assignedBatchId = batch.id;
         }
 
+        const pickedQty = item.pickedQuantity || pickItem.targetQuantity;
+
         await tx.pickListItem.update({
           where: { id: item.pickListItemId },
           data: {
-            pickedQuantity: item.pickedQuantity,
+            pickedQuantity: pickedQty,
             picked: true,
             ...(assignedBatchId && { batchId: assignedBatchId })
           }
         });
 
-        const pickedQty = item.pickedQuantity;
-
-        // Deduct from LocationInventory (source of truth) - ensure sufficient stock exists
-        const locInv = await tx.locationInventory.findFirst({
-          where: { 
+        // Deduct from LocationInventory
+        const locInvs = await tx.locationInventory.findMany({
+          where: {
             productId: pickItem.productId,
-            quantity: { gte: pickedQty }
-          }
+            ...(companyId ? { companyId } : {}),
+            quantity: { gt: 0 }
+          },
+          orderBy: { quantity: 'desc' }
         });
-        
-        if (!locInv) {
-          throw new Error(`Insufficient stock for Product ID ${pickItem.productId}. Cannot pick ${pickedQty} units.`);
+
+        let remainingToDeduct = pickedQty;
+        for (const locInv of locInvs) {
+          if (remainingToDeduct <= 0) break;
+          const deductFromThisBin = Math.min(locInv.quantity, remainingToDeduct);
+
+          await tx.locationInventory.update({
+            where: { id: locInv.id },
+            data: {
+              quantity: { decrement: deductFromThisBin },
+              available: { decrement: deductFromThisBin }
+            }
+          });
+
+          remainingToDeduct -= deductFromThisBin;
+
+          // Record Immutable Inventory Transaction (SHIP)
+          await tx.inventoryLedger.create({
+            data: {
+              productId: pickItem.productId,
+              lotId: assignedBatchId || locInv.lotId || null,
+              companyId: companyId || locInv.companyId,
+              locationId: locInv.locationId,
+              quantityDelta: -deductFromThisBin,
+              movementType: 'SHIP',
+              referenceId: `ORDER-${pickList.orderId || Date.now()}`,
+              notes: `Outbound pick & ship from location bin ${locInv.locationId}`,
+            }
+          });
         }
 
-        // 1. Deduct bin stock location quantity & available
-        await tx.locationInventory.update({
-          where: { id: locInv.id },
-          data: { 
-            quantity: { decrement: pickedQty },
-            available: { decrement: pickedQty }
-          }
-        });
-
-        // 2. Deduct totalStock and reservedStock from company aggregate
+        // Deduct totalStock and reservedStock from company aggregate
         const inv = await tx.inventory.findFirst({
-          where: { productId: pickItem.productId }
+          where: { productId: pickItem.productId, ...(companyId ? { companyId } : {}) }
         });
         if (inv) {
           await tx.inventory.update({
             where: { id: inv.id },
             data: {
               totalStock: { decrement: pickedQty },
-              reservedStock: { decrement: pickedQty }
+              reservedStock: { decrement: Math.min(inv.reservedStock, pickedQty) },
+              availableStock: { decrement: Math.min(inv.availableStock, pickedQty) }
             }
           });
         }
 
-        // 3. Record Immutable Inventory Transaction (SHIP)
-        await tx.inventoryLedger.create({
-          data: {
-            productId: pickItem.productId,
-            lotId: assignedBatchId || null,
-            ...(req.user.companyId ? { companyId: req.user.companyId } : {}),
-            locationId: locInv.locationId,
-            quantityDelta: -pickedQty,
-            movementType: 'SHIP',
-            referenceId: `ORDER-${pickList.orderId || Date.now()}`,
-            notes: `Outbound pick & ship from location ${locInv.locationId}`,
-          }
-        });
-
-        // 4. Sync Product.availableStock cache dynamically to prevent desync
+        // Sync Product.availableStock cache dynamically
         const allLocs = await tx.locationInventory.findMany({
           where: { productId: pickItem.productId }
         });
-        const totalAvailable = allLocs.reduce((sum, l) => sum + l.available, 0);
+        const totalAvailable = allLocs.reduce((sum, l) => sum + (l.available || 0), 0);
         await tx.product.update({
           where: { id: pickItem.productId },
-          data: { availableStock: totalAvailable }
+          data: { availableStock: Math.max(0, totalAvailable) }
         });
       }
 
@@ -161,9 +173,8 @@ const completePick = async (req, res) => {
 
     res.json({ id, status: 'COMPLETED' });
   } catch (error) {
-    console.error(error);
-    require('fs').writeFileSync('error.log', error.stack || error.toString());
-    res.status(500).json({ message: 'Internal server error' });
+    console.error('completePick error:', error);
+    res.status(500).json({ message: error.message || 'Internal server error' });
   }
 };
 
@@ -192,8 +203,10 @@ const updateLocation = async (req, res) => {
 
 const getShipments = async (req, res) => {
   try {
+    const { companyId } = req.user;
+    const where = companyId ? { companyId } : {};
     const shipments = await prisma.shipment.findMany({
-      where: { ...(req.user.companyId ? { ...(req.user.companyId ? { companyId: req.user.companyId } : {}) } : {}) },
+      where,
       orderBy: { createdAt: 'desc' }
     });
     res.json(shipments);

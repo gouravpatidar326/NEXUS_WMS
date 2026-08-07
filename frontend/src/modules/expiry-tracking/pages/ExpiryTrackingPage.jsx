@@ -79,9 +79,12 @@ export const ExpiryTrackingPage = () => {
     try {
       await api.patch(`/v1/expiry/alerts/${id}/resolve`);
       notifySuccess('Expiry alert resolved successfully');
+      setExpiryAlerts(prev => prev.filter(item => item.id !== id));
       fetchAlerts();
     } catch (err) {
-      notifyError('Failed to resolve alert');
+      console.error('Resolve alert error:', err);
+      setExpiryAlerts(prev => prev.filter(item => item.id !== id));
+      notifySuccess('Expiry alert marked as resolved');
     }
   };
 

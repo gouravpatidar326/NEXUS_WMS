@@ -16,7 +16,7 @@ const getWarehouses = async (req, res) => {
         include: { locationInventories: { select: { quantity: true } } }
       });
       
-      const totalCapacity = warehouse.capacityValue || 0;
+      const totalCapacity = warehouse.capacityValue || locations.reduce((sum, loc) => sum + (loc.maxCapacity || 0), 0) || 0;
       let occupiedCapacity = 0;
       
       const bins = locations.map(loc => {

@@ -11,6 +11,7 @@ const inventoryRoutes = require('./inventory.routes');
 const transferRoutes = require('./transfer.routes');
 const adjustmentRoutes = require('./adjustment.routes');
 const expiryRoutes = require('./expiry.routes');
+const settingsRoutes = require('./settings.routes');
 
 router.use('/categories', categoryRoutes);
 router.use('/products', productRoutes);
@@ -22,6 +23,7 @@ router.use('/inventory', inventoryRoutes);
 router.use('/transfers', transferRoutes);
 router.use('/adjustments', adjustmentRoutes);
 router.use('/expiry', expiryRoutes);
+router.use('/settings', settingsRoutes);
 
 // Stub for notifications to prevent 404 errors
 router.get('/notifications', (req, res) => res.json({ notifications: [] }));

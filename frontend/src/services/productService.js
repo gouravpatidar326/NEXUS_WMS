@@ -40,4 +40,8 @@ export const productService = {
   async deleteProduct(id) {
     return await api.delete(`/v1/products/${id}`);
   },
+
+  async importProducts(productsArray) {
+    return await api.post('/v1/products/bulk', { products: productsArray });
+  },
 };

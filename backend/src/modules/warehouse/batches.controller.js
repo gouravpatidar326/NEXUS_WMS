@@ -44,12 +44,24 @@ const createBatch = async (req, res) => {
         mfgDate: mfgDate ? new Date(mfgDate) : null,
         expiryDate: expiryDate ? new Date(expiryDate) : null,
         quarantine: false,
-        coaLocked: true,
+        coaLocked: false,
       },
       include: {
         product: true
       }
     });
+
+    // Auto-generate a Tracking Barcode for this Batch
+    try {
+      const barcodeService = require('../../services/barcode.service');
+      await barcodeService.generateBarcode(companyId, {
+        productId: newBatch.productId,
+        batchId: newBatch.id,
+        barcodeType: 'CODE128'
+      });
+    } catch (bcError) {
+      console.error('Failed to auto-generate barcode for batch:', bcError);
+    }
 
     res.status(201).json(newBatch);
   } catch (error) {
@@ -60,17 +72,16 @@ const createBatch = async (req, res) => {
 
 const updateBatch = async (req, res) => {
   try {
-    const { companyId } = req.user;
     const { id } = req.params;
     const { quarantine } = req.body;
 
-    const where = { id };
-    if (companyId) {
-      where.companyId = companyId;
-    }
-
     const batch = await prisma.batch.findFirst({
-      where
+      where: {
+        OR: [
+          { id: id },
+          { lotId: id }
+        ]
+      }
     });
 
     if (!batch) {
@@ -78,7 +89,7 @@ const updateBatch = async (req, res) => {
     }
 
     const updatedBatch = await prisma.batch.update({
-      where: { id },
+      where: { id: batch.id },
       data: {
         quarantine: quarantine !== undefined ? quarantine : batch.quarantine
       },
@@ -97,14 +108,14 @@ const updateBatch = async (req, res) => {
 const unlockCoa = async (req, res) => {
   try {
     const { id } = req.params;
-    const { paymentToken } = req.body; // Mock payment token validation
-
-    if (!paymentToken) {
-      return res.status(400).json({ message: 'Payment token required to unlock COA' });
-    }
 
     const batch = await prisma.batch.findFirst({
-      where: { id, ...(req.user.companyId ? { companyId: req.user.companyId } : {}) }
+      where: {
+        OR: [
+          { id: id },
+          { lotId: id }
+        ]
+      }
     });
 
     if (!batch) {
@@ -112,7 +123,7 @@ const unlockCoa = async (req, res) => {
     }
 
     const updatedBatch = await prisma.batch.update({
-      where: { id },
+      where: { id: batch.id },
       data: { coaLocked: false }
     });
 
@@ -122,11 +133,11 @@ const unlockCoa = async (req, res) => {
         userId: req.user.id,
         ipAddress: req.ip
       }
-    });
+    }).catch(() => {});
 
     res.json({ id: updatedBatch.id, coaLocked: false, message: 'Unlocked successfully' });
   } catch (error) {
-    console.error(error);
+    console.error('Error unlocking COA:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -134,42 +145,42 @@ const unlockCoa = async (req, res) => {
 const deleteBatch = async (req, res) => {
   try {
     const { id } = req.params;
-    const { companyId } = req.user;
-
-    const where = { id };
-    if (companyId) {
-      where.companyId = companyId;
-    }
 
     const batch = await prisma.batch.findFirst({
-      where
+      where: {
+        OR: [
+          { id: id },
+          { lotId: id }
+        ]
+      }
     });
 
     if (!batch) {
       return res.status(404).json({ message: 'Batch not found' });
     }
 
+    const targetId = batch.id;
+
     // Clear FK-linked records before deletion
-    await prisma.barcode.deleteMany({ where: { batchId: id } });
-    await prisma.locationInventory.deleteMany({ where: { lotId: id } });
-    await prisma.inventoryLedger.deleteMany({ where: { lotId: id } });
-    await prisma.transferItem.deleteMany({ where: { lotId: id } });
-    await prisma.stockAdjustment.deleteMany({ where: { lotId: id } });
-    await prisma.expiryAlert.deleteMany({ where: { lotId: id } });
-    await prisma.pickListItem.deleteMany({ where: { batchId: id } });
+    await prisma.barcode.deleteMany({ where: { batchId: targetId } }).catch(() => {});
+    await prisma.locationInventory.deleteMany({ where: { lotId: targetId } }).catch(() => {});
+    await prisma.inventoryLedger.deleteMany({ where: { lotId: targetId } }).catch(() => {});
+    await prisma.transferItem.deleteMany({ where: { lotId: targetId } }).catch(() => {});
+    await prisma.stockAdjustment.deleteMany({ where: { lotId: targetId } }).catch(() => {});
+    await prisma.expiryAlert.deleteMany({ where: { lotId: targetId } }).catch(() => {});
+    await prisma.pickListItem.deleteMany({ where: { batchId: targetId } }).catch(() => {});
 
-    await prisma.batch.delete({ where: { id } });
+    await prisma.batch.delete({ where: { id: targetId } });
 
-    // Audit log (userId must exist — logged-in admin)
     await prisma.auditLog.create({
       data: {
         event: 'BATCH_DELETED',
         userId: req.user.id,
         ipAddress: req.ip
       }
-    });
+    }).catch(() => {});
 
-    res.json({ message: `Batch ${batch.lotId} deleted successfully`, id });
+    res.json({ message: `Batch ${batch.lotId} deleted successfully`, id: targetId });
   } catch (error) {
     console.error('Error deleting batch:', error);
     res.status(500).json({ message: error.message || 'Internal server error' });

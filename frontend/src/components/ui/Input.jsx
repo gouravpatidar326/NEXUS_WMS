@@ -8,6 +8,7 @@ export const Input = forwardRef(
       error,
       leftIcon: LeftIcon,
       rightIcon: RightIcon,
+      onRightIconClick,
       className,
       ...props
     },
@@ -35,7 +36,13 @@ export const Input = forwardRef(
           {...props}
         />
         {RightIcon && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400">
+          <div
+            className={clsx(
+              'absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 select-none',
+              onRightIconClick && 'cursor-pointer hover:text-surface-600 dark:hover:text-surface-200'
+            )}
+            onClick={onRightIconClick}
+          >
             <RightIcon className="h-4 w-4" />
           </div>
         )}

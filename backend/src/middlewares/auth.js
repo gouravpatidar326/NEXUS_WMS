@@ -11,6 +11,9 @@ const verifyToken = (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded; // { id, role, companyId, ... }
     
+    // Save original company ID before overriding for global visibility
+    req.user.originalCompanyId = decoded.companyId;
+
     // Super Admins should have global visibility
     if (req.user.role === 'SUPER_ADMIN') {
       req.user.companyId = null;

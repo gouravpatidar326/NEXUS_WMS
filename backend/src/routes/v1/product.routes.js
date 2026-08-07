@@ -5,6 +5,7 @@ const { verifyToken, requireRole } = require('../../middlewares/auth');
 
 router.use(verifyToken);
 
+router.post('/bulk', requireRole(['SUPER_ADMIN', 'WAREHOUSE_MANAGER', 'CLIENT']), productController.createBulkProducts);
 router.post('/', requireRole(['SUPER_ADMIN', 'WAREHOUSE_MANAGER', 'CLIENT']), productController.createProduct);
 router.get('/', productController.getProducts);
 router.get('/:id', productController.getProductById);

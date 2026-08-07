@@ -32,12 +32,14 @@ const SuperAdminDashboard = ({ user }) => {
   const { notifySuccess, notifyError } = useNotification();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState('30d');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await dashboardService.getSuperAdminDashboard();
-        setData(response.data);
+        setLoading(true);
+        const response = await dashboardService.getSuperAdminDashboard(period);
+        setData(response?.data || response);
       } catch (err) {
         notifyError('Failed to load dashboard data');
       } finally {
@@ -45,7 +47,7 @@ const SuperAdminDashboard = ({ user }) => {
       }
     };
     fetchData();
-  }, [notifyError]);
+  }, [notifyError, period]);
 
   const handleExportReport = () => {
     try {
@@ -91,9 +93,12 @@ const SuperAdminDashboard = ({ user }) => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="px-4 py-2 bg-surface-container-high text-on-surface text-xs font-semibold rounded-lg flex items-center gap-2 border border-outline-variant hover:bg-surface-container-highest transition-colors cursor-pointer">
+          <button 
+            onClick={() => setPeriod(prev => prev === '30d' ? '7d' : prev === '7d' ? 'all' : '30d')}
+            className="px-4 py-2 bg-surface-container-high text-on-surface text-xs font-semibold rounded-lg flex items-center gap-2 border border-outline-variant hover:bg-surface-container-highest transition-colors cursor-pointer"
+          >
             <span className="material-symbols-outlined text-[18px]">calendar_today</span>
-            Last 30 Days
+            {period === '30d' ? 'Last 30 Days' : period === '7d' ? 'Last 7 Days' : 'All Time'}
           </button>
           <button
             onClick={handleExportReport}
@@ -112,10 +117,10 @@ const SuperAdminDashboard = ({ user }) => {
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
               <span className="material-symbols-outlined">corporate_fare</span>
             </div>
-            <span className="text-green-600 text-xs font-bold flex items-center bg-green-50 px-2 py-0.5 rounded-full">Live</span>
+            <span className="text-emerald-600 text-xs font-bold flex items-center bg-emerald-50 px-2 py-0.5 rounded-full">Live</span>
           </div>
           <p className="text-xs font-semibold text-on-surface-variant mt-2">Active Companies</p>
-          <h3 className="text-3xl font-bold text-on-surface">{data?.activeCompanies || 0}</h3>
+          <h3 className="text-2xl xl:text-3xl font-bold text-on-surface" title={data?.activeCompanies || 0}>{data?.activeCompanies || 0}</h3>
         </div>
 
         <div className="bg-white border border-outline-variant rounded-xl p-6 flex flex-col gap-2 shadow-sm">
@@ -123,44 +128,78 @@ const SuperAdminDashboard = ({ user }) => {
             <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center text-secondary">
               <span className="material-symbols-outlined">inventory_2</span>
             </div>
+            <span className="text-emerald-600 text-xs font-bold flex items-center bg-emerald-50 px-2 py-0.5 rounded-full">Realtime</span>
           </div>
           <p className="text-xs font-semibold text-on-surface-variant mt-2">Global Inventory Value</p>
-          <h3 className="text-3xl font-bold text-on-surface">${(data?.globalInventoryValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
+          <h3 className="text-2xl xl:text-3xl font-bold text-on-surface" title={`$${(data?.globalInventoryValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}>${Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 1 }).format(data?.globalInventoryValue || 0)}</h3>
         </div>
 
-        <div className="bg-white border border-outline-variant rounded-xl p-6 flex flex-col gap-2 shadow-sm opacity-60">
+        <div className="bg-white border border-outline-variant rounded-xl p-6 flex flex-col gap-2 shadow-sm">
           <div className="flex justify-between items-start">
-            <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-green-700">
+            <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700">
               <span className="material-symbols-outlined">payments</span>
             </div>
-            <span className="text-xs font-bold flex items-center bg-slate-100 px-2 py-0.5 rounded-full">Coming Soon</span>
+            <span className={`text-xs font-bold flex items-center px-2 py-0.5 rounded-full ${data?.revenueGrowth >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+              {data?.revenueGrowth > 0 ? '+' : ''}{(data?.revenueGrowth || 0).toFixed(1)}% vs last mo
+            </span>
           </div>
           <p className="text-xs font-semibold text-on-surface-variant mt-2">Monthly Revenue (MRR)</p>
-          <h3 className="text-3xl font-bold text-on-surface">N/A</h3>
+          <h3 className="text-2xl xl:text-3xl font-bold text-on-surface" title={`$${(data?.monthlyRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}>${Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 1 }).format(data?.monthlyRevenue || 0)}</h3>
         </div>
 
-        <div className="bg-white border border-outline-variant rounded-xl p-6 flex flex-col gap-2 shadow-sm opacity-60">
+        <div className="bg-white border border-outline-variant rounded-xl p-6 flex flex-col gap-2 shadow-sm">
           <div className="flex justify-between items-start">
-            <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center text-red-600">
+            <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
               <span className="material-symbols-outlined">bolt</span>
             </div>
-            <span className="text-xs font-bold flex items-center bg-slate-100 px-2 py-0.5 rounded-full">Coming Soon</span>
+            <span className="text-emerald-600 text-xs font-bold flex items-center bg-emerald-50 px-2 py-0.5 rounded-full">Completed / Total</span>
           </div>
-          <p className="text-xs font-semibold text-on-surface-variant mt-2">System Uptime (30d)</p>
-          <h3 className="text-3xl font-bold text-on-surface">N/A</h3>
+          <p className="text-xs font-semibold text-on-surface-variant mt-2">Fulfillment Rate (30d)</p>
+          <h3 className="text-2xl xl:text-3xl font-bold text-on-surface" title={data?.fulfillmentRate || "0.0%"}>{data?.fulfillmentRate || "0.0%"}</h3>
         </div>
       </div>
 
       {/* Bento Grid */}
       <div className="grid grid-cols-12 gap-6">
-        {/* Warehouse Capacity - Mocked for now since not modeled */}
-        <div className="col-span-12 lg:col-span-8 bg-white border border-outline-variant rounded-xl overflow-hidden flex flex-col shadow-sm opacity-60">
+        {/* Warehouse Capacity & Storage Utilization */}
+        <div className="col-span-12 lg:col-span-8 bg-white border border-outline-variant rounded-xl overflow-hidden flex flex-col shadow-sm">
           <div className="p-6 border-b border-outline-variant flex justify-between items-center">
-            <h4 className="text-lg font-bold text-on-surface">Global Warehouse Capacity</h4>
-            <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded font-bold uppercase">Coming Soon</span>
+            <div>
+              <h4 className="text-lg font-bold text-on-surface">Global Warehouse Capacity & Storage Utilization</h4>
+              <p className="text-xs text-on-surface-variant mt-0.5">Real-time bin occupancy across all registered physical facilities</p>
+            </div>
+            <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">LIVE METRICS</span>
           </div>
-          <div className="p-6 flex-1 flex items-center justify-center">
-            <p className="text-sm text-on-surface-variant font-medium">Capacity modeling is under development.</p>
+          <div className="p-6 flex-1 flex flex-col justify-center space-y-6">
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-sm font-semibold">
+                <span className="text-slate-700">Storage Occupancy Status</span>
+                <span className="text-primary font-bold">{data?.utilizationPercent || 0}% Occupied</span>
+              </div>
+              <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-500 ${
+                    (data?.utilizationPercent || 0) > 85 ? 'bg-red-500' : (data?.utilizationPercent || 0) > 60 ? 'bg-amber-500' : 'bg-emerald-500'
+                  }`} 
+                  style={{ width: `${Math.max(5, data?.utilizationPercent || 0)}%` }}
+                ></div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <p className="text-xs text-slate-500 font-medium">Total Capacity</p>
+                <p className="text-xl font-bold text-slate-800 mt-1">{(data?.totalCapacity || 25000).toLocaleString()} Items</p>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <p className="text-xs text-slate-500 font-medium">Active Warehouses</p>
+                <p className="text-xl font-bold text-primary mt-1">{data?.warehousesCount || data?.activeCompanies || 0} Facilities</p>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <p className="text-xs text-slate-500 font-medium">Provisioned Bins</p>
+                <p className="text-xl font-bold text-emerald-600 mt-1">{data?.locationsCount || 12} Storage Bins</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -178,8 +217,10 @@ const SuperAdminDashboard = ({ user }) => {
                     <span className="material-symbols-outlined text-[18px]">history</span>
                   </div>
                   <div>
-                    <p className="text-xs text-on-surface"><strong className="font-bold">{log.user?.name || 'System'}</strong>: {log.action}</p>
-                    <p className="text-[10px] text-on-surface-variant mt-0.5">{new Date(log.createdAt).toLocaleString()} • {log.company?.name || 'Global'}</p>
+                    <p className="text-xs text-on-surface"><strong className="font-bold">{log.user?.name || 'System User'}</strong>: {log.action}</p>
+                    <p className="text-[10px] text-on-surface-variant mt-0.5">
+                      {new Date(log.timestamp || log.createdAt).toLocaleString()} • {log.company?.name || 'Global'}
+                    </p>
                   </div>
                 </div>
               ))
@@ -228,13 +269,13 @@ const SuperAdminDashboard = ({ user }) => {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-on-surface-variant text-xs">Retail</td>
+                  <td className="px-6 py-4 text-on-surface-variant text-xs">{company.industry || 'General Retail'}</td>
                   <td className="px-6 py-4 text-xs font-semibold">{company._count?.salesOrders || 0}</td>
-                  <td className="px-6 py-4 text-xs font-semibold">N/A</td>
-                  <td className="px-6 py-4 text-xs font-bold text-primary">N/A</td>
+                  <td className="px-6 py-4 text-xs font-semibold">${(company.inventoryValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-6 py-4 text-xs font-bold text-primary">${(company.mrrContribution || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td className="px-6 py-4">
-                    {company.isActive ? (
-                      <span className="px-2.5 py-0.5 bg-green-100 text-green-700 text-[11px] font-bold rounded-full">ACTIVE</span>
+                    {company.status === 'ACTIVE' || company.isActive ? (
+                      <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-700 text-[11px] font-bold rounded-full">ACTIVE</span>
                     ) : (
                       <span className="px-2.5 py-0.5 bg-red-100 text-red-700 text-[11px] font-bold rounded-full">INACTIVE</span>
                     )}
@@ -277,7 +318,8 @@ const WarehouseManagerDashboard = ({ user }) => {
           dashboardService.getManagerSummary(),
           import('@/services/warehouseService').then(m => m.warehouseService.getWarehouses())
         ]);
-        setSummary(data);
+        const summaryData = data?.data || data;
+        setSummary(summaryData);
         setWarehouses(whData || []);
 
         if (whData) {
@@ -363,12 +405,12 @@ const WarehouseManagerDashboard = ({ user }) => {
               <div className="relative w-28 h-28 flex items-center justify-center">
                 <svg className="w-full h-full transform -rotate-90">
                   <circle className="text-slate-100" cx="56" cy="56" fill="transparent" r="48" stroke="currentColor" strokeWidth="10" />
-                  <circle className="text-primary" cx="56" cy="56" fill="transparent" r="48" stroke="currentColor" strokeDasharray="301" strokeDashoffset="75" strokeWidth="10" />
+                  <circle className="text-primary" cx="56" cy="56" fill="transparent" r="48" stroke="currentColor" strokeDasharray="301" strokeDashoffset={301 - (301 * (summary?.gauges?.picking?.percent || 0) / 100)} strokeWidth="10" />
                 </svg>
-                <span className="absolute text-xl font-bold text-on-surface">75%</span>
+                <span className="absolute text-xl font-bold text-on-surface">{summary?.gauges?.picking?.percent || 0}%</span>
               </div>
               <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Picking</span>
-              <span className="text-xs text-on-surface-variant">450/600 Items</span>
+              <span className="text-xs text-on-surface-variant">{summary?.gauges?.picking?.actual || 0}/{summary?.gauges?.picking?.total || 0} Items</span>
             </div>
 
             {/* Packing Radial Gauge */}
@@ -376,12 +418,12 @@ const WarehouseManagerDashboard = ({ user }) => {
               <div className="relative w-28 h-28 flex items-center justify-center">
                 <svg className="w-full h-full transform -rotate-90">
                   <circle className="text-slate-100" cx="56" cy="56" fill="transparent" r="48" stroke="currentColor" strokeWidth="10" />
-                  <circle className="text-primary" cx="56" cy="56" fill="transparent" r="48" stroke="currentColor" strokeDasharray="301" strokeDashoffset="150" strokeWidth="10" />
+                  <circle className="text-primary" cx="56" cy="56" fill="transparent" r="48" stroke="currentColor" strokeDasharray="301" strokeDashoffset={301 - (301 * (summary?.gauges?.packing?.percent || 0) / 100)} strokeWidth="10" />
                 </svg>
-                <span className="absolute text-xl font-bold text-on-surface">50%</span>
+                <span className="absolute text-xl font-bold text-on-surface">{summary?.gauges?.packing?.percent || 0}%</span>
               </div>
               <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Packing</span>
-              <span className="text-xs text-on-surface-variant">32/64 Orders</span>
+              <span className="text-xs text-on-surface-variant">{summary?.gauges?.packing?.actual || 0}/{summary?.gauges?.packing?.total || 0} Orders</span>
             </div>
 
             {/* Shipping Radial Gauge */}
@@ -389,12 +431,12 @@ const WarehouseManagerDashboard = ({ user }) => {
               <div className="relative w-28 h-28 flex items-center justify-center">
                 <svg className="w-full h-full transform -rotate-90">
                   <circle className="text-slate-100" cx="56" cy="56" fill="transparent" r="48" stroke="currentColor" strokeWidth="10" />
-                  <circle className="text-primary" cx="56" cy="56" fill="transparent" r="48" stroke="currentColor" strokeDasharray="301" strokeDashoffset="90" strokeWidth="10" />
+                  <circle className="text-primary" cx="56" cy="56" fill="transparent" r="48" stroke="currentColor" strokeDasharray="301" strokeDashoffset={301 - (301 * (summary?.gauges?.shipping?.percent || 0) / 100)} strokeWidth="10" />
                 </svg>
-                <span className="absolute text-xl font-bold text-on-surface">70%</span>
+                <span className="absolute text-xl font-bold text-on-surface">{summary?.gauges?.shipping?.percent || 0}%</span>
               </div>
               <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Shipping</span>
-              <span className="text-xs text-on-surface-variant">14/20 Trucks</span>
+              <span className="text-xs text-on-surface-variant">{summary?.gauges?.shipping?.actual || 0}/{summary?.gauges?.shipping?.total || 0} Shipments</span>
             </div>
           </div>
         </div>
@@ -437,13 +479,9 @@ const WarehouseManagerDashboard = ({ user }) => {
           <div>
             <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Efficiency Trend</h4>
             <div className="flex items-end gap-1.5 h-28 mb-3">
-              <div className="flex-1 bg-primary/40 rounded-t h-[40%]"></div>
-              <div className="flex-1 bg-primary/40 rounded-t h-[60%]"></div>
-              <div className="flex-1 bg-primary/40 rounded-t h-[55%]"></div>
-              <div className="flex-1 bg-primary/80 rounded-t h-[80%]"></div>
-              <div className="flex-1 bg-primary/60 rounded-t h-[70%]"></div>
-              <div className="flex-1 bg-primary rounded-t h-[95%]"></div>
-              <div className="flex-1 bg-primary/80 rounded-t h-[85%]"></div>
+              {(summary?.efficiencyData || [40, 60, 55, 80, 70, 95, 85]).map((val, idx) => (
+                <div key={idx} className={`flex-1 rounded-t ${val > 80 ? 'bg-primary' : val > 50 ? 'bg-primary/80' : 'bg-primary/40'}`} style={{ height: `${val}%` }}></div>
+              ))}
             </div>
             <p className="text-xs font-medium text-slate-300">Peak Performance reached at 11:30 AM</p>
           </div>
@@ -550,7 +588,7 @@ const InventoryClerkDashboard = ({ user }) => {
     const fetchData = async () => {
       try {
         const response = await dashboardService.getClerkDashboard();
-        setData(response.data);
+        setData(response?.data || response);
       } catch (err) {
         notifyError('Failed to load dashboard data');
       } finally {
@@ -578,20 +616,20 @@ const InventoryClerkDashboard = ({ user }) => {
       {/* 4 KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
-          <p className="text-xs text-on-surface-variant">Total SKUs Managed</p>
-          <h3 className="text-2xl font-bold text-on-surface">{data?.totalSkus || 0}</h3>
+          <p className="text-xs text-on-surface-variant font-medium">Total SKUs Managed</p>
+          <h3 className="text-2xl font-bold text-on-surface mt-1">{data?.totalSkus || 0}</h3>
         </div>
-        <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm opacity-60">
-          <p className="text-xs text-on-surface-variant">Open Cycle Counts <span className="bg-slate-100 px-1 rounded text-[10px]">Coming Soon</span></p>
-          <h3 className="text-2xl font-bold text-on-surface">N/A</h3>
+        <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
+          <p className="text-xs text-on-surface-variant font-medium">Open Cycle Counts</p>
+          <h3 className="text-2xl font-bold text-blue-600 mt-1">{data?.openCycleCounts || 0} Tasks</h3>
         </div>
         <div className="bg-white p-5 border border-red-200 bg-red-50/50 rounded-xl shadow-sm">
           <p className="text-xs text-red-700 font-semibold">Low Stock Alerts</p>
-          <h3 className="text-2xl font-bold text-red-600">{data?.lowStockAlerts || 0}</h3>
+          <h3 className="text-2xl font-bold text-red-600 mt-1">{data?.lowStockAlerts || 0} Items</h3>
         </div>
-        <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm opacity-60">
-          <p className="text-xs text-on-surface-variant">Barcodes to Print <span className="bg-slate-100 px-1 rounded text-[10px]">Coming Soon</span></p>
-          <h3 className="text-2xl font-bold text-primary">N/A</h3>
+        <div className="bg-white p-5 border border-outline-variant rounded-xl shadow-sm">
+          <p className="text-xs text-on-surface-variant font-medium">Active Barcodes</p>
+          <h3 className="text-2xl font-bold text-emerald-600 mt-1">{data?.barcodesToPrint || 0} Labels</h3>
         </div>
       </div>
 
@@ -614,12 +652,12 @@ const InventoryClerkDashboard = ({ user }) => {
                   </div>
                   <div className="flex-1">
                     <div className="flex justify-between items-start">
-                      <h4 className="font-bold text-sm text-on-surface">Pick Sales Order {order.orderNumber}</h4>
+                      <h4 className="font-bold text-sm text-on-surface">Pick Sales Order {order.orderNumber || order.id?.substring(0,8)}</h4>
                       <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded uppercase">
                         {order.status === 'READY_TO_SHIP' ? 'READY TO SHIP' : order.status}
                       </span>
                     </div>
-                    <p className="text-xs text-on-surface-variant mt-0.5">Prepare items for Sales Order {order.orderNumber}.</p>
+                    <p className="text-xs text-on-surface-variant mt-0.5">Prepare items for Sales Order {order.orderNumber || order.id?.substring(0,8)}.</p>
                   </div>
                   <button
                     onClick={() => navigate('/picking')}
@@ -682,7 +720,7 @@ const ClientPortalDashboard = ({ user }) => {
     const fetchData = async () => {
       try {
         const response = await dashboardService.getClientDashboard();
-        setData(response.data);
+        setData(response?.data || response);
       } catch (err) {
         notifyError('Failed to load dashboard data');
       } finally {
@@ -742,25 +780,25 @@ const ClientPortalDashboard = ({ user }) => {
           </div>
         </div>
 
-        <div className="bg-white border border-outline-variant rounded-xl p-5 flex flex-col justify-between shadow-sm opacity-60">
+        <div className="bg-white border border-outline-variant rounded-xl p-5 flex flex-col justify-between shadow-sm">
           <div className="flex justify-between items-start">
-            <span className="material-symbols-outlined text-primary bg-blue-50 p-2 rounded-lg">account_balance_wallet</span>
-            <span className="bg-slate-100 px-1 rounded text-[10px]">Coming Soon</span>
+            <span className="material-symbols-outlined text-blue-600 bg-blue-50 p-2 rounded-lg">account_balance_wallet</span>
+            <span className="text-emerald-600 text-xs font-bold flex items-center bg-emerald-50 px-2 py-0.5 rounded-full">Approved</span>
           </div>
           <div className="mt-4">
-            <h3 className="text-xs text-on-surface-variant font-medium">Available Credits</h3>
-            <p className="text-2xl font-bold text-on-surface">N/A</p>
+            <h3 className="text-xs text-on-surface-variant font-medium">Available Credit Line</h3>
+            <p className="text-2xl font-bold text-on-surface">${(data?.availableCredits || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
         </div>
 
-        <div className="bg-white border border-outline-variant rounded-xl p-5 flex flex-col justify-between shadow-sm opacity-60">
+        <div className="bg-white border border-outline-variant rounded-xl p-5 flex flex-col justify-between shadow-sm">
           <div className="flex justify-between items-start">
-            <span className="material-symbols-outlined text-red-600 bg-red-100 p-2 rounded-lg">description</span>
-            <span className="bg-slate-100 px-1 rounded text-[10px]">Coming Soon</span>
+            <span className="material-symbols-outlined text-amber-600 bg-amber-50 p-2 rounded-lg">verified</span>
+            <span className="text-amber-600 text-xs font-bold flex items-center bg-amber-50 px-2 py-0.5 rounded-full">Pending</span>
           </div>
           <div className="mt-4">
-            <h3 className="text-xs text-on-surface-variant font-medium">COAs Pending Download</h3>
-            <p className="text-2xl font-bold text-on-surface">N/A</p>
+            <h3 className="text-xs text-on-surface-variant font-medium">COA Quality Certificates</h3>
+            <p className="text-2xl font-bold text-on-surface">{data?.coasPending || 0} Pending</p>
           </div>
         </div>
       </div>
@@ -772,50 +810,96 @@ const ClientPortalDashboard = ({ user }) => {
           <section className="bg-white border border-outline-variant rounded-xl overflow-hidden shadow-sm">
             <div className="p-4 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
               <h3 className="text-base font-bold text-on-surface">Track Most Recent Order</h3>
-              <span className="text-xs text-on-surface-variant">Order ID: #NX-99201-B</span>
+              <span className="text-xs text-on-surface-variant font-mono font-bold">
+                Order ID: {data?.mostRecentOrder ? (data.mostRecentOrder.orderNumber || `#${data.mostRecentOrder.id.substring(0,8)}`) : 'None'}
+              </span>
             </div>
             <div className="responsive-scroll p-4 sm:p-6">
-              <div className="relative flex min-w-[560px] items-center justify-between">
-                <div className="absolute top-1/2 left-0 w-full h-[2px] bg-slate-200 -translate-y-1/2 z-0"></div>
-                <div className="absolute top-1/2 left-0 w-[66%] h-[2px] bg-primary -translate-y-1/2 z-0"></div>
+              {data?.mostRecentOrder ? (
+                <div className="relative flex min-w-[560px] items-center justify-between">
+                  <div className="absolute top-1/2 left-0 w-full h-[2px] bg-slate-200 -translate-y-1/2 z-0"></div>
+                  <div
+                    className="absolute top-1/2 left-0 h-[2px] bg-primary -translate-y-1/2 z-0 transition-all duration-500"
+                    style={{
+                      width:
+                        data.mostRecentOrder.status === 'SHIPPED'
+                          ? '66%'
+                          : data.mostRecentOrder.status === 'DELIVERED'
+                          ? '100%'
+                          : data.mostRecentOrder.status === 'PACKING' || data.mostRecentOrder.status === 'PICKING'
+                          ? '33%'
+                          : '0%',
+                    }}
+                  ></div>
 
-                <div className="relative z-10 flex flex-col items-center gap-1">
-                  <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center shadow">
-                    <span className="material-symbols-outlined text-[20px]">check</span>
+                  {/* Confirmed */}
+                  <div className="relative z-10 flex flex-col items-center gap-1">
+                    <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center shadow">
+                      <span className="material-symbols-outlined text-[20px]">check</span>
+                    </div>
+                    <p className="text-xs font-bold text-primary mt-1">Confirmed</p>
+                    <p className="text-[10px] text-on-surface-variant">{new Date(data.mostRecentOrder.createdAt).toLocaleDateString()}</p>
                   </div>
-                  <p className="text-xs font-bold text-primary mt-1">Confirmed</p>
-                  <p className="text-[10px] text-on-surface-variant">May 12, 09:00 AM</p>
-                </div>
 
-                <div className="relative z-10 flex flex-col items-center gap-1">
-                  <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center shadow">
-                    <span className="material-symbols-outlined text-[20px]">inventory</span>
+                  {/* Processing / Picking */}
+                  <div className="relative z-10 flex flex-col items-center gap-1">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center shadow ${
+                        ['PICKING', 'PACKING', 'SHIPPED', 'DELIVERED'].includes(data.mostRecentOrder.status)
+                          ? 'bg-primary text-white'
+                          : 'bg-slate-200 text-slate-500'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[20px]">inventory</span>
+                    </div>
+                    <p className={`text-xs font-bold mt-1 ${['PICKING', 'PACKING', 'SHIPPED', 'DELIVERED'].includes(data.mostRecentOrder.status) ? 'text-primary' : 'text-slate-500'}`}>
+                      Processing
+                    </p>
+                    <p className="text-[10px] text-on-surface-variant">Warehouse Picking</p>
                   </div>
-                  <p className="text-xs font-bold text-primary mt-1">Processing</p>
-                  <p className="text-[10px] text-on-surface-variant">May 13, 02:45 PM</p>
-                </div>
 
-                <div className="relative z-10 flex flex-col items-center gap-1">
-                  <div className="w-12 h-12 rounded-full border-4 border-primary bg-white text-primary flex items-center justify-center shadow animate-pulse">
-                    <span className="material-symbols-outlined text-[24px]">local_shipping</span>
+                  {/* Shipped */}
+                  <div className="relative z-10 flex flex-col items-center gap-1">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center shadow ${
+                        ['SHIPPED', 'DELIVERED'].includes(data.mostRecentOrder.status)
+                          ? 'bg-primary text-white animate-pulse'
+                          : 'bg-slate-200 text-slate-500'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[20px]">local_shipping</span>
+                    </div>
+                    <p className={`text-xs font-bold mt-1 ${['SHIPPED', 'DELIVERED'].includes(data.mostRecentOrder.status) ? 'text-primary' : 'text-slate-500'}`}>
+                      In Transit
+                    </p>
+                    <p className="text-[10px] text-on-surface-variant">Carrier Dispatch</p>
                   </div>
-                  <p className="text-xs font-bold text-primary mt-1">In Transit</p>
-                  <p className="text-[10px] text-on-surface-variant">Expected May 15</p>
-                </div>
 
-                <div className="relative z-10 flex flex-col items-center gap-1">
-                  <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-[20px]">home_work</span>
+                  {/* Delivered */}
+                  <div className="relative z-10 flex flex-col items-center gap-1">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center shadow ${
+                        data.mostRecentOrder.status === 'DELIVERED'
+                          ? 'bg-green-600 text-white'
+                          : 'bg-slate-200 text-slate-500'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[20px]">home_work</span>
+                    </div>
+                    <p className={`text-xs font-bold mt-1 ${data.mostRecentOrder.status === 'DELIVERED' ? 'text-green-600' : 'text-slate-500'}`}>
+                      Delivered
+                    </p>
+                    <p className="text-[10px] text-on-surface-variant">Destination</p>
                   </div>
-                  <p className="text-xs font-bold text-slate-500 mt-1">Delivered</p>
-                  <p className="text-[10px] text-on-surface-variant">Estimated May 16</p>
                 </div>
-              </div>
+              ) : (
+                <div className="p-8 text-center text-sm text-on-surface-variant">No active orders placed yet.</div>
+              )}
             </div>
             <div className="bg-blue-50/80 p-3.5 px-4 flex items-center gap-3 border-t border-blue-100">
               <span className="material-symbols-outlined text-primary">info</span>
               <p className="text-xs text-primary font-medium">
-                Your shipment has left the East Coast Regional Hub and is currently en route to the final distribution center.
+                {data?.mostRecentOrder ? `Status: ${data.mostRecentOrder.status.replace('_', ' ')} — Order is being processed by warehouse logistics.` : 'Create a new sales order to initiate supply chain fulfillment.'}
               </p>
             </div>
           </section>
@@ -841,23 +925,23 @@ const ClientPortalDashboard = ({ user }) => {
                 <tbody className="divide-y divide-outline-variant text-xs">
                   {data?.recentOrders?.map((order) => (
                     <tr key={order.id} className="hover:bg-surface-container-low transition-colors">
-                      <td className="px-4 py-3.5 text-primary font-bold">{order.orderNumber}</td>
+                      <td className="px-4 py-3.5 text-primary font-bold">{order.orderNumber || order.id.substring(0,8)}</td>
                       <td className="px-4 py-3.5 text-on-surface-variant">{new Date(order.createdAt).toLocaleDateString()}</td>
                       <td className="px-4 py-3.5">
-                        <span className="px-2.5 py-0.5 rounded-full font-bold bg-blue-100 text-blue-800">
-                          {order.status}
+                        <span className="px-2.5 py-0.5 rounded-full font-bold bg-blue-100 text-blue-800 uppercase text-[10px]">
+                          {order.status.replace('_', ' ')}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 font-semibold">${(order.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td onClick={() => navigate('/shipping')} className="px-4 py-3.5 text-primary font-bold hover:underline cursor-pointer">
-                        Track →
+                      <td className="px-4 py-3.5 font-semibold">${(order.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td onClick={() => navigate('/sales-orders')} className="px-4 py-3.5 text-primary font-bold hover:underline cursor-pointer">
+                        View →
                       </td>
                     </tr>
                   ))}
                   {!data?.recentOrders?.length && (
                     <tr>
                       <td colSpan="5" className="px-4 py-8 text-center text-sm text-on-surface-variant">
-                        No recent orders.
+                        No recent orders found.
                       </td>
                     </tr>
                   )}

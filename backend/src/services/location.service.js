@@ -1,5 +1,6 @@
 const locationRepository = require('../repositories/location.repository');
 const { getPaginationParams, formatPaginationMeta } = require('../utils/pagination');
+const prisma = require('../utils/prisma');
 
 class LocationService {
   async createLocation(companyId, payload) {
@@ -9,7 +10,6 @@ class LocationService {
 
     const code = payload.code || `${payload.zone}-${payload.aisle}-${payload.rack}-${payload.shelf}-${payload.bin}`.toUpperCase();
 
-    const prisma = require('../utils/prisma');
     const warehouseName = payload.warehouse || 'Main Warehouse';
     
     const facility = await prisma.warehouse.findFirst({
@@ -30,8 +30,9 @@ class LocationService {
     const currentProvisioned = existingLocs.reduce((sum, loc) => sum + (loc.maxCapacity || 0), 0);
     const newBinCapacity = parseInt(payload.maxCapacity || '1000', 10);
 
-    if (facility.capacityValue !== null && (currentProvisioned + newBinCapacity > facility.capacityValue)) {
-      throw new Error(`Warehouse capacity is ${facility.capacityValue}. Existing bins are using ${currentProvisioned}. A new bin can have a maximum capacity of ${facility.capacityValue - currentProvisioned}.`);
+    if (facility.capacityValue !== null && facility.capacityValue > 0 && (currentProvisioned + newBinCapacity > facility.capacityValue)) {
+      const available = Math.max(0, facility.capacityValue - currentProvisioned);
+      throw new Error(`Bin capacity exceeds warehouse total capacity. Warehouse Capacity: ${facility.capacityValue} ${facility.capacityType || 'Items'}. Available to provision: ${available} ${facility.capacityType || 'Items'}`);
     }
 
     const data = {
@@ -86,7 +87,6 @@ class LocationService {
 
   async updateLocation(id, companyId, payload) {
     const existingLocation = await this.getLocationById(id, companyId);
-    const prisma = require('../utils/prisma');
     
     const facility = await prisma.warehouse.findFirst({
       where: { name: existingLocation.warehouse, companyId }

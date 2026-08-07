@@ -43,20 +43,24 @@ const defaultPermissions = {
     'inventory.view', 'inventory.adjust', 'inventory.movements',
     'batch.view', 'batch.create',
     'expiry.view',
-    'po.view', 'po.receive', 'receiving.execute',
-    'to.view', 'to.execute',
-    'so.view', 'so.pick', 'picking.execute',
+    'warehouse.view', 'facilities.view',
+    'po.view', 'po.create', 'po.edit', 'po.approve', 'po.receive', 'receiving.execute',
+    'to.view', 'to.create', 'to.edit', 'to.execute',
+    'so.view', 'so.create', 'so.edit', 'so.approve', 'so.pick', 'picking.execute',
     'barcode.view', 'barcode.generate', 'barcode.print',
-    'shipping.view', 'shipping.track', 'shipping.execute'
+    'shipping.view', 'shipping.create', 'shipping.track', 'shipping.execute', 'shipping.delete',
+    'users.view', 'clients.view', 'reports.view', 'audit.view', 'settings.view'
   ],
   CLIENT: [
     'dashboard.view',
     'products.view',
+    'inventory.view',
     'batch.view',
     'expiry.view',
     'client_portal.view', 'client_portal.orders', 'client_portal.tracking', 'client_portal.reports',
     'so.view',
-    'shipping.track',
+    'warehouse.view',
+    'shipping.view', 'shipping.track',
     'reports.view',
     'settings.view'
   ]

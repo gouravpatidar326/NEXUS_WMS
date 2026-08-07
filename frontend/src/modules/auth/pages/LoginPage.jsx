@@ -10,6 +10,7 @@ export const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const { login } = useAuth();
   const { notifySuccess, notifyError } = useNotification();
@@ -17,6 +18,7 @@ export const LoginPage = () => {
 
   const handleRoleQuickLogin = async (roleKey) => {
     setIsLoading(true);
+    setErrorMessage('');
     let targetEmail = 'alex@stitchnexus.com';
     if (roleKey === ROLES.WAREHOUSE_MANAGER) targetEmail = 'jordan@stitchnexus.com';
     if (roleKey === ROLES.INVENTORY_CLERK) targetEmail = 'casey@stitchnexus.com';
@@ -29,17 +31,26 @@ export const LoginPage = () => {
       if (result?.success) {
         notifySuccess(`Logged in as ${result.user.name}`);
         navigate('/dashboard', { replace: true });
+      } else {
+        const errMsg = result?.message || 'Login failed';
+        setErrorMessage(errMsg);
+        notifyError(errMsg);
       }
     } catch (err) {
       setIsLoading(false);
-      notifyError(err.message || 'Login failed');
+      const errMsg = err.message || 'Login failed';
+      setErrorMessage(errMsg);
+      notifyError(errMsg);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMessage('');
     if (!email || !password) {
-      notifyError('Please enter email and password');
+      const msg = 'Please enter both email and password';
+      setErrorMessage(msg);
+      notifyError(msg);
       return;
     }
 
@@ -50,68 +61,99 @@ export const LoginPage = () => {
       if (result?.success) {
         notifySuccess(`Welcome back, ${result.user.name}!`);
         navigate('/dashboard', { replace: true });
+      } else {
+        const errMsg = result?.message || 'Invalid email or password';
+        setErrorMessage(errMsg);
+        notifyError(errMsg);
       }
     } catch (err) {
       setIsLoading(false);
-      notifyError(err.message || 'Invalid credentials');
+      const errMsg = err.message || 'Invalid email or password';
+      setErrorMessage(errMsg);
+      notifyError(errMsg);
     }
   };
 
   return (
-    <main className="min-h-screen flex w-full bg-background text-on-background overflow-x-hidden">
-      {/* Left Side: Authentication Form */}
-      <section className="w-full lg:w-[45%] xl:w-[40%] bg-surface flex flex-col p-6 sm:p-8 lg:p-12 relative justify-between min-h-screen">
-        {/* Logo Header */}
-        <div className="mb-6">
-          <img src="/images/brand/orbitrex-peptides-logo-transparent.png" alt="Orbitrex Peptides" className="h-24 w-auto max-w-full object-contain object-left" />
+    <main className="min-h-screen flex w-full bg-slate-50 text-slate-800 font-sans overflow-x-hidden">
+      {/* Left Side: Login Portal Form */}
+      <section className="w-full lg:w-[45%] xl:w-[40%] bg-white flex flex-col p-6 sm:p-8 lg:p-12 justify-between min-h-screen border-r border-slate-200 shadow-xl z-10">
+        
+        {/* Brand Logo Header */}
+        <div className="mb-4">
+          <img 
+            src="/images/brand/orbitrex-peptides-logo-transparent.png" 
+            alt="Orbitrex Peptides" 
+            className="h-20 w-auto object-contain object-left" 
+          />
         </div>
 
-        {/* Login Container */}
-        <div className="flex-grow flex flex-col justify-center max-w-[400px] mx-auto w-full my-auto py-6">
+        {/* Login Form Center Container */}
+        <div className="flex-grow flex flex-col justify-center max-w-[390px] mx-auto w-full my-auto py-4">
           <header className="mb-6">
-            <h1 className="text-3xl font-bold text-primary mb-1.5">Welcome Back</h1>
-            <p className="text-sm text-on-surface-variant">Access your warehouse management dashboard.</p>
+            <h1 className="text-3xl font-bold text-emerald-800 mb-1 tracking-tight">
+              Welcome Back
+            </h1>
+            <p className="text-xs text-slate-500 font-medium">
+              Access your warehouse management dashboard.
+            </p>
           </header>
 
           <form className="space-y-4" onSubmit={handleSubmit}>
-            {/* Email Field */}
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-on-surface-variant block uppercase tracking-wider" htmlFor="email">
+            {/* Inline Error Alert Box */}
+            {errorMessage && (
+              <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2.5 text-red-700 text-xs font-medium animate-fadeIn">
+                <span className="material-symbols-outlined text-[18px] shrink-0 text-red-600 mt-0.5">
+                  error
+                </span>
+                <div className="flex-1">
+                  <p className="font-bold text-red-800 text-xs">Authentication Failed</p>
+                  <p className="mt-0.5 text-red-700">{errorMessage}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Email Address Field */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-600 block uppercase tracking-wider" htmlFor="email">
                 EMAIL ADDRESS
               </label>
               <div className="relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">
+                <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">
                   mail
                 </span>
                 <input
-                  className="w-full pl-10 pr-4 py-3 bg-white border border-outline-variant rounded-lg text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                  className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-lg text-sm font-medium text-slate-800 focus:outline-none focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
                   id="email"
                   name="email"
                   placeholder="name@company.com"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (errorMessage) setErrorMessage('');
+                  }}
                   required
                 />
               </div>
             </div>
 
             {/* Password Field */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div className="flex justify-between items-center">
-                <label className="text-xs font-semibold text-on-surface-variant block uppercase tracking-wider" htmlFor="password">
+                <label className="text-xs font-bold text-slate-600 block uppercase tracking-wider" htmlFor="password">
                   PASSWORD
                 </label>
-                <a className="text-xs font-semibold text-primary hover:underline transition-all" href="#">
+                <a className="text-xs font-bold text-emerald-700 hover:underline transition-all" href="#">
                   Forgot Password?
                 </a>
               </div>
               <div className="relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">
+                <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">
                   lock
                 </span>
                 <input
-                  className="w-full pl-10 pr-12 py-3 bg-white border border-outline-variant rounded-lg text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                  className="w-full pl-11 pr-11 py-3 bg-slate-50 border border-slate-300 rounded-lg text-sm font-medium text-slate-800 focus:outline-none focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
                   id="password"
                   name="password"
                   placeholder="••••••••"
@@ -121,7 +163,7 @@ export const LoginPage = () => {
                   required
                 />
                 <button
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-primary transition-colors"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                 >
@@ -132,23 +174,23 @@ export const LoginPage = () => {
               </div>
             </div>
 
-            {/* Remember Me */}
-            <div className="flex items-center space-x-2 py-1">
+            {/* Remember Me Checkbox */}
+            <div className="flex items-center space-x-2 py-0.5">
               <input
-                className="w-4 h-4 text-primary border-outline-variant rounded focus:ring-primary cursor-pointer"
+                className="w-3.5 h-3.5 text-emerald-700 border-slate-300 rounded focus:ring-emerald-600 cursor-pointer"
                 id="remember"
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
               />
-              <label className="text-xs text-on-surface-variant cursor-pointer" htmlFor="remember">
+              <label className="text-xs text-slate-600 font-medium cursor-pointer" htmlFor="remember">
                 Remember me for 30 days
               </label>
             </div>
 
-            {/* Submit Button */}
+            {/* Main Sign-In Button */}
             <button
-              className="w-full bg-primary text-on-primary font-semibold text-sm py-3.5 rounded-lg hover:bg-primary-container active:scale-[0.98] transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full bg-emerald-700 hover:bg-emerald-800 active:scale-[0.99] text-white font-bold text-sm py-3.5 rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               type="submit"
               disabled={isLoading}
             >
@@ -163,81 +205,78 @@ export const LoginPage = () => {
             </button>
           </form>
 
-          {/* Quick Demo Role Presets */}
-          <div className="mt-6">
-            <div className="relative flex items-center mb-3">
-              <div className="flex-grow border-t border-outline-variant"></div>
-              <span className="flex-shrink mx-3 text-[11px] font-semibold text-outline tracking-wider">DEMO ROLE PRESETS</span>
-              <div className="flex-grow border-t border-outline-variant"></div>
-            </div>
+          {/* Clean Quick Role Selector (Without Tacky Text Headers) */}
+          <div className="mt-6 pt-4 border-t border-slate-200">
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => handleRoleQuickLogin(ROLES.SUPER_ADMIN)}
-                className="py-2 px-3 border border-outline-variant rounded-lg text-xs font-medium text-on-surface hover:bg-surface-container flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                className="py-2 px-3 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-500 rounded-lg text-xs font-semibold text-slate-700 hover:text-emerald-800 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
               >
-                <span className="material-symbols-outlined text-primary text-[16px]">admin_panel_settings</span>
+                <span className="material-symbols-outlined text-emerald-700 text-[16px]">admin_panel_settings</span>
                 Super Admin
               </button>
               <button
                 type="button"
                 onClick={() => handleRoleQuickLogin(ROLES.WAREHOUSE_MANAGER)}
-                className="py-2 px-3 border border-outline-variant rounded-lg text-xs font-medium text-on-surface hover:bg-surface-container flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                className="py-2 px-3 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-500 rounded-lg text-xs font-semibold text-slate-700 hover:text-emerald-800 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
               >
-                <span className="material-symbols-outlined text-primary text-[16px]">manage_accounts</span>
+                <span className="material-symbols-outlined text-emerald-700 text-[16px]">manage_accounts</span>
                 Manager
               </button>
               <button
                 type="button"
                 onClick={() => handleRoleQuickLogin(ROLES.INVENTORY_CLERK)}
-                className="py-2 px-3 border border-outline-variant rounded-lg text-xs font-medium text-on-surface hover:bg-surface-container flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                className="py-2 px-3 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-500 rounded-lg text-xs font-semibold text-slate-700 hover:text-emerald-800 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
               >
-                <span className="material-symbols-outlined text-primary text-[16px]">inventory</span>
+                <span className="material-symbols-outlined text-emerald-700 text-[16px]">inventory</span>
                 Clerk
               </button>
               <button
                 type="button"
                 onClick={() => handleRoleQuickLogin(ROLES.CLIENT)}
-                className="py-2 px-3 border border-outline-variant rounded-lg text-xs font-medium text-on-surface hover:bg-surface-container flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                className="py-2 px-3 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-500 rounded-lg text-xs font-semibold text-slate-700 hover:text-emerald-800 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
               >
-                <span className="material-symbols-outlined text-primary text-[16px]">person</span>
+                <span className="material-symbols-outlined text-emerald-700 text-[16px]">person</span>
                 Client
               </button>
             </div>
           </div>
         </div>
 
-        {/* Footer / Status */}
-        <footer className="mt-6 flex flex-col sm:flex-row justify-between items-center gap-3 border-t border-outline-variant/40 pt-4">
-          <div className="flex items-center gap-2 px-3 py-1 bg-surface-container-high rounded-full border border-outline-variant">
-            <span className="material-symbols-outlined text-on-secondary-container text-[16px]">verified_user</span>
-            <span className="text-[11px] font-semibold text-on-secondary-container">SOC2 TYPE II COMPLIANT</span>
+        {/* Footer Security Badges */}
+        <footer className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-2 border-t border-slate-200 pt-3 text-slate-500">
+          <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-slate-100 rounded-full border border-slate-200">
+            <span className="material-symbols-outlined text-emerald-700 text-[15px]">verified_user</span>
+            <span className="text-[10px] font-bold tracking-wider text-slate-700 uppercase">SOC2 TYPE II COMPLIANT</span>
           </div>
-          <div className="text-[11px] font-mono text-outline">
+          <div className="text-[10px] font-mono text-slate-400">
             System Build: v2.4.0-nexus
           </div>
         </footer>
       </section>
 
-      {/* Right Side: Immersive Illustration */}
+      {/* Right Side: High-Res Original Warehouse Image Showcase */}
       <section className="hidden lg:block lg:w-[55%] xl:w-[60%] relative overflow-hidden bg-slate-900 min-h-screen">
+        {/* Original Clean High-Res Image */}
         <div
-          className="absolute inset-0 z-0 h-full w-full bg-cover bg-center opacity-85"
+          className="absolute inset-0 z-0 h-full w-full bg-cover bg-center"
           style={{
             backgroundImage: `url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2000&auto=format&fit=crop')`,
           }}
         ></div>
-        {/* Atmospheric Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-r from-surface via-transparent to-transparent z-10 w-24"></div>
 
-        {/* Floating Feature Tag */}
-        <div className="absolute bottom-12 right-12 z-20 max-w-sm">
-          <div className="bg-white/90 backdrop-blur-md p-6 rounded-xl border border-white/20 shadow-2xl">
-            <div className="flex items-center gap-3 mb-2">
-              <span className="material-symbols-outlined text-primary text-[32px]">precision_manufacturing</span>
-              <h3 className="font-semibold text-lg text-on-background">Logistics Intelligence</h3>
+        {/* Crisp Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/40 via-transparent to-transparent z-10"></div>
+
+        {/* Bottom Right Logistics Feature Box */}
+        <div className="absolute bottom-10 right-10 z-20 max-w-sm">
+          <div className="bg-white/95 backdrop-blur-md p-6 rounded-xl border border-white/40 shadow-2xl space-y-2">
+            <div className="flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-emerald-700 text-[26px]">precision_manufacturing</span>
+              <h3 className="font-bold text-sm text-slate-900">Logistics Intelligence</h3>
             </div>
-            <p className="text-xs text-on-surface-variant leading-relaxed">
+            <p className="text-xs text-slate-600 leading-relaxed font-medium">
               Nexus WMS leverages real-time spatial mapping and predictive routing to optimize every picker's journey, reducing warehouse latency by up to 34%.
             </p>
           </div>

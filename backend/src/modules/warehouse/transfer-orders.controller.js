@@ -31,13 +31,20 @@ const createTransferOrder = async (req, res) => {
       return res.status(400).json({ message: 'Invalid transfer parameters' });
     }
 
-    if (destinationCompanyId === req.user.companyId) {
+    let companyId = req.user.companyId;
+    if (!companyId) {
+      const defaultCompany = await prisma.company.findFirst();
+      if (!defaultCompany) return res.status(400).json({ message: 'No company found' });
+      companyId = defaultCompany.id;
+    }
+
+    if (destinationCompanyId === companyId) {
       return res.status(400).json({ message: 'Destination company cannot be the same as source' });
     }
 
     // Verify product & stock exist in source company
     const sourceProduct = await prisma.product.findFirst({
-      where: { id: productId, ...(req.user.companyId ? { companyId: req.user.companyId } : {}) }
+      where: { id: productId, companyId }
     });
 
     if (!sourceProduct) {
@@ -54,7 +61,7 @@ const createTransferOrder = async (req, res) => {
     const order = await prisma.$transaction(async (tx) => {
       const to = await tx.transferOrder.create({
         data: {
-          sourceCompanyId: req.user.companyId,
+          sourceCompanyId: companyId,
           destinationCompanyId,
           productId,
           quantity,

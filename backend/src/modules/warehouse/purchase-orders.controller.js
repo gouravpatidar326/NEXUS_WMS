@@ -29,15 +29,32 @@ const getPurchaseOrders = async (req, res) => {
 const createPurchaseOrder = async (req, res) => {
   try {
     const { supplier, expectedDelivery, totalCost, items } = req.body;
-    const companyId = req.user.companyId;
+    let companyId = req.user?.companyId || req.body?.companyId;
+
+    if (!companyId) {
+      const defaultCompany = await prisma.company.findFirst();
+      if (defaultCompany) {
+        companyId = defaultCompany.id;
+      }
+    }
+
+    if (!companyId) {
+      return res.status(400).json({ message: 'Company ID is required to create Purchase Orders' });
+    }
 
     if (!supplier || !items || !items.length) {
       return res.status(400).json({ message: 'Supplier and items are required' });
     }
 
-    // Generate PO Number
+    // Generate unique PO Number
     const count = await prisma.purchaseOrder.count({ where: { companyId } });
-    const poNumber = `PO-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+    let poNumber = `PO-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+
+    // Ensure uniqueness
+    const existing = await prisma.purchaseOrder.findUnique({ where: { poNumber } });
+    if (existing) {
+      poNumber = `PO-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
+    }
 
     const newPO = await prisma.$transaction(async (tx) => {
       const po = await tx.purchaseOrder.create({
@@ -77,7 +94,7 @@ const createPurchaseOrder = async (req, res) => {
     res.status(201).json(newPO);
   } catch (error) {
     console.error('Create PO Error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: error.message || 'Internal server error' });
   }
 };
 
@@ -116,7 +133,7 @@ const receiveGoods = async (req, res) => {
           data: {
             lotId: lot.lotId,
             productId: lot.productId,
-            ...(req.user.companyId ? { companyId: req.user.companyId } : {}),
+            companyId: order.companyId,
             mfgDate: lot.mfgDate ? new Date(lot.mfgDate) : null,
             expiryDate: lot.expiryDate ? new Date(lot.expiryDate) : null,
             coaLocked: false, // Inbound docs might not need lock if they trust vendor, or keep it true based on business rule
@@ -128,7 +145,7 @@ const receiveGoods = async (req, res) => {
         await tx.inventoryLedger.create({
           data: {
             productId: lot.productId,
-            ...(req.user.companyId ? { companyId: req.user.companyId } : {}),
+            companyId: order.companyId,
             location: lot.binLocation,
             quantityDelta: Number(lot.quantity),
             movementType: 'PO_RECEIPT'

@@ -11,6 +11,7 @@ import SearchBar from '@/components/forms/SearchBar';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
 import ReadOnlyBanner from '@/components/ui/ReadOnlyBanner';
@@ -23,11 +24,13 @@ export const PurchaseOrdersPage = () => {
   const { user } = useAuth();
   const { notifySuccess, notifyError } = useNotification();
   const canExecuteReceiving = hasPermission(user, PERMISSIONS.RECEIVING_EXECUTE);
+  const canCreatePo = user?.role === 'SUPER_ADMIN' || user?.role === 'WAREHOUSE_MANAGER' || hasPermission(user, PERMISSIONS.PO_CREATE);
 
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletePoState, setDeletePoState] = useState({ isOpen: false, po: null });
 
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -85,8 +88,34 @@ export const PurchaseOrdersPage = () => {
     setRecQty(po.items?.[0]?.quantity || 100);
   };
 
+  const handleOpenCreateModal = () => {
+    setSupplier('');
+    setExpectedDate(new Date().toISOString().split('T')[0]);
+    if (products.length > 0) {
+      const firstProd = products[0];
+      const cost = firstProd.unitCost ?? firstProd.wholesalePrice ?? 0;
+      setLineItems([{
+        productId: firstProd.id,
+        quantity: 10,
+        unitCost: cost
+      }]);
+    } else {
+      setLineItems([{ productId: '', quantity: 10, unitCost: 0 }]);
+    }
+    setIsModalOpen(true);
+  };
+
   const handleAddLineItem = () => {
-    setLineItems([...lineItems, { productId: '', quantity: 1, unitCost: 0 }]);
+    const firstProd = products.length > 0 ? products[0] : null;
+    const cost = firstProd ? (firstProd.unitCost ?? firstProd.wholesalePrice ?? 0) : 0;
+    setLineItems([
+      ...lineItems,
+      {
+        productId: firstProd ? firstProd.id : '',
+        quantity: 10,
+        unitCost: cost
+      }
+    ]);
   };
 
   const handleRemoveLineItem = (index) => {
@@ -103,8 +132,9 @@ export const PurchaseOrdersPage = () => {
 
     if (field === 'productId') {
       const selectedProd = products.find((p) => p.id === value);
-      if (selectedProd && selectedProd.unitCost !== undefined) {
-        updated[index].unitCost = selectedProd.unitCost || 0;
+      if (selectedProd) {
+        const cost = selectedProd.unitCost ?? selectedProd.wholesalePrice ?? 0;
+        updated[index].unitCost = cost;
       }
     }
 
@@ -179,13 +209,17 @@ export const PurchaseOrdersPage = () => {
     }
   };
 
-  const handleDeletePurchaseOrder = async (poId) => {
-    if (!window.confirm('Are you sure you want to delete this Purchase Order?')) return;
-    
+  const handleDeletePoClick = (po) => {
+    setDeletePoState({ isOpen: true, po });
+  };
+
+  const confirmDeletePo = async () => {
+    if (!deletePoState.po) return;
     try {
-      await purchaseOrderService.deletePurchaseOrder(poId);
-      notifySuccess('Purchase Order deleted successfully');
-      fetchData(); // Refresh list
+      await purchaseOrderService.deletePurchaseOrder(deletePoState.po.id);
+      notifySuccess(`Purchase Order "${deletePoState.po.poNumber || deletePoState.po.id}" deleted successfully`);
+      setDeletePoState({ isOpen: false, po: null });
+      fetchData();
     } catch (error) {
       notifyError('Failed to delete purchase order');
     }
@@ -253,7 +287,7 @@ export const PurchaseOrdersPage = () => {
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => handleDeletePurchaseOrder(row.id)}
+              onClick={() => handleDeletePoClick(row)}
               className="text-slate-400 hover:text-red-600 hover:bg-red-50 p-2"
               title="Delete Purchase Order"
             >
@@ -276,8 +310,8 @@ export const PurchaseOrdersPage = () => {
         description="Procurement workflow, vendor goods receiving dock, automated Lot generation, and inventory posting"
         breadcrumbs={[{ label: 'Order Management' }, { label: 'Purchase Orders' }]}
         actions={
-          canExecuteReceiving && user?.role?.toUpperCase() !== 'SUPER_ADMIN' ? (
-            <Button leftIcon={Plus} onClick={() => setIsModalOpen(true)}>Create Purchase Order</Button>
+          canCreatePo ? (
+            <Button leftIcon={Plus} onClick={handleOpenCreateModal}>Create Purchase Order</Button>
           ) : null
         }
       />
@@ -374,7 +408,7 @@ export const PurchaseOrdersPage = () => {
                           .filter((p) => p.name && !p.name.includes('dsadsa')) // Clean dropdown
                           .map((p) => (
                             <option key={p.id} value={p.id}>
-                              {p.name} ({p.sku})
+                              {p.name} ({p.sku}) - {p.availableStock || 0} available
                             </option>
                           ))}
                       </select>
@@ -495,6 +529,17 @@ export const PurchaseOrdersPage = () => {
           </form>
         </Modal>
       )}
+
+      {/* Delete PO Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deletePoState.isOpen}
+        onClose={() => setDeletePoState({ isOpen: false, po: null })}
+        onConfirm={confirmDeletePo}
+        title="Delete Purchase Order"
+        message={`Are you sure you want to delete Purchase Order "${deletePoState.po?.poNumber || deletePoState.po?.id}"? This action cannot be undone.`}
+        confirmText="Yes, Delete PO"
+        variant="danger"
+      />
     </div>
   );
 };

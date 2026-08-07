@@ -173,15 +173,15 @@ export const InventoryListPage = () => {
       accessor: 'quantity',
       cell: (row) => (
         <div className="flex flex-col text-sm">
-          <div className="flex justify-between w-32 border-b border-slate-100 pb-0.5 mb-0.5">
+          <div className="flex justify-between w-full max-w-[140px] border-b border-slate-100 pb-0.5 mb-0.5">
             <span className="text-slate-500">Available:</span>
             <span className="font-bold text-green-600">{row.available}</span>
           </div>
-          <div className="flex justify-between w-32 border-b border-slate-100 pb-0.5 mb-0.5">
+          <div className="flex justify-between w-full max-w-[140px] border-b border-slate-100 pb-0.5 mb-0.5">
             <span className="text-slate-500">Reserved:</span>
             <span className="font-bold text-amber-600">{row.reserved}</span>
           </div>
-          <div className="flex justify-between w-32">
+          <div className="flex justify-between w-full max-w-[140px]">
             <span className="text-slate-500 text-xs">Total:</span>
             <span className="font-bold text-slate-800 text-xs">{row.quantity}</span>
           </div>

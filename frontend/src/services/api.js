@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const rawBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const cleanBaseUrl = rawBaseUrl.replace(/\/+$/, '');
+const API_BASE_URL = cleanBaseUrl.endsWith('/api') ? cleanBaseUrl : `${cleanBaseUrl}/api`;
 
 export const api = {
   async request(endpoint, options = {}) {
@@ -22,8 +24,8 @@ export const api = {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
       
       if (!response.ok) {
-        // Handle 401 Unauthorized (e.g., token expired)
-        if (response.status === 401) {
+        // Handle 401 Unauthorized for expired tokens (skip login endpoint)
+        if (response.status === 401 && !endpoint.includes('/auth/login')) {
           localStorage.removeItem('wms_token');
           localStorage.removeItem('wms_user');
           window.dispatchEvent(new Event('auth:unauthorized'));
@@ -57,6 +59,14 @@ export const api = {
       ...options,
       method: 'PUT',
       body: JSON.stringify(body),
+    });
+  },
+
+  patch(endpoint, body, options = {}) {
+    return this.request(endpoint, {
+      ...options,
+      method: 'PATCH',
+      body: body ? JSON.stringify(body) : undefined,
     });
   },
 

@@ -39,6 +39,7 @@ model Company {
   notifications      Notification[]
   shipments          Shipment[]
   warehouses         Warehouse[]
+  @@map("company")
 }
 
 model User {
@@ -63,6 +64,7 @@ model User {
   createdTransfers   InventoryTransfer[] @relation("TransferCreatedUser")
   createdAdjustments StockAdjustment[]   @relation("AdjustmentCreatedUser")
   managedWarehouses  Warehouse[]         @relation("WarehouseManager")
+  @@map("user")
 }
 
 model Client {
@@ -85,6 +87,7 @@ model Client {
   company     Company?   @relation(fields: [companyId], references: [id])
   warehouse   Warehouse? @relation(fields: [warehouseId], references: [id])
   salesOrders SalesOrder[]
+  @@map("client")
 }
 
 model AuditLog {
@@ -95,6 +98,7 @@ model AuditLog {
   timestamp DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id])
+  @@map("auditlog")
 }
 
 model SystemSettings {
@@ -102,6 +106,7 @@ model SystemSettings {
   key       String   @unique
   value     String   @db.Text
   updatedAt DateTime @updatedAt
+  @@map("systemsettings")
 }
 
 model Category {
@@ -116,6 +121,7 @@ model Category {
 
   company  Company   @relation(fields: [companyId], references: [id])
   products Product[]
+  @@map("category")
 }
 
 // Catalog-only Product model (stock is driven by LocationInventory & InventoryLedger)
@@ -158,6 +164,7 @@ model Product {
   salesOrderItems     SalesOrderItem[]
   purchaseOrderItems  PurchaseOrderItem[]
   specification       ProductSpecification?
+  @@map("product")
 }
 
 model ProductSpecification {
@@ -170,6 +177,7 @@ model ProductSpecification {
   volume    Float?
 
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  @@map("productspecification")
 }
 
 model Receiving {
@@ -190,6 +198,7 @@ model Receiving {
   company   Company         @relation(fields: [companyId], references: [id])
   inspector User?           @relation("InspectorUser", fields: [inspectorId], references: [id])
   items     ReceivingItem[]
+  @@map("receiving")
 }
 
 model ReceivingItem {
@@ -207,6 +216,7 @@ model ReceivingItem {
   receiving Receiving @relation(fields: [receivingId], references: [id])
   product   Product   @relation(fields: [productId], references: [id])
   batches   Batch[]
+  @@map("receivingitem")
 }
 
 model Batch {
@@ -236,6 +246,7 @@ model Batch {
   stockAdjustments    StockAdjustment[]
   expiryAlerts        ExpiryAlert[]
   pickListItems       PickListItem[]
+  @@map("batch")
 }
 
 model Barcode {
@@ -244,11 +255,13 @@ model Barcode {
   barcodeType String   @default("CODE128") // CODE128, QR
   productId   String
   batchId     String
+  trackingStatus String @default("GENERATED")
   companyId   String
   createdAt   DateTime @default(now())
 
   product Product @relation(fields: [productId], references: [id])
   batch   Batch   @relation(fields: [batchId], references: [id])
+  @@map("barcode")
 }
 
 model Location {
@@ -276,6 +289,7 @@ model Location {
   sourceTransfers     InventoryTransfer[] @relation("SourceLocation")
   destTransfers       InventoryTransfer[] @relation("DestLocation")
   stockAdjustments    StockAdjustment[]
+  @@map("location")
 }
 
 model Warehouse {
@@ -303,6 +317,7 @@ model Warehouse {
   users               User[]
   clients             Client[]
   manager             User?               @relation("WarehouseManager", fields: [managerId], references: [id])
+  @@map("warehouse")
 }
 
 model LocationInventory {
@@ -329,6 +344,7 @@ model LocationInventory {
   company  Company  @relation(fields: [companyId], references: [id])
 
   @@unique([locationId, productId, lotId])
+  @@map("locationinventory")
 }
 
 model Inventory {
@@ -344,6 +360,7 @@ model Inventory {
   company Company @relation(fields: [companyId], references: [id])
 
   @@unique([productId, companyId])
+  @@map("inventory")
 }
 
 model InventoryLedger {
@@ -366,6 +383,7 @@ model InventoryLedger {
   batch   Batch?    @relation(fields: [lotId], references: [id])
   company Company   @relation(fields: [companyId], references: [id])
   locRef  Location? @relation(fields: [locationId], references: [id])
+  @@map("inventoryledger")
 }
 
 model InventoryTransfer {
@@ -385,6 +403,7 @@ model InventoryTransfer {
   destLocation   Location       @relation("DestLocation", fields: [destLocationId], references: [id])
   creator        User?          @relation("TransferCreatedUser", fields: [createdBy], references: [id])
   items          TransferItem[]
+  @@map("inventorytransfer")
 }
 
 model TransferItem {
@@ -397,6 +416,7 @@ model TransferItem {
   transfer InventoryTransfer @relation(fields: [transferId], references: [id])
   product  Product           @relation(fields: [productId], references: [id])
   batch    Batch             @relation(fields: [lotId], references: [id])
+  @@map("transferitem")
 }
 
 model StockAdjustment {
@@ -417,6 +437,7 @@ model StockAdjustment {
   location Location @relation(fields: [locationId], references: [id])
   creator  User?    @relation("AdjustmentCreatedUser", fields: [createdBy], references: [id])
   company  Company  @relation(fields: [companyId], references: [id])
+  @@map("stockadjustment")
 }
 
 model ExpiryAlert {
@@ -433,6 +454,7 @@ model ExpiryAlert {
   batch   Batch   @relation(fields: [lotId], references: [id])
   product Product @relation(fields: [productId], references: [id])
   company Company @relation(fields: [companyId], references: [id])
+  @@map("expiryalert")
 }
 
 model PurchaseOrder {
@@ -448,6 +470,7 @@ model PurchaseOrder {
 
   company Company             @relation(fields: [companyId], references: [id])
   items   PurchaseOrderItem[]
+  @@map("purchaseorder")
 }
 
 model PurchaseOrderItem {
@@ -459,6 +482,7 @@ model PurchaseOrderItem {
 
   purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
   product       Product       @relation(fields: [productId], references: [id])
+  @@map("purchaseorderitem")
 }
 
 model TransferOrder {
@@ -474,6 +498,7 @@ model TransferOrder {
   sourceCompany      Company @relation("SourceCompany", fields: [sourceCompanyId], references: [id])
   destinationCompany Company @relation("DestCompany", fields: [destinationCompanyId], references: [id])
   product            Product @relation(fields: [productId], references: [id])
+  @@map("transferorder")
 }
 
 model PickList {
@@ -486,6 +511,7 @@ model PickList {
 
   company Company        @relation(fields: [companyId], references: [id])
   items   PickListItem[]
+  @@map("picklist")
 }
 
 model PickListItem {
@@ -501,6 +527,7 @@ model PickListItem {
   pickList PickList @relation(fields: [pickListId], references: [id])
   product  Product  @relation(fields: [productId], references: [id])
   batch    Batch?   @relation(fields: [batchId], references: [id])
+  @@map("picklistitem")
 }
 
 model SalesOrder {
@@ -521,6 +548,7 @@ model SalesOrder {
   client  Client           @relation(fields: [clientId], references: [id])
   company Company          @relation(fields: [companyId], references: [id])
   items   SalesOrderItem[]
+  @@map("salesorder")
 }
 
 model SalesOrderItem {
@@ -531,6 +559,8 @@ model SalesOrderItem {
 
   salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id])
   product    Product    @relation(fields: [productId], references: [id])
+  @@map("salesorderitem")
+
 }
 
 model Notification {
@@ -544,6 +574,7 @@ model Notification {
 
   user    User?   @relation(fields: [userId], references: [id])
   company Company @relation(fields: [companyId], references: [id])
+  @@map("notification")
 }
 
 model Shipment {
@@ -561,4 +592,5 @@ model Shipment {
   updatedAt         DateTime @updatedAt
 
   company Company @relation(fields: [companyId], references: [id])
+  @@map("shipment")
 }

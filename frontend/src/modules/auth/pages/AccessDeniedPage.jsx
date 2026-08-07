@@ -24,7 +24,7 @@ export const AccessDeniedPage = () => {
 
       {user && (
         <div className="px-4 py-2 bg-surface-100 dark:bg-surface-800 rounded-xl text-xs text-surface-600 dark:text-surface-300 border border-surface-200 dark:border-surface-700 mb-6">
-          Your current role is <strong className="text-primary-600 dark:text-primary-400">{ROLE_LABELS[user.role]}</strong>.
+          Your current role is <strong className="text-primary-600 dark:text-primary-400">{ROLE_LABELS[user.role] || user.role || 'Unknown'}</strong>.
         </div>
       )}
 

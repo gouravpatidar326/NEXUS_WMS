@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Eye, EyeOff } from 'lucide-react';
 import { useNotification } from '@/contexts/NotificationContext';
 import PageHeader from '@/components/navigation/PageHeader';
 import DataTable from '@/components/data-display/DataTable';
@@ -11,6 +11,8 @@ import FormField from '@/components/ui/FormField';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import LoadingState from '@/components/feedback/LoadingState';
+import PhoneCountryInput from '@/components/forms/PhoneCountryInput';
+import LocationAddressSection from '@/components/forms/LocationAddressSection';
 import { clientService } from '@/services/clientService';
 import { warehouseService } from '@/services/warehouseService';
 
@@ -27,13 +29,28 @@ export const ClientsPage = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
-  const [shippingAddress, setShippingAddress] = useState('');
+
+  // Location Address State (Billing)
+  const [country, setCountry] = useState('United States');
+  const [state, setState] = useState('');
+  const [city, setCity] = useState('');
+  const [zipCode, setZipCode] = useState('');
+  const [streetAddress, setStreetAddress] = useState('');
+
+  // Location Address State (Shipping)
   const [sameAsBilling, setSameAsBilling] = useState(true);
+  const [shipCountry, setShipCountry] = useState('United States');
+  const [shipState, setShipState] = useState('');
+  const [shipCity, setShipCity] = useState('');
+  const [shipZipCode, setShipZipCode] = useState('');
+  const [shipStreetAddress, setShipStreetAddress] = useState('');
+
   const [gstNumber, setGstNumber] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
-  const [password, setPassword] = useState('client123');
-  const [confirmPassword, setConfirmPassword] = useState('client123');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [status, setStatus] = useState('ACTIVE');
   const [tier, setTier] = useState('STANDARD');
   const [creditLimit, setCreditLimit] = useState('100000');
@@ -64,13 +81,23 @@ export const ClientsPage = () => {
     setName('');
     setEmail('');
     setPhone('');
-    setAddress('');
-    setShippingAddress('');
+    setCountry('United States');
+    setState('');
+    setCity('');
+    setZipCode('');
+    setStreetAddress('');
+    setShipCountry('United States');
+    setShipState('');
+    setShipCity('');
+    setShipZipCode('');
+    setShipStreetAddress('');
     setSameAsBilling(true);
     setGstNumber('');
     setWarehouseId('');
-    setPassword('client123');
-    setConfirmPassword('client123');
+    setPassword('');
+    setConfirmPassword('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
     setStatus('ACTIVE');
     setTier('STANDARD');
     setCreditLimit('100000');
@@ -83,13 +110,22 @@ export const ClientsPage = () => {
     setName(cli.name || '');
     setEmail(cli.email || '');
     setPhone(cli.phone || '');
-    setAddress(cli.address || '');
-    setShippingAddress(cli.shippingAddress || '');
-    setSameAsBilling(cli.address === cli.shippingAddress);
+    
+    // Parse address string if available
+    setStreetAddress(cli.address || '');
+    setCountry('United States');
+    setState('');
+    setCity('');
+    setZipCode('');
+    
+    setShipStreetAddress(cli.shippingAddress || '');
+    setSameAsBilling(!cli.shippingAddress || cli.address === cli.shippingAddress);
     setGstNumber(cli.gstNumber || '');
     setWarehouseId(cli.warehouseId || '');
     setPassword('');
     setConfirmPassword('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
     setStatus(cli.status || 'ACTIVE');
     setTier(cli.tier || 'STANDARD');
     setCreditLimit(String(cli.creditLimit || '100000'));
@@ -104,7 +140,7 @@ export const ClientsPage = () => {
     if (!name) newErrors.name = 'Contact name is required';
     if (!email) newErrors.email = 'Email address is required';
     if (!phone) newErrors.phone = 'Phone number is required';
-    if (!address) newErrors.address = 'Billing address is required';
+    if (!streetAddress && !city) newErrors.address = 'Billing address is required';
     if (!status) newErrors.status = 'Status is required';
     if (!editingClient) {
       if (!password) newErrors.password = 'Initial password is required';
@@ -123,13 +159,19 @@ export const ClientsPage = () => {
 
     setErrors({});
 
+    // Construct full address string with city, state, country, zip
+    const formattedBillingAddr = [streetAddress, city, state, country, zipCode ? `PIN: ${zipCode}` : ''].filter(Boolean).join(', ');
+    const formattedShippingAddr = sameAsBilling
+      ? formattedBillingAddr
+      : [shipStreetAddress, shipCity, shipState, shipCountry, shipZipCode ? `PIN: ${shipZipCode}` : ''].filter(Boolean).join(', ');
+
     try {
       const payload = {
         name,
         email,
         phone,
-        address,
-        shippingAddress: sameAsBilling ? address : shippingAddress,
+        address: formattedBillingAddr,
+        shippingAddress: formattedShippingAddr,
         gstNumber,
         warehouseId,
         status,
@@ -238,7 +280,7 @@ export const ClientsPage = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={editingClient ? `Edit ${editingClient.name}` : 'Provision Client Portal Account'}
-        size="md"
+        size="lg"
         footer={
           <>
             <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
@@ -248,8 +290,9 @@ export const ClientsPage = () => {
           </>
         }
       >
-        <form onSubmit={handleSaveClient} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSaveClient} className="space-y-5">
+          {/* Section: Basic Profile Information */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Client Contact Name" required error={errors.name}>
               <Input value={name} onChange={(e) => { setName(e.target.value); setErrors({...errors, name: ''}); }} placeholder="e.g. Sam Wilson" error={errors.name} />
             </FormField>
@@ -258,21 +301,45 @@ export const ClientsPage = () => {
             </FormField>
           </div>
 
+          {/* Section: Password Fields with Eye Icon Toggle */}
           {!editingClient && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-surface-50 dark:bg-surface-800/50 p-3 rounded-xl border border-surface-200 dark:border-surface-700">
               <FormField label="Initial Password" required error={errors.password}>
-                <Input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setErrors({...errors, password: ''}); }} placeholder="client123" error={errors.password} />
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setErrors({...errors, password: ''}); }}
+                  placeholder="client123"
+                  error={errors.password}
+                  rightIcon={showPassword ? EyeOff : Eye}
+                  onRightIconClick={() => setShowPassword(!showPassword)}
+                />
               </FormField>
               <FormField label="Confirm Password" required error={errors.confirmPassword}>
-                <Input type="password" value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setErrors({...errors, confirmPassword: ''}); }} placeholder="client123" error={errors.confirmPassword} />
+                <Input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => { setConfirmPassword(e.target.value); setErrors({...errors, confirmPassword: ''}); }}
+                  placeholder="client123"
+                  error={errors.confirmPassword}
+                  rightIcon={showConfirmPassword ? EyeOff : Eye}
+                  onRightIconClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                />
               </FormField>
             </div>
           )}
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Phone with Country Dial Code & Flag Dropdown */}
             <FormField label="Phone Number" required error={errors.phone}>
-              <Input value={phone} onChange={(e) => { setPhone(e.target.value); setErrors({...errors, phone: ''}); }} placeholder="e.g. +1 555-0198" error={errors.phone} />
+              <PhoneCountryInput
+                value={phone}
+                onChange={(val) => { setPhone(val); setErrors({...errors, phone: ''}); }}
+                placeholder="Enter phone number"
+                required
+              />
             </FormField>
+
             <FormField label="Account Status" required error={errors.status}>
               <Select
                 value={status}
@@ -285,21 +352,63 @@ export const ClientsPage = () => {
             </FormField>
           </div>
 
-          <FormField label="Billing Address" required error={errors.address}>
-            <Input value={address} onChange={(e) => { setAddress(e.target.value); setErrors({...errors, address: ''}); }} placeholder="123 Corporate Blvd, Suite 100" error={errors.address} />
-          </FormField>
-          
-          <div className="flex items-center gap-2 mb-2">
-            <input type="checkbox" id="sameAsBilling" checked={sameAsBilling} onChange={(e) => setSameAsBilling(e.target.checked)} className="rounded border-slate-300" />
-            <label htmlFor="sameAsBilling" className="text-sm text-surface-600 dark:text-surface-300">Shipping Address is same as Billing Address</label>
+          {/* Section: Automated Billing Location Selector */}
+          <div className="border-t border-surface-200 dark:border-surface-700 pt-4 space-y-3">
+            <h4 className="text-xs font-bold text-surface-700 dark:text-surface-300 uppercase">
+              Billing Address Information
+            </h4>
+            <LocationAddressSection
+              country={country}
+              onCountryChange={setCountry}
+              state={state}
+              onStateChange={setState}
+              city={city}
+              onCityChange={setCity}
+              zipCode={zipCode}
+              onZipCodeChange={setZipCode}
+              address={streetAddress}
+              onAddressChange={setStreetAddress}
+              required
+            />
           </div>
-          {!sameAsBilling && (
-            <FormField label="Shipping Address">
-              <Input value={shippingAddress} onChange={(e) => setShippingAddress(e.target.value)} placeholder="Warehouse Delivery Address" />
-            </FormField>
-          )}
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* Shipping Address Same Checkbox & Custom Location */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="sameAsBilling"
+                checked={sameAsBilling}
+                onChange={(e) => setSameAsBilling(e.target.checked)}
+                className="rounded border-surface-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
+              />
+              <label htmlFor="sameAsBilling" className="text-xs font-semibold text-surface-700 dark:text-surface-300 cursor-pointer">
+                Shipping Address is same as Billing Address
+              </label>
+            </div>
+
+            {!sameAsBilling && (
+              <div className="border border-dashed border-surface-300 dark:border-surface-700 p-4 rounded-xl space-y-3 bg-surface-50/50 dark:bg-surface-800/40">
+                <h4 className="text-xs font-bold text-surface-700 dark:text-surface-300 uppercase">
+                  Shipping Delivery Address
+                </h4>
+                <LocationAddressSection
+                  country={shipCountry}
+                  onCountryChange={setShipCountry}
+                  state={shipState}
+                  onStateChange={setShipState}
+                  city={shipCity}
+                  onCityChange={setShipCity}
+                  zipCode={shipZipCode}
+                  onZipCodeChange={setShipZipCode}
+                  address={shipStreetAddress}
+                  onAddressChange={setShipStreetAddress}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-surface-200 dark:border-surface-700 pt-4">
             <FormField label="GST Number / Tax ID">
               <Input value={gstNumber} onChange={(e) => setGstNumber(e.target.value)} placeholder="e.g. 27AADCB2230M1Z2" />
             </FormField>
@@ -314,7 +423,7 @@ export const ClientsPage = () => {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Account Tier" required>
               <Select
                 value={tier}

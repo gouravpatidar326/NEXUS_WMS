@@ -54,8 +54,9 @@ const createLocation = async (req, res) => {
       const currentProvisioned = existingLocs.reduce((sum, loc) => sum + (loc.maxCapacity || 0), 0);
       const newBinCapacity = parseInt(maxCapacity, 10);
 
-      if (facility.capacityValue !== null && (currentProvisioned + newBinCapacity > facility.capacityValue)) {
-        throw new Error(`Bin capacity exceeds warehouse total capacity. Warehouse Capacity: ${facility.capacityValue} ${facility.capacityType}. Available to provision: ${facility.capacityValue - currentProvisioned} ${facility.capacityType}`);
+      if (facility.capacityValue !== null && facility.capacityValue > 0 && (currentProvisioned + newBinCapacity > facility.capacityValue)) {
+        const available = Math.max(0, facility.capacityValue - currentProvisioned);
+        throw new Error(`Bin capacity exceeds warehouse total capacity. Warehouse Capacity: ${facility.capacityValue} ${facility.capacityType || 'Items'}. Available to provision: ${available} ${facility.capacityType || 'Items'}`);
       }
 
       const newLoc = await tx.location.create({

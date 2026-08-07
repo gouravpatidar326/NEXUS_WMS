@@ -5,8 +5,8 @@ export const dashboardService = {
     const response = await api.get('/dashboard/manager-summary');
     return response;
   },
-  getSuperAdminDashboard: async () => {
-    return await api.request('/dashboard/super-admin');
+  getSuperAdminDashboard: async (period = '30d') => {
+    return await api.request(`/dashboard/super-admin?period=${period}`);
   },
   getManagerDashboard: async () => {
     return await api.request('/dashboard/manager');

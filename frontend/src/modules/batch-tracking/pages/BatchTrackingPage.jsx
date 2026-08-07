@@ -26,6 +26,8 @@ export const BatchTrackingPage = () => {
   const [selectedLotCoa, setSelectedLotCoa] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, id: null, lotId: '' });
+  const [paymentModal, setPaymentModal] = useState({ isOpen: false, lotId: null, processing: false });
+  const isClient = user?.role === 'client' || user?.role?.toUpperCase() === 'CLIENT';
 
   // Form State
   const [formData, setFormData] = useState({
@@ -43,8 +45,8 @@ export const BatchTrackingPage = () => {
         batchService.getBatches(),
         productService.getProducts({ pageSize: 100 })
       ]);
-      setLots(batchesRes);
-      setProducts(productsRes.items || productsRes); // Fix: use items property
+      setLots(Array.isArray(batchesRes) ? batchesRes : (batchesRes?.data || []));
+      setProducts(productsRes.items || productsRes);
     } catch (error) {
       console.error(error);
       notifyError('Failed to load batches');
@@ -79,11 +81,11 @@ export const BatchTrackingPage = () => {
 
   const handleUnlockCoa = async (lotId) => {
     try {
-      await batchService.unlockCoa(lotId, 'dummy-token');
-      notifySuccess(`[Simulated Payment Gateway] $150 Payment Verified! COA Certificate unlocked for Account (${user?.email}).`);
+      await batchService.unlockCoa(lotId);
+      notifySuccess(`COA Quality Lab Certificate unlocked successfully.`);
       fetchData();
     } catch (error) {
-      notifyError('Failed to unlock COA');
+      notifyError('Failed to verify COA certificate');
     }
   };
 
@@ -109,6 +111,22 @@ export const BatchTrackingPage = () => {
       fetchData();
     } catch (error) {
       notifyError('Failed to update quarantine status');
+    }
+  };
+
+  const handleProcessPayment = async () => {
+    setPaymentModal(prev => ({ ...prev, processing: true }));
+    // Simulate payment gateway delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    try {
+      await batchService.unlockCoa(paymentModal.lotId);
+      notifySuccess(`Payment Successful! COA Quality Lab Certificate unlocked.`);
+      setPaymentModal({ isOpen: false, lotId: null, processing: false });
+      fetchData();
+    } catch (error) {
+      notifyError('Payment processed but failed to unlock COA. Please contact support.');
+      setPaymentModal(prev => ({ ...prev, processing: false }));
     }
   };
 
@@ -251,18 +269,13 @@ export const BatchTrackingPage = () => {
     {
       header: '3rd-Party COA Lab Test Result',
       accessor: 'coaLocked',
-      cell: (row) => !row.coaLocked ? (
+      cell: (row) => (
         <div className="flex items-center gap-2">
-          <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+          <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 ${
+            !row.coaLocked ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+          }`}>
             <span className="material-symbols-outlined text-[14px]">verified</span>
-            COA UNLOCKED (Passed)
-          </span>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2">
-          <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 flex items-center gap-1">
-            <span className="material-symbols-outlined text-[14px]">lock</span>
-            COA LOCKED (Payment Required)
+            {!row.coaLocked ? 'COA VERIFIED (Passed)' : 'COA READY (Click to Verify)'}
           </span>
         </div>
       )
@@ -283,10 +296,10 @@ export const BatchTrackingPage = () => {
               </button>
             ) : (
               <button
-                onClick={() => handleUnlockCoa(row.id)}
-                className="px-3 py-1 bg-amber-600 text-white rounded text-xs font-bold hover:bg-amber-700 transition-colors shadow-sm cursor-pointer w-full max-w-[160px]"
+                onClick={() => isClient ? setPaymentModal({ isOpen: true, lotId: row.id, processing: false }) : handleUnlockCoa(row.id)}
+                className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer w-full max-w-[160px]"
               >
-                Pay $150 to Unlock COA
+                {isClient ? 'Pay to Unlock Test Results' : 'Unlock COA Report'}
               </button>
             )}
             <button

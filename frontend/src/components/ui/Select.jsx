@@ -2,7 +2,7 @@ import { forwardRef } from 'react';
 import clsx from 'clsx';
 
 export const Select = forwardRef(
-  ({ options = [], placeholder = 'Select option', error, className, ...props }, ref) => {
+  ({ options = [], placeholder = null, error, className, ...props }, ref) => {
     return (
       <select
         ref={ref}

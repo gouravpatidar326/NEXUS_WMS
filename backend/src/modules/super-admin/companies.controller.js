@@ -84,7 +84,8 @@ const deleteCompany = async (req, res) => {
     const { id } = req.params;
 
     // Prevent Super Admin from deleting their own company
-    if (req.user && req.user.companyId === id) {
+    const userCompanyId = req.user.originalCompanyId || req.user.companyId;
+    if (req.user && userCompanyId === id) {
       return res.status(403).json({ message: 'Action Denied: You cannot delete your own active company.' });
     }
 

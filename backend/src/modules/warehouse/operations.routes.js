@@ -3,7 +3,7 @@ const router = express.Router();
 const opsController = require('./operations.controller');
 const { verifyToken, requireRole } = require('../../middlewares/auth');
 
-const opsAuth = [verifyToken, requireRole(['SUPER_ADMIN', 'WAREHOUSE_MANAGER', 'INVENTORY_CLERK'])];
+const opsAuth = [verifyToken, requireRole(['SUPER_ADMIN', 'WAREHOUSE_MANAGER', 'INVENTORY_CLERK', 'CLIENT'])];
 const execAuth = [verifyToken, requireRole(['SUPER_ADMIN', 'INVENTORY_CLERK'])];
 const managerAuth = [verifyToken, requireRole(['SUPER_ADMIN', 'WAREHOUSE_MANAGER'])];
 

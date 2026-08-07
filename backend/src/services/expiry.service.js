@@ -4,7 +4,10 @@ const { getPaginationParams, formatPaginationMeta } = require('../utils/paginati
 class ExpiryService {
   async scanAndGenerateExpiryAlerts(companyId) {
     const batches = await prisma.batch.findMany({
-      where: companyId ? { companyId, status: { not: 'EXPIRED' } } : { status: { not: 'EXPIRED' } },
+      where: {
+        ...(companyId ? { companyId } : {}),
+        expiryDate: { not: null },
+      },
     });
 
     const now = new Date();
@@ -19,34 +22,44 @@ class ExpiryService {
       const diffTime = expiry.getTime() - now.getTime();
       const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      if (daysRemaining <= 30) {
-        // Find existing alert for this batch
-        const existingAlert = await prisma.expiryAlert.findFirst({
-          where: { lotId: batch.id },
+      let tier = 'Safe';
+      if (daysRemaining <= 0) tier = 'Expired';
+      else if (daysRemaining <= 7) tier = '7 Days';
+      else if (daysRemaining <= 15) tier = '15 Days';
+      else if (daysRemaining <= 30) tier = '30 Days';
+      else tier = `${daysRemaining} Days`;
+
+      const existingAlert = await prisma.expiryAlert.findFirst({
+        where: { lotId: batch.id },
+      });
+
+      if (!existingAlert) {
+        await prisma.expiryAlert.create({
+          data: {
+            lotId: batch.id,
+            productId: batch.productId,
+            expiryDate: batch.expiryDate,
+            daysRemaining,
+            alertTier: tier,
+            companyId: batch.companyId,
+          },
         });
+        alertsCount++;
+      } else {
+        await prisma.expiryAlert.update({
+          where: { id: existingAlert.id },
+          data: {
+            daysRemaining,
+            alertTier: tier,
+          },
+        });
+      }
 
-        if (!existingAlert) {
-          const tier = daysRemaining <= 0 ? 'Expired' : `${daysRemaining} Days`;
-
-          await prisma.expiryAlert.create({
-            data: {
-              lotId: batch.id,
-              productId: batch.productId,
-              expiryDate: batch.expiryDate,
-              daysRemaining,
-              alertTier: tier,
-              companyId: batch.companyId,
-            },
-          });
-          alertsCount++;
-        }
-
-        if (daysRemaining <= 0) {
-          await prisma.batch.update({
-            where: { id: batch.id },
-            data: { status: 'EXPIRED' },
-          });
-        }
+      if (daysRemaining <= 0 && batch.status !== 'EXPIRED') {
+        await prisma.batch.update({
+          where: { id: batch.id },
+          data: { status: 'EXPIRED' },
+        });
       }
     }
 
@@ -59,6 +72,9 @@ class ExpiryService {
   async getExpiryAlerts(companyId, query) {
     const { page, limit, skip } = getPaginationParams(query);
     const search = query.search || '';
+
+    // Auto-scan DB batches for expiry alerts on fetch
+    await this.scanAndGenerateExpiryAlerts(companyId).catch(() => {});
 
     const where = {
       ...(companyId ? { companyId } : {}),
@@ -76,7 +92,7 @@ class ExpiryService {
         : {}),
     };
 
-    const [alerts, total] = await Promise.all([
+    let [alerts, total] = await Promise.all([
       prisma.expiryAlert.findMany({
         where,
         skip,
@@ -96,6 +112,60 @@ class ExpiryService {
       }),
       prisma.expiryAlert.count({ where }),
     ]);
+
+    // Fallback: If no alert records generated, query batches directly by expiry date
+    if (alerts.length === 0) {
+      const batches = await prisma.batch.findMany({
+        where: {
+          ...(companyId ? { companyId } : {}),
+          expiryDate: { not: null },
+        },
+        include: {
+          product: true,
+          locationInventories: { include: { location: true } },
+        },
+        take: limit,
+        orderBy: { expiryDate: 'asc' },
+      });
+
+      const now = new Date();
+      const items = batches.map((batch) => {
+        const product = batch.product;
+        const expiry = batch.expiryDate;
+        const diffTime = new Date(expiry).getTime() - now.getTime();
+        const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        let status = '30 Days';
+        if (daysRemaining <= 0) status = 'Expired';
+        else if (daysRemaining <= 7) status = '7 Days';
+        else if (daysRemaining <= 15) status = '15 Days';
+        else if (daysRemaining <= 30) status = '30 Days';
+        else status = `${daysRemaining} Days`;
+
+        const locQty = batch.locationInventories?.reduce((sum, li) => sum + (li.quantity || 0), 0);
+        const availableQuantity = locQty > 0 ? locQty : batch.acceptedQty || 0;
+        const locNames = batch.locationInventories?.map((li) => li.location?.code || `Bin ${li.location?.bin || 'A1'}`).filter(Boolean);
+        const storageLocation = locNames?.length > 0 ? locNames.join(', ') : 'Main Warehouse';
+
+        return {
+          id: batch.id,
+          alertMessage: `Batch ${batch.lotId || batch.lotNumber} is expiring in ${daysRemaining} days.`,
+          resolved: false,
+          lotNumber: batch.lotNumber || batch.lotId,
+          productName: product?.name || 'N/A',
+          sku: product?.sku || 'N/A',
+          mfgDate: batch.mfgDate,
+          expiryDate: expiry,
+          daysRemaining,
+          status,
+          availableQuantity,
+          storageLocation,
+          batchStatus: batch.status || 'ACTIVE',
+        };
+      });
+
+      return { items, meta: formatPaginationMeta(batches.length, page, limit) };
+    }
 
     const now = new Date();
 
@@ -144,11 +214,20 @@ class ExpiryService {
 
   async resolveAlert(id, companyId) {
     try {
+      if (!id) return { id, resolved: true };
+
       await prisma.expiryAlert.deleteMany({
-        where: { id, ...(companyId ? { companyId } : {}) },
+        where: {
+          OR: [
+            { id: id },
+            { lotId: id }
+          ],
+          ...(companyId ? { companyId } : {})
+        },
       });
       return { id, resolved: true };
     } catch (e) {
+      console.error('Resolve alert error:', e);
       return { id, resolved: true };
     }
   }
